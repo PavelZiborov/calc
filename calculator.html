@@ -1,0 +1,282 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Калькулятор полиграфии</title>
+
+<style>
+body{ font-family:Arial, sans-serif; background:#f5f6fa; padding:20px; color: #333; }
+.container{ background:white; max-width:900px; margin:auto; padding:25px; border-radius:12px; box-shadow:0 0 15px rgba(0,0,0,0.08); }
+h2 { color: #2f7df6; margin-top: 0; }
+label{ display:block; margin-top:12px; font-weight:bold; }
+select,input{ width:100%; padding:10px; margin-top:5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+.row{ display:flex; gap:20px; }
+.col{ flex:1; }
+button{ margin-top:25px; padding:15px; width:100%; background:#2f7df6; border:none; color:white; font-size:18px; border-radius:8px; cursor:pointer; font-weight: bold; }
+button:hover { background: #1e5fcb; }
+.result{ margin-top:20px; background:#eef3ff; padding:20px; border-radius:8px; font-size:18px; border-left: 5px solid #2f7df6; line-height: 1.5; }
+.tech-info { margin-top: 15px; padding: 15px; background: #f9f9f9; border: 1px dashed #ccc; border-radius: 8px; font-size: 14px; color: #666; }
+.section-title { margin-top: 20px; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #666; font-size: 14px; text-transform: uppercase; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Калькулятор полиграфии</h2>
+
+    <label>Тип продукции</label>
+    <select id="type" onchange="updateType()">
+        <option value="sheet">Листовая продукция</option>
+        <option value="catalog">Каталоги / презентации</option>
+    </select>
+
+    <label>Изделие</label>
+    <select id="product"></select>
+
+    <div id="catalogFields" style="display:none">
+        <label>Количество полос (включая обложку)</label>
+        <input id="pages" type="number" value="12" onchange="validatePages()">
+        
+        <label>Способ скрепления</label>
+        <select id="binding">
+            <option value="staple">Скоба (30 ₽/шт)</option>
+            <option value="spring">Пружина (50 ₽/шт)</option>
+        </select>
+    </div>
+
+    <label>Формат изделия</label>
+    <select id="format" onchange="setFormat()">
+        <option value="A4">A4</option>
+        <option value="A5">A5</option>
+        <option value="A6">A6</option>
+        <option value="210x98">Евро (210×98)</option>
+        <option value="90x50">Визитка (90×50)</option>
+        <option value="custom">Произвольный</option>
+    </select>
+
+    <div class="row">
+        <div class="col">
+            <label>Ширина (мм)</label>
+            <input id="width" value="210" oninput="customFormat()">
+        </div>
+        <div class="col">
+            <label>Высота (мм)</label>
+            <input id="height" value="297" oninput="customFormat()">
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <label>Тираж (шт)</label>
+            <input id="tirazh" value="100">
+        </div>
+        <div class="col" id="layoutContainer">
+            <label>Изделий на SRA3</label>
+            <input id="layout" readonly style="background:#eee;">
+        </div>
+    </div>
+
+    <div id="sheetBlock">
+        <label>Бумага</label>
+        <select id="paper"></select>
+        <label>Цветность</label>
+        <select id="color">
+            <option value="24">4+0 (Цвет с одной стороны)</option>
+            <option value="48">4+4 (Цвет с двух сторон)</option>
+        </select>
+    </div>
+
+    <div id="catalogPaper" style="display:none">
+        <div class="row">
+            <div class="col">
+                <div class="section-title">Обложка (4 полосы)</div>
+                <label>Бумага</label>
+                <select id="paperCover"></select>
+                <label>Цветность</label>
+                <select id="colorCover">
+                    <option value="48">4+4 (Цвет)</option>
+                    <option value="24">4+0 (Цвет)</option>
+                </select>
+            </div>
+            <div class="col">
+                <div class="section-title">Блок</div>
+                <label>Бумага</label>
+                <select id="paperBlock"></select>
+                <label>Цветность</label>
+                <select id="colorBlock">
+                    <option value="48">4+4 (Цвет)</option>
+                    <option value="24">1+1 (ЧБ)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <label style="margin-top: 20px; cursor: pointer;">
+        <input type="checkbox" id="cut" checked style="width: auto;">
+        Резка (+20% к себестоимости)
+    </label>
+
+    <button onclick="calc()">РАССЧИТАТЬ СТОИМОСТЬ</button>
+
+    <div id="result" class="result" style="display:none;"></div>
+    
+    <div id="techData" class="tech-info" style="display:none;">
+        <strong>Технические данные (на 1 ед. продукции):</strong><br>
+        <span id="techContent"></span>
+    </div>
+</div>
+
+<script>
+const SRA3_W = 320;
+const SRA3_H = 450;
+const MARGIN = 5;
+const GAP = 2;
+
+const papers = [
+    ["100 гр", 11], ["130 гр", 12], ["150 гр", 13], ["170 гр", 15],
+    ["200 гр", 16], ["250 гр", 18], ["300 гр", 19], ["350 гр", 30]
+];
+
+const formats = {
+    "A4": [210, 297], "A5": [148, 210], "A6": [105, 148], "210x98": [210, 98], "90x50": [90, 50]
+};
+
+function fillPapers(id) {
+    let el = document.getElementById(id);
+    papers.forEach(p => {
+        let o = document.createElement("option");
+        o.value = p[1]; o.text = p[0];
+        if(id === "paperCover" && p[1] === 19) o.selected = true;
+        if(id === "paperBlock" && p[1] === 16) o.selected = true;
+        el.appendChild(o);
+    });
+}
+
+function setFormat() {
+    let f = document.getElementById("format").value;
+    if(formats[f]){
+        document.getElementById("width").value = formats[f][0];
+        document.getElementById("height").value = formats[f][1];
+    }
+    calcLayout();
+}
+
+function customFormat() {
+    document.getElementById("format").value = "custom";
+    calcLayout();
+}
+
+function calcLayout() {
+    let w = Number(document.getElementById("width").value);
+    let h = Number(document.getElementById("height").value);
+    let workW = SRA3_W - (MARGIN * 2);
+    let workH = SRA3_H - (MARGIN * 2);
+
+    let res1 = Math.floor((workW + GAP) / (w + GAP)) * Math.floor((workH + GAP) / (h + GAP));
+    let res2 = Math.floor((workW + GAP) / (h + GAP)) * Math.floor((workH + GAP) / (w + GAP));
+    document.getElementById("layout").value = Math.max(res1, res2);
+}
+
+function updateType() {
+    let type = document.getElementById("type").value;
+    let product = document.getElementById("product");
+    let layoutCont = document.getElementById("layoutContainer");
+    product.innerHTML = "";
+
+    if(type === "sheet"){
+        ["Визитки", "Листовки", "Меню"].forEach(p => {
+            let o = document.createElement("option"); o.text = p; product.appendChild(o);
+        });
+        document.getElementById("catalogFields").style.display = "none";
+        document.getElementById("catalogPaper").style.display = "none";
+        document.getElementById("sheetBlock").style.display = "block";
+        layoutCont.style.display = "block";
+    } else {
+        ["Каталог", "Презентация"].forEach(p => {
+            let o = document.createElement("option"); o.text = p; product.appendChild(o);
+        });
+        document.getElementById("catalogFields").style.display = "block";
+        document.getElementById("catalogPaper").style.display = "block";
+        document.getElementById("sheetBlock").style.display = "none";
+        layoutCont.style.display = "none";
+    }
+    // Очищаем результаты при смене типа
+    document.getElementById("result").style.display = "none";
+    document.getElementById("techData").style.display = "none";
+}
+
+function validatePages() {
+    let p = document.getElementById("pages");
+    if (document.getElementById("binding").value === "staple") {
+        p.value = Math.ceil(p.value / 4) * 4;
+    }
+}
+
+function calc() {
+    let type = document.getElementById("type").value;
+    let tirazh = Number(document.getElementById("tirazh").value);
+    let layoutCount = Number(document.getElementById("layout").value);
+    
+    let totalPaperCost = 0;
+    let totalPrintCost = 0;
+    let totalBindCost = 0;
+    let techHtml = "";
+
+    let pagesPerSheet = layoutCount * 2;
+
+    if (type === "sheet") {
+        let sheets = Math.ceil(tirazh / layoutCount);
+        totalPaperCost = sheets * Number(document.getElementById("paper").value);
+        totalPrintCost = sheets * Number(document.getElementById("color").value);
+        techHtml = `Листов SRA3 на тираж: ${sheets} шт.`;
+    } else {
+        let pagesTotal = Number(document.getElementById("pages").value);
+        
+        // Обложка (4 полосы)
+        let coverSheetsTotal = Math.ceil((4 * tirazh) / pagesPerSheet);
+        let coverSheetsPerOne = 4 / pagesPerSheet;
+        totalPaperCost += coverSheetsTotal * Number(document.getElementById("paperCover").value);
+        totalPrintCost += coverSheetsTotal * Number(document.getElementById("colorCover").value);
+
+        // Блок
+        let blockPages = pagesTotal - 4;
+        let blockSheetsTotal = Math.ceil((blockPages * tirazh) / pagesPerSheet);
+        let blockSheetsPerOne = blockPages / pagesPerSheet;
+        totalPaperCost += blockSheetsTotal * Number(document.getElementById("paperBlock").value);
+        totalPrintCost += blockSheetsTotal * Number(document.getElementById("colorBlock").value);
+
+        // Скрепление
+        totalBindCost = tirazh * ((document.getElementById("binding").value === "staple") ? 30 : 50);
+
+        techHtml = `Листов на обложку (1 шт): ${coverSheetsPerOne.toFixed(2)}<br>` +
+                   `Листов на блок (1 шт): ${blockSheetsPerOne.toFixed(2)}<br>` +
+                   `Всего листов SRA3 на тираж: ${coverSheetsTotal + blockSheetsTotal} шт.`;
+    }
+
+    let subTotal = totalPaperCost + totalPrintCost + totalBindCost;
+    let cutCost = document.getElementById("cut").checked ? subTotal * 0.2 : 0;
+    let finalCost = subTotal + cutCost;
+    let clientPrice = finalCost * 2;
+
+    // Вывод
+    document.getElementById("result").style.display = "block";
+    document.getElementById("result").innerHTML = 
+        `<b>Бумага:</b> ${Math.round(totalPaperCost)} ₽ | <b>Печать:</b> ${Math.round(totalPrintCost)} ₽<br>` +
+        `<b>Сборка:</b> ${Math.round(totalBindCost)} ₽ | <b>Резка:</b> ${Math.round(cutCost)} ₽<br>` +
+        `<hr><b>Себестоимость: ${Math.round(finalCost)} ₽</b><br>` +
+        `<span style="font-size:22px; color:#2f7df6;"><b>Цена клиенту: ${Math.round(clientPrice)} ₽</b></span>`;
+
+    document.getElementById("techData").style.display = "block";
+    document.getElementById("techContent").innerHTML = techHtml;
+}
+
+fillPapers("paper");
+fillPapers("paperCover");
+fillPapers("paperBlock");
+updateType();
+setFormat();
+</script>
+
+</body>
+</html>
