@@ -1,282 +1,661 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Калькулятор полиграфии</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heaven Calc Pro</title>
 <style>
-body{ font-family:Arial, sans-serif; background:#f5f6fa; padding:20px; color: #333; }
-.container{ background:white; max-width:900px; margin:auto; padding:25px; border-radius:12px; box-shadow:0 0 15px rgba(0,0,0,0.08); }
-h2 { color: #2f7df6; margin-top: 0; }
-label{ display:block; margin-top:12px; font-weight:bold; }
-select,input{ width:100%; padding:10px; margin-top:5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-.row{ display:flex; gap:20px; }
-.col{ flex:1; }
-button{ margin-top:25px; padding:15px; width:100%; background:#2f7df6; border:none; color:white; font-size:18px; border-radius:8px; cursor:pointer; font-weight: bold; }
-button:hover { background: #1e5fcb; }
-.result{ margin-top:20px; background:#eef3ff; padding:20px; border-radius:8px; font-size:18px; border-left: 5px solid #2f7df6; line-height: 1.5; }
-.tech-info { margin-top: 15px; padding: 15px; background: #f9f9f9; border: 1px dashed #ccc; border-radius: 8px; font-size: 14px; color: #666; }
-.section-title { margin-top: 20px; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #666; font-size: 14px; text-transform: uppercase; }
+    body{ font-family:Arial, sans-serif; background:#f5f6fa; padding:20px; color: #333; margin: 0; }
+    .container{ background:white; max-width:900px; margin:auto; padding:25px; border-radius:12px; box-shadow:0 0 15px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    h2, h3 { color: #2f7df6; margin-top: 0; }
+    label{ display:block; margin-top:12px; font-weight:bold; }
+    select,input{ width:100%; padding:10px; margin-top:5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    .row{ display:flex; gap:20px; }
+    .col{ flex:1; }
+    button{ margin-top:25px; padding:15px; width:100%; background:#2f7df6; border:none; color:white; font-size:18px; border-radius:8px; cursor:pointer; font-weight: bold; transition: 0.2s; }
+    button:hover { background: #1e5fcb; }
+    
+    .tabs-nav { display: flex; gap: 5px; max-width: 900px; margin: 0 auto 15px auto; border-bottom: 2px solid #ddd; }
+    .tab-btn { padding: 12px 25px; background: #e0e0e0; border: none; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; color: #666; transition: 0.3s; }
+    .tab-btn.active { background: #2f7df6; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .result-main { margin-top: 20px; display: none; }
+    .rec-price-box { background: #d4e3ff; padding: 20px; border-radius: 8px; border: 2px solid #2f7df6; text-align: center; margin-bottom: 10px; }
+    .rec-price-label { color: #2f7df6; font-size: 14px; font-weight: bold; text-transform: uppercase; }
+    .rec-price-val { font-size: 32px; color: #2f7df6; font-weight: bold; display: block; }
+    details { background: #f0f4f8; border-radius: 8px; padding: 10px; margin-bottom: 15px; }
+    details summary { cursor: pointer; font-weight: bold; color: #555; outline: none; }
+    .price-list-hidden { margin-top: 10px; font-size: 15px; border-top: 1px solid #ccc; padding-top: 10px; }
+    .cost-detail { background: #fff; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 15px; line-height: 1.6; }
+    .tech-info { margin-top: 15px; padding: 15px; background: #f9f9f9; border: 1px dashed #ccc; border-radius: 8px; font-size: 14px; color: #666; }
+    .section-title { margin-top: 20px; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #666; font-size: 14px; text-transform: uppercase; }
+    .checkbox-group { margin-top: 15px; background: #fcfcfc; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+
+    .crm-item { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-top: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+    .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .elements-list { background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 8px 12px; }
+    .element-row { border-bottom: 1px solid #eee; transition: background 0.5s; display: flex; align-items: center; padding: 8px 0; position: relative; }
+    .element-row:last-child { border-bottom: none; }
+    .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
+    .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
+    .readonly-mode .add-btn, .readonly-mode [id^="save-area-"] { display: none !important; }
 </style>
 </head>
-
 <body>
 
-<div class="container">
-    <h2>Калькулятор полиграфии</h2>
+<div id="user-bar" style="background: #2c3e50; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+    <div>
+        <span id="role-badge" style="background: #7f8c8d; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase;">ГОСТЬ</span>
+        <span id="user-display-name" style="margin-left: 10px; font-size: 14px;">Режим просмотра</span>
+    </div>
+    <div id="auth-controls">
+        <button id="authBtn" onclick="toggleAuthModal()" style="margin:0; width:auto; padding: 8px 20px; font-size: 14px; background: #2f7df6;">Войти</button>
+    </div>
+</div>
 
-    <label>Тип продукции</label>
-    <select id="type" onchange="updateType()">
-        <option value="sheet">Листовая продукция</option>
-        <option value="catalog">Каталоги / презентации</option>
-    </select>
-
-    <label>Изделие</label>
-    <select id="product"></select>
-
-    <div id="catalogFields" style="display:none">
-        <label>Количество полос (включая обложку)</label>
-        <input id="pages" type="number" value="12" onchange="validatePages()">
+<div id="auth-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center;">
+    <div class="container" style="max-width:350px; padding:30px; border-radius:15px; position:relative;">
+        <span onclick="toggleAuthModal()" style="position:absolute; top:15px; right:20px; cursor:pointer; font-size:24px; color:#999;">&times;</span>
+        <h3 style="text-align:center; margin-bottom:20px;">Авторизация</h3>
         
-        <label>Способ скрепления</label>
-        <select id="binding">
-            <option value="staple">Скоба (30 ₽/шт)</option>
-            <option value="spring">Пружина (50 ₽/шт)</option>
+        <form onsubmit="attemptLogin(event)">
+            <input type="text" id="loginEmail" name="username" placeholder="Ваш ID компании" autocomplete="username">
+            <input type="password" id="loginPass" name="password" placeholder="Пароль (Ваш телефон)" style="margin-top:12px;" autocomplete="current-password">
+            <button type="submit" id="loginSubmitBtn">Войти в систему</button>
+        </form>
+        
+        <div id="login-error" style="color:#e74c3c; margin-top:15px; font-size:13px; text-align:center; font-weight:bold;"></div>
+    </div>
+</div>
+
+<div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('main-tab')">Калькулятор и Сделки</button>
+    <button class="tab-btn" id="adv-tab-btn" onclick="switchTab('search-tab')" style="display:none;">Расширенный поиск</button>
+</div>
+
+<div id="main-tab" class="tab-content active">
+    <div class="container">
+        <h2>Калькулятор полиграфии</h2>
+        <label>Тип продукции</label>
+        <select id="type" onchange="updateType()">
+            <option value="sheet">Листовая продукция</option>
+            <option value="catalog">Каталог / презентация</option>
         </select>
-    </div>
 
-    <label>Формат изделия</label>
-    <select id="format" onchange="setFormat()">
-        <option value="A4">A4</option>
-        <option value="A5">A5</option>
-        <option value="A6">A6</option>
-        <option value="210x98">Евро (210×98)</option>
-        <option value="90x50">Визитка (90×50)</option>
-        <option value="custom">Произвольный</option>
-    </select>
+        <label>Изделие</label>
+        <select id="product" onchange="handleProductChange()"></select>
 
-    <div class="row">
-        <div class="col">
-            <label>Ширина (мм)</label>
-            <input id="width" value="210" oninput="customFormat()">
+        <div id="catalogFields" style="display:none">
+            <label>Количество полос</label>
+            <input id="pages" type="number" value="12" onchange="validatePages()">
+            <label>Скрепление</label>
+            <select id="binding">
+                <option value="staple">Скоба (30 ₽/шт)</option>
+                <option value="spring">Пружина (50 ₽/шт)</option>
+            </select>
         </div>
-        <div class="col">
-            <label>Высота (мм)</label>
-            <input id="height" value="297" oninput="customFormat()">
-        </div>
-    </div>
 
-    <div class="row">
-        <div class="col">
-            <label>Тираж (шт)</label>
-            <input id="tirazh" value="100">
-        </div>
-        <div class="col" id="layoutContainer">
-            <label>Изделий на SRA3</label>
-            <input id="layout" readonly style="background:#eee;">
-        </div>
-    </div>
+        <label>Формат изделия</label>
+        <select id="format" onchange="setFormat()"></select>
 
-    <div id="sheetBlock">
-        <label>Бумага</label>
-        <select id="paper"></select>
-        <label>Цветность</label>
-        <select id="color">
-            <option value="24">4+0 (Цвет с одной стороны)</option>
-            <option value="48">4+4 (Цвет с двух сторон)</option>
-        </select>
-    </div>
-
-    <div id="catalogPaper" style="display:none">
         <div class="row">
-            <div class="col">
-                <div class="section-title">Обложка (4 полосы)</div>
-                <label>Бумага</label>
-                <select id="paperCover"></select>
-                <label>Цветность</label>
-                <select id="colorCover">
-                    <option value="48">4+4 (Цвет)</option>
-                    <option value="24">4+0 (Цвет)</option>
-                </select>
-            </div>
-            <div class="col">
-                <div class="section-title">Блок</div>
-                <label>Бумага</label>
-                <select id="paperBlock"></select>
-                <label>Цветность</label>
-                <select id="colorBlock">
-                    <option value="48">4+4 (Цвет)</option>
-                    <option value="24">1+1 (ЧБ)</option>
-                </select>
+            <div class="col"><label>Ширина (мм)</label><input id="width" value="210" type="number" oninput="customFormat()"></div>
+            <div class="col"><label>Высота (мм)</label><input id="height" value="297" type="number" oninput="customFormat()"></div>
+        </div>
+
+        <div class="row">
+            <div class="col"><label>Тираж (шт)</label><input id="tirazh" value="100" type="number"></div>
+            <div class="col" id="layoutContainer"><label>Изделий на SRA3</label><input id="layout" readonly style="background:#eee;"></div>
+        </div>
+
+        <div id="sheetBlock">
+            <label>Бумага</label><select id="paper"></select>
+            <label>Цветность</label><select id="colorSheet"></select>
+            <label>Ламинация</label><select id="lamSheet"></select>
+        </div>
+
+        <div id="catalogPaper" style="display:none">
+            <div class="row">
+                <div class="col">
+                    <div class="section-title">Обложка</div>
+                    <label>Бумага</label><select id="paperCover"></select>
+                    <label>Цветность</label><select id="colorCover"></select>
+                    <label>Ламинация</label><select id="lamCover"></select>
+                </div>
+                <div class="col">
+                    <div class="section-title">Блок</div>
+                    <label>Бумага</label><select id="paperBlock"></select>
+                    <label>Цветность</label><select id="colorBlock"></select>
+                </div>
             </div>
         </div>
+
+        <div class="checkbox-group">
+            <div id="simpleCutGroup"><label style="display:flex; align-items:center; cursor:pointer; font-weight:normal;"><input type="checkbox" id="cut" checked onchange="calcLayout()" style="width:auto; margin-right:10px;"> Резка</label></div>
+            <div id="stickerCutGroup" style="display:none;">
+                <label>Метод резки</label>
+                <select id="cutMethod" onchange="calcLayout()">
+                    <option value="plotter">Плоттерная резка (25 ₽/лист)</option>
+                    <option value="straight">Гильотинная резка (+20%)</option>
+                </select>
+            </div>
+            <div id="roundingContainer" style="display:flex; align-items:center; margin-top:10px;"><input type="checkbox" id="rounding" style="width:auto; margin-right:10px;"><label style="margin-top:0; font-weight:normal;">Скругление углов</label></div>
+        </div>
+
+        <button onclick="calc()">РАССЧИТАТЬ СТОИМОСТЬ</button>
+
+        <div id="resultMain" class="result-main">
+            <div class="rec-price-box">
+                <span class="rec-price-label" id="recMultiplierLabel">Рекомендованная цена</span>
+                <span class="rec-price-val" id="recPriceVal">0 ₽</span>
+            </div>
+            <details>
+                <summary>Показать все наценки</summary>
+                <div id="priceListHidden" class="price-list-hidden"></div>
+            </details>
+            <div id="costDetail" class="cost-detail"></div>
+        </div>
+        <div id="techData" class="tech-info" style="display:none;"><span id="techContent"></span></div>
     </div>
 
-    <label style="margin-top: 20px; cursor: pointer;">
-        <input type="checkbox" id="cut" checked style="width: auto;">
-        Резка (+20% к себестоимости)
-    </label>
+    <div class="container" id="crm-search-container" style="display:none;">
+        <h3>Поиск сделок в Heaven CRM</h3>
+        <div class="row" style="align-items: flex-end;">
+            <div class="col"><label>Поиск по клиенту или номеру</label><input type="text" id="crmSearchInput" placeholder="Введите имя..."></div>
+            <div style="flex: 0 0 150px;"><button onclick="searchCRM('main')" style="margin-top:0; padding:10px;">Найти</button></div>
+        </div>
+        <div id="crmLoader" class="loader">Синхронизация с сервером...</div>
+        <div id="crmResults"></div>
+    </div>
+</div>
 
-    <button onclick="calc()">РАССЧИТАТЬ СТОИМОСТЬ</button>
-
-    <div id="result" class="result" style="display:none;"></div>
-    
-    <div id="techData" class="tech-info" style="display:none;">
-        <strong>Технические данные (на 1 ед. продукции):</strong><br>
-        <span id="techContent"></span>
+<div id="search-tab" class="tab-content">
+    <div class="container">
+        <h3>Расширенный поиск (Только чтение)</h3>
+        <div class="row" style="align-items: flex-end;">
+            <div class="col"><input type="text" id="advSearchInput" placeholder="Поиск по всей базе..."></div>
+            <div style="flex: 0 0 150px;"><button onclick="searchCRM('adv')" style="margin-top:0; padding: 10px; background:#27ae60;">Найти</button></div>
+        </div>
+        <div id="advCrmLoader" class="loader">Поиск по архиву...</div>
+        <div id="advCrmResults" class="readonly-mode"></div>
     </div>
 </div>
 
 <script>
-const SRA3_W = 320;
-const SRA3_H = 450;
-const MARGIN = 5;
-const GAP = 2;
+// --- КОНФИГУРАЦИЯ ---
+const SRA3_W = 320, SRA3_H = 450;
+const N8N_URL = "https://n8n.heavendevelop.ru/webhook/search-crm";
+let currentUser = JSON.parse(localStorage.getItem('calc_user')) || { role: 'guest', login: '', pass: '' };
+let lastCalcData = null;
 
-const papers = [
-    ["100 гр", 11], ["130 гр", 12], ["150 гр", 13], ["170 гр", 15],
-    ["200 гр", 16], ["250 гр", 18], ["300 гр", 19], ["350 гр", 30]
+// --- СИСТЕМА ПРАВ ---
+function toggleAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    modal.style.display = (modal.style.display === 'none' || modal.style.display === '') ? 'flex' : 'none';
+}
+
+// Добавляем event в скобки
+async function attemptLogin(event) {
+    if (event) event.preventDefault(); // Это предотвратит перезагрузку при отправке формы
+
+    const clientId = document.getElementById('loginEmail').value;
+    const pass = document.getElementById('loginPass').value;
+    const errorDiv = document.getElementById('login-error');
+    const btn = document.getElementById('loginSubmitBtn');
+
+    if (!clientId || !pass) { errorDiv.innerText = "Введите ID и пароль"; return; }
+    btn.innerText = "Проверка..."; btn.disabled = true;
+
+    try {
+        const response = await fetch(N8N_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'auth', clientId: clientId, password: pass })
+        });
+        const data = await response.json();
+
+        if (response.ok && data.role) {
+            currentUser = { role: data.role, login: clientId, pass: pass, crmId: data.crmId, clientName: data.name };
+            localStorage.setItem('calc_user', JSON.stringify(currentUser));
+            location.reload();
+        } else {
+            errorDiv.innerText = data.message || "Ошибка: проверьте ID или пароль";
+        }
+    } catch (e) {
+        errorDiv.innerText = "Ошибка n8n";
+    } finally {
+        btn.innerText = "Войти в систему"; btn.disabled = false;
+    }
+}
+
+function logout() { localStorage.removeItem('calc_user'); location.reload(); }
+
+function applyPermissions() {
+    const badge = document.getElementById('role-badge');
+    const nameDisp = document.getElementById('user-display-name');
+    const authBtn = document.getElementById('authBtn');
+    const crmContainer = document.getElementById('crm-search-container');
+    const searchRow = crmContainer ? crmContainer.querySelector('.row') : null;
+
+    if (currentUser.role === 'staff' || currentUser.role === 'client') {
+        badge.innerText = currentUser.role === 'staff' ? "СОТРУДНИК" : "КЛИЕНТ";
+        badge.style.background = currentUser.role === 'staff' ? "#e67e22" : "#27ae60";
+        nameDisp.innerText = currentUser.login;
+        authBtn.innerText = "Выйти"; 
+        authBtn.onclick = logout;
+        
+        crmContainer.style.display = 'block';
+
+        // Если зашел клиент — убираем инпут и ставим кнопку "Загрузить"
+        if (currentUser.role === 'client' && searchRow) {
+            searchRow.innerHTML = `
+                <div class="col">
+                    <button onclick="searchCRM('main')" style="margin-top:0; background: #27ae60;">
+                        🔄 Загрузить список моих заказов
+                    </button>
+                </div>`;
+        }
+        
+        if (currentUser.role === 'staff') {
+            document.getElementById('adv-tab-btn').style.display = 'block';
+        }
+    }
+}
+
+// --- ДАННЫЕ КАЛЬКУЛЯТОРА ---
+// --- ДАННЫЕ КАЛЬКУЛЯТОРА (ID должны совпадать с Google Sheets) ---
+const papersFull = [
+    ["Бумага 100 гр.", "paper_100"], ["Бумага 190 гр.", "paper_190"], ["Бумага 130 гр.", "paper_130"], 
+    ["Бумага 150 гр.", "paper_150"], ["Бумага 170 гр.", "paper_170"], ["Бумага 200 гр.", "paper_200"], 
+    ["Бумага 250 гр.", "paper_250"], ["Бумага 300 гр.", "paper_300"], ["Бумага icelaser лен 300 гр.", "paper_icelaser"], 
+    ["Бумага 350 гр.", "paper_350"], ["Самоклейка пленка цифровая белая", "sticker_film_white"], 
+    ["Бумага Touch Paper 300 гр.", "paper_touch"], ["Бумага Rubber lake 300 гр.", "paper_rubber"], 
+    ["Самоклейка бумажная", "sticker_paper"], ["Бумага DNS 300 гр.", "paper_dns_300"], 
+    ["Бумага DNS 200 гр.", "paper_dns_200"], ["Пленка цифровая прозрачная", "sticker_film_trans"], 
+    ["Конверт E65", "envelope_e65"], ["HPG VIVID 300 гр.", "paper_hpg_vivid"], 
+    ["Colorcopy 200 гр.", "paper_cc_200"], ["Colorcopy 300 гр.", "paper_cc_300"], 
+    ["Бумага 30х64 см мелованная 230 гр.", "paper_30x64"]
 ];
 
-const formats = {
-    "A4": [210, 297], "A5": [148, 210], "A6": [105, 148], "210x98": [210, 98], "90x50": [90, 50]
-};
+const stickerPapers = [
+    ["Самоклейка бумажная", "sticker_paper"], ["Самоклейка пленка цифровая белая", "sticker_film_white"], 
+    ["Пленка цифровая прозрачная", "sticker_film_trans"], ["Самоклейка пленка белая HQ", "sticker_film_white_hq"], 
+    ["Пленка цифровая прозрачная HQ", "sticker_film_trans_hq"]
+];
 
-function fillPapers(id) {
-    let el = document.getElementById(id);
-    papers.forEach(p => {
-        let o = document.createElement("option");
-        o.value = p[1]; o.text = p[0];
-        if(id === "paperCover" && p[1] === 19) o.selected = true;
-        if(id === "paperBlock" && p[1] === 16) o.selected = true;
-        el.appendChild(o);
+const colorOptions = [
+    ["1+0", "color_1_0"], ["1+1", "color_1_1"], ["4+0", "color_4_0"], 
+    ["4+4", "color_4_4"], ["конверт Е65", "color_env_e65"]
+];
+
+const stickerColorOptions = [
+    ["1+0", "color_1_0"], ["4+0", "color_4_0"]
+];
+
+const lamOptions = [
+    ["Без ламинации", "lam_none"], ["глянец 32 мкм 1+0", "lam_gl_32_1_0"], ["глянец 32 мкм 1+1", "lam_gl_32_1_1"], 
+    ["матовая 32 мкм 1+0", "lam_mat_32_1_0"], ["матовая 32 мкм 1+1", "lam_mat_32_1_1"], 
+    ["soft touch 32 мкм 1+0", "lam_soft_32_1_0"], ["soft touch 32 мкм 1+1", "lam_soft_32_1_1"], 
+    ["глянец 75 мкм 1+0", "lam_gl_75_1_0"], ["глянец 75 мкм 1+1", "lam_gl_75_1_1"], 
+    ["матовая 75 мкм 1+0", "lam_mat_75_1_0"], ["матовая 75 мкм 1+1", "lam_mat_75_1_1"], 
+    ["глянец 125 мкм 1+0", "lam_gl_125_1_0"], ["глянец 125 мкм 1+1", "lam_gl_125_1_1"], 
+    ["матовая 125 мкм 1+0", "lam_mat_125_1_0"], ["матовая 125 мкм 1+1", "lam_mat_125_1_1"]
+];
+const commonFormats = { "A3": [297, 420], "A4": [210, 297], "A5": [148, 210], "A6": [105, 148], "A7": [74, 105], "210x98": [210, 98], "90x50": [90, 50], "custom": "Произвольный" };
+const stickerFormats = { "30x30": [30, 30], "40x40": [40, 40], "50x50": [50, 50], "60x60": [60, 60], "70x70": [70, 70], "80x80": [80, 80], "90x90": [90, 90], "100x100": [100, 100], "A5": [148, 210], "A6": [105, 148], "A7": [74, 105], "custom": "Произвольный" };
+const stickerPackFormats = { "A4": [210, 297], "A5": [148, 210], "A6": [105, 148], "A7": [74, 105], "custom": "Произвольный" };
+
+// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+function switchTab(id) { document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); event.currentTarget.classList.add('active'); }
+function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }
+function fillFormatOptions(p) { let el = document.getElementById("format"); el.innerHTML = ""; let data = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); for (let k in data) { let o = document.createElement("option"); o.value = k; o.text = Array.isArray(data[k]) ? `${k} (${data[k][0]}x${data[k][1]} мм)` : data[k]; el.appendChild(o); } }
+function setFormat() { let f = document.getElementById("format").value, p = document.getElementById("product").value; let d = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); if(d[f] && Array.isArray(d[f])){ document.getElementById("width").value = d[f][0]; document.getElementById("height").value = d[f][1]; } calcLayout(); }
+function customFormat() { document.getElementById("format").value = "custom"; calcLayout(); }
+function calcLayout() {
+    let w = Number(document.getElementById("width").value), h = Number(document.getElementById("height").value);
+    let p = document.getElementById("product").value, m = (p === "Наклейка" && document.getElementById("cutMethod").value === "plotter") ? 15 : 5, g = 2;
+    let ww = SRA3_W - (m * 2), wh = SRA3_H - (m * 2);
+    let r1 = Math.floor((ww + g) / (w + g)) * Math.floor((wh + g) / (h + g));
+    let r2 = Math.floor((ww + g) / (h + g)) * Math.floor((wh + g) / (w + g));
+    document.getElementById("layout").value = Math.max(r1, r2) || 0;
+}
+function updateType() {
+    let t = document.getElementById("type").value, p = document.getElementById("product"); p.innerHTML = "";
+    if(t === "sheet"){
+        ["Визитка", "Листовка", "Открытка", "Наклейка", "Стикерпак", "Буклет", "Карточка", "Меню"].forEach(x => p.add(new Option(x, x)));
+        document.getElementById("catalogFields").style.display = "none"; document.getElementById("catalogPaper").style.display = "none";
+        document.getElementById("sheetBlock").style.display = "block"; document.getElementById("layoutContainer").style.display = "block";
+        handleProductChange();
+    } else {
+        ["Каталог", "Презентация"].forEach(x => p.add(new Option(x, x)));
+        document.getElementById("catalogFields").style.display = "block"; document.getElementById("catalogPaper").style.display = "block";
+        document.getElementById("sheetBlock").style.display = "none"; document.getElementById("layoutContainer").style.display = "none";
+        fillOptions("paperCover", papersFull, "Бумага 300 гр."); fillOptions("paperBlock", papersFull, "Бумага 150 гр.");
+        fillFormatOptions("default"); document.getElementById("format").value = "A4"; setFormat();
+    }
+}
+
+function handleProductChange() {
+    let p = document.getElementById("product").value, t = document.getElementById("type").value;
+    if (t === "sheet") {
+        document.getElementById("roundingContainer").style.display = (p === "Наклейка" || p === "Стикерпак") ? "none" : "flex";
+        if (p === "Наклейка" || p === "Стикерпак") {
+            fillOptions("paper", stickerPapers, "Самоклейка бумажная"); fillOptions("colorSheet", stickerColorOptions, "4+0"); fillFormatOptions(p);
+            document.getElementById("format").value = (p === "Наклейка" ? "A5" : "A4");
+            document.getElementById("stickerCutGroup").style.display = (p === "Наклейка") ? "block" : "none";
+            document.getElementById("simpleCutGroup").style.display = (p === "Стикерпак") ? "none" : (p === "Наклейка" ? "none" : "block");
+        } else {
+            fillOptions("paper", papersFull, "Бумага 300 гр."); fillOptions("colorSheet", colorOptions, "4+0"); fillFormatOptions(p);
+            document.getElementById("simpleCutGroup").style.display = "block"; document.getElementById("stickerCutGroup").style.display = "none";
+            document.getElementById("format").value = (p === "Визитка" ? "90x50" : "A5");
+        }
+        setFormat();
+    }
+}
+
+function validatePages() { if (document.getElementById("binding").value === "staple") { let p = document.getElementById("pages"); p.value = Math.ceil(p.value / 4) * 4; } }
+
+function updateSelectedPrice(pOne, total, mult) {
+    document.getElementById("recMultiplierLabel").innerText = `Выбранная цена (x${mult})`;
+    document.getElementById("recPriceVal").innerHTML = `${total} ₽ <small>(${Number(pOne).toFixed(2)} ₽/шт)</small>`;
+    
+    // Обновляем данные для сохранения
+    if (lastCalcData) {
+        lastCalcData.total = total;
+        lastCalcData.pricePerOne = pOne;
+    }
+}
+
+// --- РАСЧЕТ ---
+async function calc() {
+    const type = document.getElementById("type").value;
+    const tir = Number(document.getElementById("tirazh").value);
+    const lay = Number(document.getElementById("layout").value);
+    
+    const calcData = {
+        action: 'calculate',
+        type: type,
+        product: document.getElementById("product").value,
+        tirazh: tir,
+        layout: lay,
+        options: {
+            cut: document.getElementById("cut").checked,
+            rounding: document.getElementById("rounding").checked,
+            cutMethod: document.getElementById("cutMethod") ? document.getElementById("cutMethod").value : 'straight'
+        }
+    };
+
+    if (type === "sheet") {
+        calcData.paperId = document.getElementById("paper").value;
+        calcData.color = document.getElementById("colorSheet").value;
+        calcData.lamination = document.getElementById("lamSheet").value;
+    } else {
+        calcData.pages = Number(document.getElementById("pages").value);
+        calcData.binding = document.getElementById("binding").value;
+        calcData.paperCoverId = document.getElementById("paperCover").value;
+        calcData.colorCoverId = document.getElementById("colorCover").value;
+        calcData.lamCoverId = document.getElementById("lamCover").value;
+        calcData.paperBlockId = document.getElementById("paperBlock").value;
+        calcData.colorBlockId = document.getElementById("colorBlock").value;
+    }
+
+    const btn = document.querySelector('button[onclick="calc()"]');
+    btn.innerText = "Считаем..."; btn.disabled = true;
+
+    try {
+        const response = await fetch(N8N_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(calcData)
+        });
+
+        const result = await response.json();
+
+        window.currentCalcState = result.state; 
+        lastCalcData = result.lastCalc;
+
+        // 1. Устанавливаем основную цену
+        document.getElementById("recMultiplierLabel").innerText = (currentUser.role === 'staff') ? "Рекомендованная цена" : "Итоговая стоимость";
+        document.getElementById("recPriceVal").innerHTML = `${result.total} ₽ <small>(${result.priceOne} ₽/шт)</small>`;
+        
+        // 2. Если менеджер — выводим список наценок и расшифровку
+        if (currentUser.role === 'staff') {
+            // Список наценок
+            document.getElementById("priceListHidden").innerHTML = result.markupList.map(m => `
+                <div onclick="updateSelectedPrice(${m.perOne}, ${m.total}, ${m.multiplier})" 
+                     style="cursor:pointer; padding:8px; border-bottom:1px solid #eee; transition: 0.2s;" 
+                     onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background='transparent'">
+                    Наценка x${m.multiplier} — <b>${m.total} ₽</b> (${m.perOne} ₽/шт)
+                </div>
+            `).join('');
+
+            // Расшифровка себестоимости
+            document.getElementById("costDetail").innerHTML = `
+                <div style="font-weight:bold; margin-bottom:5px;">Себестоимость: ${result.cost} ₽</div>
+                <div style="font-size:13px; color:#666;">${result.costBreakdown}</div>
+            `;
+            
+            document.getElementById("techContent").innerHTML = result.techInfo;
+            
+            document.getElementById("techData").style.display = "block";
+            document.querySelector('details').style.display = "block";
+        } else {
+            document.getElementById("techData").style.display = "none";
+            document.querySelector('details').style.display = "none";
+        }
+
+        document.getElementById("resultMain").style.display = "block";
+
+    } catch (e) {
+        alert("Ошибка расчета");
+    } finally {
+        btn.innerText = "РАССЧИТАТЬ СТОИМОСТЬ"; btn.disabled = false;
+    }
+}
+
+// --- CRM ЛОГИКА ---
+async function searchCRM(mode) {
+    const resId = mode === 'main' ? 'crmResults' : 'advCrmResults';
+    const loadId = mode === 'main' ? 'crmLoader' : 'advCrmLoader';
+    const resDiv = document.getElementById(resId);
+    const load = document.getElementById(loadId);
+    
+    let q = "";
+    if (currentUser.role === 'staff' || mode === 'adv') {
+        const input = document.getElementById(mode === 'main' ? 'crmSearchInput' : 'advSearchInput');
+        q = input ? input.value : "";
+        if (!q && mode === 'adv') return;
+    }
+
+    resDiv.innerHTML = ""; load.style.display = "block";
+
+    try {
+        const res = await fetch(N8N_URL, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'search', 
+                query: q, 
+                role: currentUser.role, 
+                clientId: currentUser.crmId 
+            })
+        });
+
+        const data = await res.json();
+        console.log("DEBUG: Данные от n8n:", data); // Посмотрите это в консоли (F12)
+
+        load.style.display = "none";
+
+        // ЛОГИКА РАСПАКОВКИ:
+        let deals = [];
+        if (Array.isArray(data)) {
+            // Если пришел массив (как у клиента после Split Out)
+            deals = data[0] && data[0].json ? data.map(i => i.json) : data;
+        } else if (data && data.items && Array.isArray(data.items)) {
+            // Если пришел объект с полем items (как обычно у сотрудника)
+            deals = data.items;
+        } else if (data && typeof data === 'object') {
+            // На случай, если n8n вернул один объект сделки вместо массива
+            deals = [data];
+        }
+
+        if (deals.length === 0) {
+            resDiv.innerHTML = "<p style='text-align:center;'>Ничего не найдено</p>";
+            return;
+        }
+        
+        renderDealsList(deals, resDiv);
+
+    } catch (e) {
+        console.error("Критическая ошибка поиска:", e);
+        load.style.display = "none";
+        resDiv.innerHTML = `<p style="color:red; text-align:center;">Ошибка: ${e.message}</p>`;
+    }
+}
+
+// Функция для определения иконок и цветов статуса
+function getStatusIcon(statusName) {
+    const name = (statusName || "").toLowerCase().trim();
+    if (!name || name === "без статуса") return { icon: "⚪", color: "#95a5a6", label: "Без статуса" };
+    if (name === "печать") return { icon: "🖨️", color: "#3498db", label: "Печать" };
+    if (name === "постпечать") return { icon: "✂️", color: "#e67e22", label: "Постпечать" };
+    if (name === "завершено") return { icon: "✅", color: "#27ae60", label: "Завершено" };
+    return { icon: "📦", color: "#9b59b6", label: statusName || "Статус" };
+}
+
+// Функция для создания HTML строки товара (элемента сделки)
+function createRowHtml(name, qty, price, statusName, isNew = false) {
+    const s = getStatusIcon(statusName);
+    const q = Number(qty) || 0;
+    const p = Number(price) || 0;
+    const rowTotal = q * p;
+    return `
+        <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}" style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; position: relative;">
+            <span title="${s.label}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${s.icon}</span>
+            <span style="flex: 1; padding-right: 10px; font-size: 14px; line-height: 1.2;">${name}, ${q} шт, ${p} руб.</span>
+            <span style="font-weight: bold; white-space: nowrap; font-size: 14px; margin-right: ${isNew ? '30px' : '0'};">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} руб.</span>
+            ${isNew ? `<button onclick="this.parentElement.remove(); updateDealTotal(this.closest('.elements-list'));" style="position: absolute; right: 0; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">&times;</button>` : ''}
+        </div>`;
+}
+
+function renderDealsList(deals, targetDiv) {
+    if (!targetDiv) return;
+    targetDiv.innerHTML = ""; 
+
+    deals.forEach(deal => {
+        if (!deal) return;
+
+        const card = document.createElement('div');
+        card.className = 'crm-item';
+        card.id = `deal-${deal.id}`;
+
+        // 1. Получаем статус основной сделки
+        const statusObj = deal.status || {};
+        // Если статуса нет совсем, пишем "Статус не установлен"
+        const statusName = statusObj.name || deal.status_name || deal.status_text || 'Статус не установлен';
+        
+        const bkColor = statusObj.bk_color || '#dfdfdf';
+        const txtColor = statusObj.text_color || 'black';
+
+        // 2. Формируем список товаров
+        let elementsHtml = "";
+        if (deal.elements && Array.isArray(deal.elements)) {
+            elementsHtml = deal.elements.map(e => {
+                // ПРИОРИТЕТ СТАТУСА ЭЛЕМЕНТА:
+                // Берем статус только из самого элемента. Если его нет — передаем пустую строку.
+                // Наша функция getStatusIcon при пустой строке автоматически вернет ⚪
+                const itemStatus = (e.status && e.status.name) ? e.status.name : (e.status_name || "");
+                
+                return createRowHtml(e.name, e.quantity, e.price, itemStatus, false);
+            }).join('');
+        }
+
+        const isClosed = statusName.toLowerCase().includes("завершено");
+        const dealLink = (currentUser.role === 'staff') 
+            ? `<a href="https://crm.heavendevelop.ru/editDeal/${deal.id}" target="_blank" style="color: #2f7df6; text-decoration: none;">№ ${deal.num || deal.id} 🔗</a>`
+            : `№ ${deal.num || deal.id}`;
+
+        card.innerHTML = `
+            <div class="crm-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <div class="deal-num" style="font-weight: bold; font-size: 16px;">
+                    ${dealLink}
+                    <small style="font-weight:normal; color:#888; margin-left: 8px;">${deal.created_at || ''}</small>
+                </div>
+                <div class="status-badge" style="background:${bkColor}; color:${txtColor};">
+                    ${statusName}
+                </div>
+            </div>
+            <div class="client-name">👤 ${deal.client?.name || deal.client_name || 'Клиент не указан'}</div>
+            <div class="elements-list">
+                <div id="list-${deal.id}">${elementsHtml}</div>
+                ${(currentUser.role === 'staff' && !isClosed) ? `
+                <div class="add-btn-container" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; text-align: left;">
+                    <button class="add-btn" onclick="addToDeal(${deal.id})">+ Добавить расчет</button>
+                </div>` : ''}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f0f0f0;">
+                <div id="save-area-${deal.id}" style="display: none;">
+                    <button onclick="saveDeal(${deal.id})" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                </div>
+                <div style="font-size: 12px; color: #777;">Менеджер: <b>${deal.employee_name || '—'}</b></div>
+                <div style="font-weight: bold; font-size: 16px;">Итого: <span id="total-${deal.id}">${Number(deal.amount || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2})}</span> ₽</div>
+            </div>`;
+            
+        targetDiv.appendChild(card);
     });
 }
 
-function setFormat() {
-    let f = document.getElementById("format").value;
-    if(formats[f]){
-        document.getElementById("width").value = formats[f][0];
-        document.getElementById("height").value = formats[f][1];
-    }
-    calcLayout();
+function addToDeal(id) {
+    if (!lastCalcData) { alert("Сделайте расчет!"); return; }
+    const list = document.getElementById(`list-${id}`), s = window.currentCalcState;
+    const row = document.createElement('div'); row.className = 'element-row new-row';
+    row.setAttribute('data-full-name', lastCalcData.name); row.setAttribute('data-qty', lastCalcData.qty);
+    row.setAttribute('data-cost-total', s.totalCost); row.setAttribute('data-price', lastCalcData.total);
+    row.innerHTML = `<span>${lastCalcData.name}, ${lastCalcData.qty} шт</span><b>${lastCalcData.total.toLocaleString()} ₽</b><button onclick="this.parentElement.remove(); updateDealTotal(document.getElementById('list-${id}'));" style="background:red; color:white; border:none; border-radius:50%; width:18px; height:18px; cursor:pointer; margin-left:10px;">×</button>`;
+    list.appendChild(row); document.getElementById(`save-area-${id}`).style.display = "block"; updateDealTotal(list);
 }
 
-function customFormat() {
-    document.getElementById("format").value = "custom";
-    calcLayout();
+async function saveDeal(id) {
+    const list = document.getElementById(`list-${id}`), rows = list.querySelectorAll('.new-row');
+    const btn = document.querySelector(`#save-area-${id} button`); btn.innerText = "⌛..."; btn.disabled = true;
+    try {
+        for (let r of rows) {
+            const item = { name: r.getAttribute('data-full-name'), quantity: Number(r.getAttribute('data-qty')), total: Number(r.getAttribute('data-price')), cost: Math.round(parseFloat(r.getAttribute('data-cost-total'))), category_id: 2896, units: "шт" };
+            await fetch(N8N_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'save', dealId: id, item: item, password: currentUser.pass }) });
+            r.classList.remove('new-row'); r.querySelector('button').remove();
+        }
+        alert("Сохранено!"); document.getElementById(`save-area-${id}`).style.display = "none";
+    } catch (e) { alert("Ошибка сохранения"); } finally { btn.innerText = "💾 Сохранить"; btn.disabled = false; updateDealTotal(list); }
 }
 
-function calcLayout() {
-    let w = Number(document.getElementById("width").value);
-    let h = Number(document.getElementById("height").value);
-    let workW = SRA3_W - (MARGIN * 2);
-    let workH = SRA3_H - (MARGIN * 2);
-
-    let res1 = Math.floor((workW + GAP) / (w + GAP)) * Math.floor((workH + GAP) / (h + GAP));
-    let res2 = Math.floor((workW + GAP) / (h + GAP)) * Math.floor((workH + GAP) / (w + GAP));
-    document.getElementById("layout").value = Math.max(res1, res2);
+function updateDealTotal(el) {
+    let sum = 0; el.querySelectorAll('.element-row').forEach(r => { let b = r.querySelector('b').innerText.replace(/\D/g, ''); sum += parseInt(b); });
+    const id = el.id.replace('list-', ''); document.getElementById(`total-${id}`).innerText = sum.toLocaleString();
 }
 
-function updateType() {
-    let type = document.getElementById("type").value;
-    let product = document.getElementById("product");
-    let layoutCont = document.getElementById("layoutContainer");
-    product.innerHTML = "";
-
-    if(type === "sheet"){
-        ["Визитки", "Листовки", "Меню"].forEach(p => {
-            let o = document.createElement("option"); o.text = p; product.appendChild(o);
-        });
-        document.getElementById("catalogFields").style.display = "none";
-        document.getElementById("catalogPaper").style.display = "none";
-        document.getElementById("sheetBlock").style.display = "block";
-        layoutCont.style.display = "block";
-    } else {
-        ["Каталог", "Презентация"].forEach(p => {
-            let o = document.createElement("option"); o.text = p; product.appendChild(o);
-        });
-        document.getElementById("catalogFields").style.display = "block";
-        document.getElementById("catalogPaper").style.display = "block";
-        document.getElementById("sheetBlock").style.display = "none";
-        layoutCont.style.display = "none";
-    }
-    // Очищаем результаты при смене типа
-    document.getElementById("result").style.display = "none";
-    document.getElementById("techData").style.display = "none";
-}
-
-function validatePages() {
-    let p = document.getElementById("pages");
-    if (document.getElementById("binding").value === "staple") {
-        p.value = Math.ceil(p.value / 4) * 4;
-    }
-}
-
-function calc() {
-    let type = document.getElementById("type").value;
-    let tirazh = Number(document.getElementById("tirazh").value);
-    let layoutCount = Number(document.getElementById("layout").value);
+// --- ИНИЦИАЛИЗАЦИЯ ---
+window.onload = () => {
+    // Инициализация списков с использованием строковых ID
+    fillOptions("paper", papersFull, "Бумага 300 гр."); 
+    fillOptions("paperCover", papersFull, "Бумага 300 гр."); 
+    fillOptions("paperBlock", papersFull, "Бумага 150 гр.");
     
-    let totalPaperCost = 0;
-    let totalPrintCost = 0;
-    let totalBindCost = 0;
-    let techHtml = "";
-
-    let pagesPerSheet = layoutCount * 2;
-
-    if (type === "sheet") {
-        let sheets = Math.ceil(tirazh / layoutCount);
-        totalPaperCost = sheets * Number(document.getElementById("paper").value);
-        totalPrintCost = sheets * Number(document.getElementById("color").value);
-        techHtml = `Листов SRA3 на тираж: ${sheets} шт.`;
-    } else {
-        let pagesTotal = Number(document.getElementById("pages").value);
-        
-        // Обложка (4 полосы)
-        let coverSheetsTotal = Math.ceil((4 * tirazh) / pagesPerSheet);
-        let coverSheetsPerOne = 4 / pagesPerSheet;
-        totalPaperCost += coverSheetsTotal * Number(document.getElementById("paperCover").value);
-        totalPrintCost += coverSheetsTotal * Number(document.getElementById("colorCover").value);
-
-        // Блок
-        let blockPages = pagesTotal - 4;
-        let blockSheetsTotal = Math.ceil((blockPages * tirazh) / pagesPerSheet);
-        let blockSheetsPerOne = blockPages / pagesPerSheet;
-        totalPaperCost += blockSheetsTotal * Number(document.getElementById("paperBlock").value);
-        totalPrintCost += blockSheetsTotal * Number(document.getElementById("colorBlock").value);
-
-        // Скрепление
-        totalBindCost = tirazh * ((document.getElementById("binding").value === "staple") ? 30 : 50);
-
-        techHtml = `Листов на обложку (1 шт): ${coverSheetsPerOne.toFixed(2)}<br>` +
-                   `Листов на блок (1 шт): ${blockSheetsPerOne.toFixed(2)}<br>` +
-                   `Всего листов SRA3 на тираж: ${coverSheetsTotal + blockSheetsTotal} шт.`;
-    }
-
-    let subTotal = totalPaperCost + totalPrintCost + totalBindCost;
-    let cutCost = document.getElementById("cut").checked ? subTotal * 0.2 : 0;
-    let finalCost = subTotal + cutCost;
-    let clientPrice = finalCost * 2;
-
-    // Вывод
-    document.getElementById("result").style.display = "block";
-    document.getElementById("result").innerHTML = 
-        `<b>Бумага:</b> ${Math.round(totalPaperCost)} ₽ | <b>Печать:</b> ${Math.round(totalPrintCost)} ₽<br>` +
-        `<b>Сборка:</b> ${Math.round(totalBindCost)} ₽ | <b>Резка:</b> ${Math.round(cutCost)} ₽<br>` +
-        `<hr><b>Себестоимость: ${Math.round(finalCost)} ₽</b><br>` +
-        `<span style="font-size:22px; color:#2f7df6;"><b>Цена клиенту: ${Math.round(clientPrice)} ₽</b></span>`;
-
-    document.getElementById("techData").style.display = "block";
-    document.getElementById("techContent").innerHTML = techHtml;
-}
-
-fillPapers("paper");
-fillPapers("paperCover");
-fillPapers("paperBlock");
-updateType();
-setFormat();
+    fillOptions("colorSheet", colorOptions, "4+0"); 
+    fillOptions("colorCover", colorOptions, "4+4"); 
+    fillOptions("colorBlock", colorOptions, "4+4");
+    
+    fillOptions("lamSheet", lamOptions, "Без ламинации"); 
+    fillOptions("lamCover", lamOptions, "Без ламинации");
+    
+    updateType(); 
+    setFormat(); 
+    applyPermissions();
+    
+    document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
+    document.getElementById('advSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('adv'); });
+};
 </script>
-
 </body>
 </html>
