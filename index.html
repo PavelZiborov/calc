@@ -108,7 +108,7 @@
 
         <div id="catalogFields" style="display:none">
             <label>Количество полос</label>
-            <input id="pages" type="number" value="12" onchange="validatePages()">
+            <input id="pages" type="number" inputmode="numeric" value="12" onchange="validatePages()">
             <label>Скрепление</label>
             <select id="binding">
                 <option value="staple">Скоба (30 ₽/шт)</option>
@@ -117,13 +117,13 @@
         </div>
 
         <div class="row">
-            <div class="col"><label>Ширина (мм)</label><input id="width" value="210" type="number" oninput="customFormat()"></div>
-            <div class="col"><label>Высота (мм)</label><input id="height" value="297" type="number" oninput="customFormat()"></div>
+            <div class="col"><label>Ширина (мм)</label><input id="width" value="210" type="number" inputmode="numeric" oninput="customFormat()"></div>
+            <div class="col"><label>Высота (мм)</label><input id="height" value="297" type="number" inputmode="numeric" oninput="customFormat()"></div>
         </div>
 
         <div class="row">
-            <div class="col"><label>Тираж (шт)</label><input id="tirazh" value="100" type="number"></div>
-            <div class="col" id="layoutContainer"><label>Изделий на SRA3</label><input id="layout" readonly style="background:#eee;"></div>
+            <div class="col"><label>Тираж (шт)</label><input id="tirazh" value="100" type="number" inputmode="numeric"></div>
+            <div class="col" id="layoutContainer"><label>Изделий на SRA3</label><input id="layout" inputmode="numeric" readonly style="background:#eee;"></div>
         </div>
 
         <div id="sheetBlock">
