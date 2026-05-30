@@ -211,8 +211,22 @@
 // --- КОНФИГУРАЦИЯ ---
 const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
-let currentUser = JSON.parse(localStorage.getItem('calc_user')) || { role: 'guest', login: '', pass: '' };
+function readSession() {
+    try {
+        return JSON.parse(sessionStorage.getItem('calc_session')) || { role: 'guest', login: '', token: '' };
+    } catch (e) {
+        sessionStorage.removeItem('calc_session');
+        return { role: 'guest', login: '', token: '' };
+    }
+}
+let currentUser = readSession();
 let lastCalcData = null;
+
+function authHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (currentUser.token) headers.Authorization = `Bearer ${currentUser.token}`;
+    return headers;
+}
 
 // --- СИСТЕМА ПРАВ ---
 function toggleAuthModal() {
@@ -239,13 +253,21 @@ async function attemptLogin(event) {
             body: JSON.stringify({ action: 'auth', clientId: clientId, password: pass })
         });
         const data = await response.json();
+        const session = Array.isArray(data) ? data[0] : data;
 
-        if (response.ok && data.role) {
-            currentUser = { role: data.role, login: clientId, pass: pass, crmId: data.crmId, clientName: data.name };
-            localStorage.setItem('calc_user', JSON.stringify(currentUser));
+        if (response.ok && session?.role && session?.token) {
+            currentUser = {
+                role: session.role,
+                login: session.name || clientId,
+                token: session.token,
+                crmId: session.crmId,
+                clientName: session.name,
+                expiresAt: session.expiresAt
+            };
+            sessionStorage.setItem('calc_session', JSON.stringify(currentUser));
             location.reload();
         } else {
-            errorDiv.innerText = data.message || "Ошибка: проверьте ID или пароль";
+            errorDiv.innerText = session?.message || "Ошибка: проверьте ID или пароль";
         }
     } catch (e) {
         errorDiv.innerText = "Ошибка n8n";
@@ -254,7 +276,7 @@ async function attemptLogin(event) {
     }
 }
 
-function logout() { localStorage.removeItem('calc_user'); location.reload(); }
+function logout() { sessionStorage.removeItem('calc_session'); location.reload(); }
 
 function applyPermissions() {
     const badge = document.getElementById('role-badge');
@@ -809,7 +831,6 @@ async function calc() {
         product: document.getElementById("product").value,
         tirazh: tir,
         layout: layoutForRequest,
-        password: currentUser.pass, 
         options: {
             cut: type === "catalog" ? true : document.getElementById("cut").checked,
             rounding: type === "sheet" ? document.getElementById("rounding").checked : false,
@@ -838,7 +859,7 @@ async function calc() {
         
         const fetchPromise = fetch(N8N_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(),
             body: JSON.stringify(calcData)
         });
 
@@ -970,14 +991,11 @@ async function searchCRM(mode) {
     try {
         const res = await fetch(N8N_URL, {
             method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(),
             body: JSON.stringify({ 
                 action: 'search', 
                 hp: document.getElementById("honey_field").value,
-                query: q, 
-                role: currentUser.role, 
-                clientId: currentUser.crmId,
-                password: currentUser.pass // Безопасность!
+                query: q
             })
         });
 
@@ -1169,11 +1187,10 @@ async function createDealFromDeal(sourceDealId, btn) {
     try {
         const response = await fetch(N8N_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(),
             body: JSON.stringify({
                 action: 'createDeal',
-                sourceDealId: sourceDealId,
-                password: currentUser.pass
+                sourceDealId: sourceDealId
             })
         });
 
@@ -1285,12 +1302,11 @@ async function saveDeal(id) {
 
             const response = await fetch(N8N_URL, { 
                 method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
+                headers: authHeaders(), 
                 body: JSON.stringify({ 
                     action: 'save', 
                     dealId: id, 
-                    item: item, 
-                    password: currentUser.pass 
+                    item: item
                 }) 
             });
 
