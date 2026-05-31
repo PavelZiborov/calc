@@ -213,9 +213,9 @@ const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 function readSession() {
     try {
-        return JSON.parse(sessionStorage.getItem('calc_session')) || { role: 'guest', login: '', token: '' };
+        return JSON.parse(localStorage.getItem('calc_session')) || { role: 'guest', login: '', token: '' };
     } catch (e) {
-        sessionStorage.removeItem('calc_session');
+        localStorage.removeItem('calc_session');
         return { role: 'guest', login: '', token: '' };
     }
 }
@@ -264,7 +264,7 @@ async function attemptLogin(event) {
                 clientName: session.name,
                 expiresAt: session.expiresAt
             };
-            sessionStorage.setItem('calc_session', JSON.stringify(currentUser));
+            localStorage.setItem('calc_session', JSON.stringify(currentUser));
             location.reload();
         } else {
             errorDiv.innerText = session?.message || "Ошибка: проверьте ID или пароль";
@@ -276,7 +276,7 @@ async function attemptLogin(event) {
     }
 }
 
-function logout() { sessionStorage.removeItem('calc_session'); location.reload(); }
+function logout() { localStorage.removeItem('calc_session'); location.reload(); }
 
 function applyPermissions() {
     const badge = document.getElementById('role-badge');
