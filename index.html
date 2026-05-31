@@ -1023,7 +1023,8 @@ async function searchCRM(mode) {
             body: JSON.stringify({ 
                 action: 'search', 
                 hp: document.getElementById("honey_field").value,
-                query: q
+                query: q,
+                clientId: currentUser.role === 'client' ? (currentUser.crmId || null) : null
             })
         });
 
