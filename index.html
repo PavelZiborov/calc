@@ -49,6 +49,48 @@
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
     .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
     .readonly-mode .add-btn, .readonly-mode [id^="save-area-"] { display: none !important; }
+    .filter-btn { margin-top:0; padding:10px; min-height:39px; font-size:14px; }
+    .status-dropdown { position: relative; }
+    .status-dropdown-btn {
+        width: 100%;
+        margin-top: 5px;
+        padding: 10px;
+        background: white;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: normal;
+        text-align: left;
+    }
+    .status-dropdown-list {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        max-height: 260px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        z-index: 1000;
+        padding: 6px;
+    }
+    .status-dropdown.open .status-dropdown-list { display: block; }
+    .status-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 6px;
+        font-weight: normal;
+        margin: 0;
+        cursor: pointer;
+    }
+    .status-option:hover { background: #f2f5f8; }
+    .status-option input { width: auto; margin: 0; }
     #auth-modal {
         display: none;
         position: fixed;
@@ -77,6 +119,34 @@
             padding-top: 16px;
             align-items: flex-start;
         }
+    }
+    @media (max-width: 600px) {
+        body { padding: 10px; font-size: 12px; }
+        .container { padding: 14px; border-radius: 10px; }
+        h2 { font-size: 18px; }
+        h3 { font-size: 16px; }
+        label { font-size: 12px; }
+        select,input,textarea { padding: 8px; font-size: 14px; }
+        button { padding: 10px; font-size: 13px; }
+        .filter-btn { font-size: 12px; }
+        .status-dropdown-btn { font-size: 14px; padding: 8px; }
+        .status-option { font-size: 12px; padding: 6px; }
+        .row { flex-direction: column; gap: 10px; }
+        .row > div[style*="flex: 0 0 150px"] { flex: 0 0 auto !important; width: 100%; }
+        .tabs-nav { gap: 3px; margin-bottom: 10px; }
+        .tab-btn { padding: 8px 10px; font-size: 12px; }
+        .rec-price-box { padding: 14px; }
+        .rec-price-label { font-size: 11px; }
+        .rec-price-val { font-size: 22px; }
+        .cost-detail, .tech-info { font-size: 12px; }
+        .crm-item { padding: 10px; }
+        .crm-header { gap: 8px; flex-wrap: wrap; }
+        .deal-num { font-size: 12px !important; }
+        .deal-num small { display: block; margin-left: 0 !important; margin-top: 3px; }
+        .status-badge { font-size: 9px; }
+        .client-name { font-size: 12px; }
+        .element-row span { font-size: 11px !important; }
+        .add-btn { font-size: 10px; padding: 3px 8px; }
     }
 </style>
 </head>
@@ -228,8 +298,29 @@
     <div class="container">
         <h3>Расширенный поиск (Только чтение)</h3>
         <div class="row" style="align-items: flex-end;">
-            <div class="col"><input type="text" id="advSearchInput" placeholder="Поиск по всей базе..."></div>
-            <div style="flex: 0 0 150px;"><button onclick="searchCRM('adv')" style="margin-top:0; padding: 10px; background:#27ae60;">Найти</button></div>
+            <div class="col">
+                <label>Поиск по всей базе</label>
+                <input type="text" id="advSearchInput" placeholder="Клиент, номер сделки...">
+            </div>
+            <div class="col">
+                <label>Статусы сделки</label>
+                <div class="status-dropdown" id="advStatusDropdown">
+                    <button type="button" class="status-dropdown-btn" onclick="toggleStatusDropdown()">Любой статус</button>
+                    <div class="status-dropdown-list" id="advStatusList"></div>
+                </div>
+            </div>
+        </div>
+        <div class="row" style="align-items: flex-end; margin-top: 10px;">
+            <div class="col">
+                <label>Дата от</label>
+                <input type="date" id="advDateFrom">
+            </div>
+            <div class="col">
+                <label>Дата до</label>
+                <input type="date" id="advDateTo">
+            </div>
+            <div style="flex: 0 0 150px;"><button class="filter-btn" onclick="searchCRM('adv')" style="background:#27ae60;">Найти</button></div>
+            <div style="flex: 0 0 150px;"><button class="filter-btn" onclick="clearAdvFilters()" style="background:#7f8c8d;">Очистить фильтры</button></div>
         </div>
         <div id="advCrmLoader" class="loader">Поиск по архиву...</div>
         <div id="advCrmResults" class="readonly-mode"></div>
@@ -242,6 +333,21 @@ const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 const SERVER_TIMEOUT_MS = 15000;
 const SERVER_UNAVAILABLE_MESSAGE = "Сервер не отвечает, попробуйте позднее";
+const CRM_STATUSES = [
+    { id: 6059, name: "Дизайн", bk_color: "#FC3BFF", text_color: "white" },
+    { id: 6058, name: "Согласование", bk_color: "#7E57C2", text_color: "white" },
+    { id: 6060, name: "Печать", bk_color: "#29b6f6", text_color: "black" },
+    { id: 6057, name: "Завершено", bk_color: "#33B86C", text_color: "black" },
+    { id: 20606, name: "Документы", bk_color: "#A2F6FF", text_color: "black" },
+    { id: 24873, name: "Заказ готов", bk_color: "#3EE084", text_color: "black" },
+    { id: 6330, name: "Ждем оплату", bk_color: "#FF5955", text_color: "white" },
+    { id: 7762, name: "Отгружено, ждем оплату", bk_color: "#D44A47", text_color: "white" },
+    { id: 15913, name: "Заказ готов к выдаче", bk_color: "#95FF1C", text_color: "black" },
+    { id: 10132, name: "Выставить счет", bk_color: "#E67E22", text_color: "black" },
+    { id: 6335, name: "Оплачено, ожидает выдачи", bk_color: "#34495e", text_color: "white" },
+    { id: 23912, name: "Перезаказ", bk_color: "#D3D3D3", text_color: "black" },
+    { id: 20605, name: "Отменен", bk_color: "#6E49C2", text_color: "white" }
+];
 
 function fetchWithTimeout(url, options = {}, timeoutMs = SERVER_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -1017,8 +1123,24 @@ async function searchCRM(mode) {
     if (currentUser.role === 'staff' || mode === 'adv') {
         const input = document.getElementById(mode === 'main' ? 'crmSearchInput' : 'advSearchInput');
         q = input ? input.value : "";
-        if (!q && mode === 'adv') return;
     }
+
+    const selectedStatusInputs = mode === 'adv'
+        ? Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked'))
+        : [];
+    const selectedStatuses = selectedStatusInputs
+        .map(input => Number(input.value))
+        .filter(Number.isInteger);
+    const selectedStatusNames = selectedStatusInputs.map(input => input.dataset.name || "");
+
+    const advFilters = mode === 'adv' ? {
+        status: selectedStatuses,
+        statusNames: selectedStatusNames,
+        dateFrom: formatDateForWebhook(document.getElementById('advDateFrom')?.value || ""),
+        dateTo: formatDateForWebhook(document.getElementById('advDateTo')?.value || "")
+    } : {};
+
+    if (mode === 'adv' && !q && advFilters.status.length === 0 && !advFilters.dateFrom && !advFilters.dateTo) return;
 
     resDiv.innerHTML = ""; 
     load.style.display = "block";
@@ -1029,15 +1151,21 @@ async function searchCRM(mode) {
     }
 
     try {
+        const searchPayload = { 
+            action: 'search', 
+            hp: document.getElementById("honey_field").value,
+            query: q,
+            clientId: currentUser.role === 'client' ? (currentUser.crmId || null) : null
+        };
+
+        if (mode === 'adv') {
+            searchPayload.filters = advFilters;
+        }
+
         const res = await fetch(N8N_URL, {
             method: 'POST', 
             headers: authHeaders(),
-            body: JSON.stringify({ 
-                action: 'search', 
-                hp: document.getElementById("honey_field").value,
-                query: q,
-                clientId: currentUser.role === 'client' ? (currentUser.crmId || null) : null
-            })
+            body: JSON.stringify(searchPayload)
         });
 
         if (res.status === 401) {
@@ -1081,6 +1209,76 @@ function normalizeDealResponse(data, allowIdOnly = false) {
     return isValidDeal(deal, allowIdOnly) ? deal : null;
 }
 
+function findCrmStatus(status) {
+    if (status && typeof status === 'object') {
+        const statusById = findCrmStatus(status.id);
+        if (statusById) return statusById;
+        return findCrmStatus(status.name);
+    }
+
+    const statusId = Number(status);
+    if (Number.isInteger(statusId)) {
+        return CRM_STATUSES.find(s => s.id === statusId) || null;
+    }
+
+    const statusName = String(status || "");
+    const normalized = (statusName || "").toLowerCase().trim();
+    return CRM_STATUSES.find(s => s.name.toLowerCase() === normalized) || null;
+}
+
+function fillStatusFilter() {
+    const list = document.getElementById('advStatusList');
+    if (!list) return;
+
+    list.innerHTML = CRM_STATUSES.map(s => `
+        <label class="status-option">
+            <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="updateStatusDropdownLabel()">
+            <span class="status-badge" style="background:${s.bk_color}; color:${s.text_color};">${s.name}</span>
+        </label>
+    `).join('');
+
+    updateStatusDropdownLabel();
+}
+
+function formatDateForWebhook(dateValue) {
+    if (!dateValue) return "";
+    const [year, month, day] = dateValue.split("-");
+    return year && month && day ? `${day}-${month}-${year}` : dateValue;
+}
+
+function toggleStatusDropdown() {
+    document.getElementById('advStatusDropdown')?.classList.toggle('open');
+}
+
+document.addEventListener('click', (event) => {
+    const dropdown = document.getElementById('advStatusDropdown');
+    if (dropdown && !dropdown.contains(event.target)) dropdown.classList.remove('open');
+});
+
+function updateStatusDropdownLabel() {
+    const btn = document.querySelector('#advStatusDropdown .status-dropdown-btn');
+    const selected = Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked'));
+    if (!btn) return;
+
+    if (selected.length === 0) {
+        btn.innerText = "Любой статус";
+    } else if (selected.length === 1) {
+        btn.innerText = selected[0].dataset.name || "1 статус";
+    } else {
+        btn.innerText = `Выбрано статусов: ${selected.length}`;
+    }
+}
+
+function clearAdvFilters() {
+    const dateFrom = document.getElementById('advDateFrom');
+    const dateTo = document.getElementById('advDateTo');
+
+    document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => input.checked = false);
+    updateStatusDropdownLabel();
+    if (dateFrom) dateFrom.value = "";
+    if (dateTo) dateTo.value = "";
+}
+
 // Функция для определения иконок и цветов статуса
 function getStatusIcon(statusName) {
     const name = (statusName || "").toLowerCase().trim();
@@ -1121,9 +1319,10 @@ function renderDealsList(deals, targetDiv) {
         const statusObj = deal.status || {};
         // Если статуса нет совсем, пишем "Статус не установлен"
         const statusName = statusObj.name || deal.status_name || deal.status_text || 'Статус не установлен';
+        const knownStatus = findCrmStatus(statusObj) || findCrmStatus(deal.status_id || deal.statusId) || findCrmStatus(statusName);
         
-        const bkColor = statusObj.bk_color || '#dfdfdf';
-        const txtColor = statusObj.text_color || 'black';
+        const bkColor = knownStatus?.bk_color || statusObj.bk_color || '#dfdfdf';
+        const txtColor = knownStatus?.text_color || statusObj.text_color || 'black';
 
         // 2. Формируем список товаров
         let elementsHtml = "";
@@ -1409,6 +1608,7 @@ window.onload = () => {
     
     updateType(); 
     setFormat(); 
+    fillStatusFilter();
     applyPermissions();
     
     document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
