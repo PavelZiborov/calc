@@ -52,16 +52,35 @@
     .filter-btn { margin-top:0; padding:10px; min-height:39px; font-size:14px; }
     .status-dropdown { position: relative; }
     .status-dropdown-btn {
+        position: relative;
         width: 100%;
         margin-top: 5px;
-        padding: 10px;
+        padding: 10px 28px 10px 10px;
         background: white;
         color: #333;
         border: 1px solid #ccc;
         border-radius: 6px;
-        font-size: 16px;
+        font-size: 14px;
+        line-height: 1.15;
         font-weight: normal;
         text-align: left;
+        height: 40px;
+        min-height: 40px;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .status-dropdown-btn::after,
+    .date-range-btn::after {
+        content: "⌄";
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #777;
+        font-size: 13px;
+        pointer-events: none;
     }
     .status-dropdown-list {
         display: none;
@@ -83,14 +102,170 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 7px 8px;
+        padding: 9px 10px;
         border-radius: 6px;
         font-weight: normal;
         margin: 0;
         cursor: pointer;
+        color: #333;
+        font-size: 16px;
     }
     .status-option:hover { background: #f2f5f8; }
-    .status-option input { width: auto; margin: 0; }
+    .status-option input { display: none; }
+    .status-color-marker {
+        width: 15px;
+        height: 21px;
+        flex: 0 0 15px;
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+    }
+    .status-option-name { flex: 1; min-width: 0; }
+    .status-checkmark {
+        visibility: hidden;
+        color: #333;
+        font-size: 22px;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .status-option input:checked ~ .status-checkmark { visibility: visible; }
+    .advanced-toolbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    .advanced-toolbar .col { min-width: 0; }
+    .clear-filters-btn {
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+        margin-top: 0;
+        padding: 0;
+        border-radius: 8px;
+        background: #2f7df6;
+        font-size: 24px;
+        line-height: 1;
+    }
+    .advanced-search-row {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        margin-top: 10px;
+    }
+    .advanced-search-row input {
+        flex: 1;
+        margin-top: 0;
+        border-radius: 6px 0 0 6px;
+    }
+    .advanced-search-row button {
+        width: 54px;
+        min-width: 54px;
+        margin-top: 0;
+        padding: 0;
+        border-radius: 0;
+        font-size: 22px;
+        line-height: 1;
+    }
+    .advanced-search-row button:last-child { border-radius: 0 6px 6px 0; }
+    .date-range-dropdown { position: relative; }
+    .date-range-btn {
+        position: relative;
+        width: 100%;
+        margin-top: 5px;
+        padding: 10px 28px 10px 10px;
+        background: white;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 13px;
+        line-height: 1.15;
+        font-weight: normal;
+        text-align: left;
+        height: 40px;
+        min-height: 40px;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .date-range-panel {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        z-index: 1000;
+        padding: 10px;
+    }
+    .date-range-dropdown.open .date-range-panel { display: block; }
+    .calendar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    .calendar-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .calendar-month-select {
+        width: auto;
+        min-height: 32px;
+        margin-top: 0;
+        padding: 4px 24px 4px 8px;
+        font-size: 14px;
+        text-transform: capitalize;
+    }
+    .calendar-year-select {
+        width: auto;
+        min-height: 32px;
+        margin-top: 0;
+        padding: 4px 24px 4px 8px;
+        font-size: 14px;
+    }
+    .calendar-nav {
+        width: 32px;
+        height: 32px;
+        margin: 0;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 18px;
+        line-height: 1;
+        background: #edf2f7;
+        color: #333;
+    }
+    .calendar-weekdays,
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .calendar-weekdays span {
+        text-align: center;
+        font-size: 12px;
+        color: #777;
+        padding: 4px 0;
+    }
+    .calendar-day {
+        height: 34px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: #333;
+        font-size: 14px;
+        font-weight: normal;
+        margin: 0;
+        padding: 0;
+    }
+    .calendar-day:hover { background: #eef4ff; }
+    .calendar-day.muted { color: #b8c0cc; }
+    .calendar-day.future { color: #c8d0da; opacity: 0.55; }
+    .calendar-day.in-range { background: #e8f1ff; border-radius: 0; }
+    .calendar-day.selected { background: #2f7df6; color: white; border-radius: 10px; }
     #auth-modal {
         display: none;
         position: fixed;
@@ -121,32 +296,62 @@
         }
     }
     @media (max-width: 600px) {
-        body { padding: 10px; font-size: 12px; }
-        .container { padding: 14px; border-radius: 10px; }
-        h2 { font-size: 18px; }
-        h3 { font-size: 16px; }
-        label { font-size: 12px; }
-        select,input,textarea { padding: 8px; font-size: 14px; }
-        button { padding: 10px; font-size: 13px; }
-        .filter-btn { font-size: 12px; }
-        .status-dropdown-btn { font-size: 14px; padding: 8px; }
-        .status-option { font-size: 12px; padding: 6px; }
-        .row { flex-direction: column; gap: 10px; }
-        .row > div[style*="flex: 0 0 150px"] { flex: 0 0 auto !important; width: 100%; }
-        .tabs-nav { gap: 3px; margin-bottom: 10px; }
-        .tab-btn { padding: 8px 10px; font-size: 12px; }
+        body { padding: 8px; font-size: 14px; overflow-x: hidden; }
+        #user-bar { padding: 10px 12px !important; gap: 10px; flex-wrap: wrap; }
+        #user-display-name { display: inline-block; max-width: 58vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+        #authBtn { padding: 8px 14px !important; font-size: 16px !important; }
+        .container { width: 100%; padding: 14px; border-radius: 10px; box-sizing: border-box; }
+        h2 { font-size: 20px; line-height: 1.2; }
+        h3 { font-size: 18px; line-height: 1.25; }
+        label { font-size: 14px; line-height: 1.25; }
+        select,input,textarea {
+            min-height: 42px;
+            padding: 9px 10px;
+            font-size: 16px;
+            line-height: 1.25;
+        }
+        input[type="checkbox"] { min-height: 0; }
+        button { padding: 11px 12px; font-size: 16px; line-height: 1.2; }
+        .filter-btn { min-height: 42px; font-size: 15px; white-space: normal; }
+        .status-dropdown-btn, .date-range-btn { height: 42px; min-height: 42px; padding: 9px 28px 9px 10px; }
+        .status-dropdown-btn { font-size: 14px; }
+        .date-range-btn { font-size: 13px; }
+        .status-dropdown-list, .date-range-panel { position: fixed; left: 12px; right: 12px; top: auto; max-height: 50vh; overflow-y: auto; }
+        .status-option { font-size: 16px; padding: 10px 12px; }
+        .row { gap: 12px; }
+        .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
+        #search-tab .row { flex-direction: column; align-items: stretch !important; }
+        #search-tab .advanced-toolbar { gap: 8px; align-items: flex-end; }
+        #search-tab .advanced-toolbar .col { flex: 1 1 0; min-width: 0; }
+        #search-tab .advanced-toolbar label { font-size: 13px; white-space: nowrap; }
+        .advanced-search-row button { width: 52px; min-width: 52px; }
+        #main-tab .row { flex-direction: row; gap: 10px; }
+        #main-tab .col { min-width: 0; }
+        #main-tab #crm-search-container .row { flex-direction: column; align-items: stretch !important; }
+        #main-tab #crm-search-container .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
+        .tabs-nav { overflow-x: auto; gap: 4px; margin-bottom: 10px; border-bottom: 0; padding-bottom: 2px; }
+        .tab-btn { flex: 0 0 auto; width: auto; margin-top: 0; padding: 10px 12px; font-size: 14px; border-radius: 8px; }
         .rec-price-box { padding: 14px; }
-        .rec-price-label { font-size: 11px; }
-        .rec-price-val { font-size: 22px; }
-        .cost-detail, .tech-info { font-size: 12px; }
-        .crm-item { padding: 10px; }
+        .rec-price-label { font-size: 12px; }
+        .rec-price-val { font-size: 24px; line-height: 1.15; }
+        #roundPriceControls { flex-wrap: wrap; }
+        #roundPriceControls button { flex: 1 1 140px; font-size: 14px !important; }
+        .cost-detail, .tech-info { font-size: 14px; overflow-x: auto; }
+        .crm-item { padding: 12px; overflow: hidden; }
         .crm-header { gap: 8px; flex-wrap: wrap; }
-        .deal-num { font-size: 12px !important; }
-        .deal-num small { display: block; margin-left: 0 !important; margin-top: 3px; }
-        .status-badge { font-size: 9px; }
-        .client-name { font-size: 12px; }
-        .element-row span { font-size: 11px !important; }
-        .add-btn { font-size: 10px; padding: 3px 8px; }
+        .deal-num { flex: 1 1 auto; min-width: 0; font-size: 13px !important; line-height: 1.25; }
+        .deal-num small { display: inline !important; margin-left: 6px !important; margin-top: 0; white-space: nowrap; }
+        .deal-num button { font-size: 10px !important; padding: 2px 7px !important; }
+        .status-badge { max-width: 100%; font-size: 9px; line-height: 1.2; white-space: normal; padding: 3px 7px; }
+        .client-name { font-size: 12px; line-height: 1.25; }
+        .elements-list { padding: 8px; overflow: hidden; }
+        .element-row { align-items: flex-start; gap: 6px; flex-wrap: wrap; }
+        .element-row span { font-size: 11px !important; line-height: 1.2; }
+        .element-row span:nth-child(2) { flex: 1 1 calc(100% - 36px); min-width: 0; overflow-wrap: anywhere; }
+        .element-row span:nth-child(3) { font-size: 11px !important; }
+        .crm-item > div:last-child { gap: 8px; flex-wrap: wrap; font-size: 11px !important; }
+        .crm-item > div:last-child > div { font-size: 11px !important; }
+        .add-btn { font-size: 11px; padding: 5px 9px; }
     }
 </style>
 </head>
@@ -285,9 +490,11 @@
 
     <div class="container" id="crm-search-container" style="display:none;">
         <h3>Поиск сделок в Heaven CRM</h3>
-        <div class="row" style="align-items: flex-end;">
-            <div class="col"><label>Поиск по клиенту или номеру</label><input type="text" id="crmSearchInput" placeholder="Введите имя..."></div>
-            <div style="flex: 0 0 150px;"><button onclick="searchCRM('main')" style="margin-top:0; padding:10px;">Найти</button></div>
+        <label>Поиск</label>
+        <div class="advanced-search-row">
+            <input type="text" id="crmSearchInput" placeholder="">
+            <button onclick="searchCRM('main')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
+            <button onclick="clearMainSearch()" style="background:#2f7df6;" title="Очистить поиск" aria-label="Очистить поиск">🔄</button>
         </div>
         <div id="crmLoader" class="loader">Синхронизация с сервером...</div>
         <div id="crmResults"></div>
@@ -296,31 +503,42 @@
 
 <div id="search-tab" class="tab-content">
     <div class="container">
-        <h3>Расширенный поиск (Только чтение)</h3>
-        <div class="row" style="align-items: flex-end;">
+        <div class="advanced-toolbar">
             <div class="col">
-                <label>Поиск по всей базе</label>
-                <input type="text" id="advSearchInput" placeholder="Клиент, номер сделки...">
-            </div>
-            <div class="col">
-                <label>Статусы сделки</label>
+                <label>Статус</label>
                 <div class="status-dropdown" id="advStatusDropdown">
-                    <button type="button" class="status-dropdown-btn" onclick="toggleStatusDropdown()">Любой статус</button>
+                    <button type="button" class="status-dropdown-btn" onclick="toggleStatusDropdown()"></button>
                     <div class="status-dropdown-list" id="advStatusList"></div>
                 </div>
             </div>
+            <div class="col">
+                <label>Период</label>
+                <div class="date-range-dropdown" id="advDateDropdown">
+                    <button type="button" class="date-range-btn" onclick="toggleDateDropdown()"></button>
+                    <div class="date-range-panel" onclick="event.stopPropagation()">
+                        <input type="hidden" id="advDateFrom">
+                        <input type="hidden" id="advDateTo">
+                        <div class="calendar-header">
+                            <button type="button" class="calendar-nav" onclick="changeCalendarMonth(-1)">‹</button>
+                            <div class="calendar-title-wrap">
+                                <select class="calendar-month-select" id="calendarMonthSelect" onchange="changeCalendarMonthSelect(this.value)"></select>
+                                <select class="calendar-year-select" id="calendarYearSelect" onchange="changeCalendarYear(this.value)"></select>
+                            </div>
+                            <button type="button" class="calendar-nav" onclick="changeCalendarMonth(1)">›</button>
+                        </div>
+                        <div class="calendar-weekdays">
+                            <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+                        </div>
+                        <div class="calendar-grid" id="calendarGrid"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="row" style="align-items: flex-end; margin-top: 10px;">
-            <div class="col">
-                <label>Дата от</label>
-                <input type="date" id="advDateFrom">
-            </div>
-            <div class="col">
-                <label>Дата до</label>
-                <input type="date" id="advDateTo">
-            </div>
-            <div style="flex: 0 0 150px;"><button class="filter-btn" onclick="searchCRM('adv')" style="background:#27ae60;">Найти</button></div>
-            <div style="flex: 0 0 150px;"><button class="filter-btn" onclick="clearAdvFilters()" style="background:#7f8c8d;">Очистить фильтры</button></div>
+        <label>Поиск</label>
+        <div class="advanced-search-row">
+            <input type="text" id="advSearchInput" placeholder="">
+            <button onclick="searchCRM('adv')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
+            <button onclick="clearAdvFilters()" style="background:#2f7df6;" title="Очистить фильтры" aria-label="Очистить фильтры">🔄</button>
         </div>
         <div id="advCrmLoader" class="loader">Поиск по архиву...</div>
         <div id="advCrmResults" class="readonly-mode"></div>
@@ -333,7 +551,7 @@ const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 const SERVER_TIMEOUT_MS = 15000;
 const SERVER_UNAVAILABLE_MESSAGE = "Сервер не отвечает, попробуйте позднее";
-const CRM_STATUSES = [
+const DEFAULT_CRM_STATUSES = [
     { id: 6059, name: "Дизайн", bk_color: "#FC3BFF", text_color: "white" },
     { id: 6058, name: "Согласование", bk_color: "#7E57C2", text_color: "white" },
     { id: 6060, name: "Печать", bk_color: "#29b6f6", text_color: "black" },
@@ -367,6 +585,30 @@ function readSession() {
 }
 let currentUser = readSession();
 let lastCalcData = null;
+let calendarMonth = new Date();
+let calendarRangeStart = "";
+let calendarRangeEnd = "";
+
+function normalizeStatuses(statuses) {
+    if (!Array.isArray(statuses)) return [];
+
+    return statuses
+        .map(status => ({
+            id: Number(status.status_id ?? status.id),
+            name: status.name || "",
+            bk_color: status.bk_color || "#dfdfdf",
+            text_color: status.text_color || "black",
+            type: status.type,
+            is_email: status.is_email,
+            is_preliminary: status.is_preliminary
+        }))
+        .filter(status => Number.isInteger(status.id) && status.name);
+}
+
+function getCrmStatuses() {
+    const sessionStatuses = normalizeStatuses(currentUser.statuses);
+    return sessionStatuses.length ? sessionStatuses : DEFAULT_CRM_STATUSES;
+}
 
 function authHeaders() {
     const headers = { 'Content-Type': 'application/json' };
@@ -408,7 +650,8 @@ async function attemptLogin(event) {
                 token: session.token,
                 crmId: session.crmId,
                 clientName: session.name,
-                expiresAt: session.expiresAt
+                expiresAt: session.expiresAt,
+                statuses: normalizeStatuses(session.statuses)
             };
             localStorage.setItem('calc_session', JSON.stringify(currentUser));
             location.reload();
@@ -1118,6 +1361,7 @@ async function searchCRM(mode) {
     // Находим кнопку, которая вызвала поиск
     const btn = event?.target?.tagName === 'BUTTON' ? event.target : document.querySelector(`button[onclick="searchCRM('${mode}')"]`);
     if (btn && btn.disabled) return;
+    const originalBtnText = btn ? btn.innerText : "";
 
     let q = "";
     if (currentUser.role === 'staff' || mode === 'adv') {
@@ -1139,8 +1383,6 @@ async function searchCRM(mode) {
         dateFrom: formatDateForWebhook(document.getElementById('advDateFrom')?.value || ""),
         dateTo: formatDateForWebhook(document.getElementById('advDateTo')?.value || "")
     } : {};
-
-    if (mode === 'adv' && !q && advFilters.status.length === 0 && !advFilters.dateFrom && !advFilters.dateTo) return;
 
     resDiv.innerHTML = ""; 
     load.style.display = "block";
@@ -1193,7 +1435,7 @@ async function searchCRM(mode) {
         if (btn) {
             setTimeout(() => {
                 btn.disabled = false;
-                btn.innerText = "Найти";
+                btn.innerText = originalBtnText || "Найти";
             }, 2000);
         }
     }
@@ -1218,22 +1460,24 @@ function findCrmStatus(status) {
 
     const statusId = Number(status);
     if (Number.isInteger(statusId)) {
-        return CRM_STATUSES.find(s => s.id === statusId) || null;
+        return getCrmStatuses().find(s => s.id === statusId) || null;
     }
 
     const statusName = String(status || "");
     const normalized = (statusName || "").toLowerCase().trim();
-    return CRM_STATUSES.find(s => s.name.toLowerCase() === normalized) || null;
+    return getCrmStatuses().find(s => s.name.toLowerCase() === normalized) || null;
 }
 
 function fillStatusFilter() {
     const list = document.getElementById('advStatusList');
     if (!list) return;
 
-    list.innerHTML = CRM_STATUSES.map(s => `
+    list.innerHTML = getCrmStatuses().map(s => `
         <label class="status-option">
             <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="updateStatusDropdownLabel()">
-            <span class="status-badge" style="background:${s.bk_color}; color:${s.text_color};">${s.name}</span>
+            <span class="status-color-marker" style="background:${s.bk_color};"></span>
+            <span class="status-option-name">${s.name}</span>
+            <span class="status-checkmark">✓</span>
         </label>
     `).join('');
 
@@ -1246,13 +1490,128 @@ function formatDateForWebhook(dateValue) {
     return year && month && day ? `${day}-${month}-${year}` : dateValue;
 }
 
+function formatDateInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    const monthSelect = document.getElementById('calendarMonthSelect');
+    const yearSelect = document.getElementById('calendarYearSelect');
+    if (!grid || !monthSelect || !yearSelect) return;
+
+    const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    const startOffset = (monthStart.getDay() + 6) % 7;
+    const firstCellDate = new Date(monthStart);
+    firstCellDate.setDate(monthStart.getDate() - startOffset);
+    const todayValue = formatDateInput(new Date());
+
+    renderCalendarMonthOptions(monthSelect);
+    renderCalendarYearOptions(yearSelect);
+    grid.innerHTML = "";
+
+    for (let i = 0; i < 42; i++) {
+        const day = new Date(firstCellDate);
+        day.setDate(firstCellDate.getDate() + i);
+
+        const value = formatDateInput(day);
+        const btn = document.createElement('button');
+        btn.type = "button";
+        btn.className = "calendar-day";
+        btn.innerText = String(day.getDate());
+        btn.onclick = () => selectCalendarDate(value);
+
+        if (day.getMonth() !== calendarMonth.getMonth()) btn.classList.add("muted");
+        if (value > todayValue) btn.classList.add("future");
+        if (calendarRangeStart && calendarRangeEnd && value > calendarRangeStart && value < calendarRangeEnd) btn.classList.add("in-range");
+        if (value === calendarRangeStart || value === calendarRangeEnd) btn.classList.add("selected");
+
+        grid.appendChild(btn);
+    }
+}
+
+function renderCalendarMonthOptions(select) {
+    const selectedMonth = calendarMonth.getMonth();
+
+    if (select.dataset.rendered === "true" && Number(select.value) === selectedMonth) return;
+
+    select.innerHTML = "";
+    for (let month = 0; month < 12; month++) {
+        const option = document.createElement('option');
+        option.value = String(month);
+        option.innerText = new Date(calendarMonth.getFullYear(), month, 1)
+            .toLocaleDateString('ru-RU', { month: 'long' });
+        option.selected = month === selectedMonth;
+        select.appendChild(option);
+    }
+    select.dataset.rendered = "true";
+}
+
+function renderCalendarYearOptions(select) {
+    const selectedYear = calendarMonth.getFullYear();
+    const currentYear = new Date().getFullYear();
+    const startYear = currentYear - 5;
+    const endYear = currentYear + 1;
+
+    if (select.dataset.renderedFor === `${startYear}-${endYear}` && Number(select.value) === selectedYear) return;
+
+    select.innerHTML = "";
+    for (let year = startYear; year <= endYear; year++) {
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.innerText = String(year);
+        option.selected = year === selectedYear;
+        select.appendChild(option);
+    }
+    select.dataset.renderedFor = `${startYear}-${endYear}`;
+}
+
+function selectCalendarDate(value) {
+    if (!calendarRangeStart || (calendarRangeStart && calendarRangeEnd) || value < calendarRangeStart) {
+        calendarRangeStart = value;
+        calendarRangeEnd = "";
+    } else {
+        calendarRangeEnd = value;
+    }
+
+    document.getElementById('advDateFrom').value = calendarRangeStart;
+    document.getElementById('advDateTo').value = calendarRangeEnd;
+    updateDateDropdownLabel();
+    renderCalendar();
+}
+
+function changeCalendarMonth(delta) {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1);
+    renderCalendar();
+}
+
+function changeCalendarMonthSelect(month) {
+    calendarMonth = new Date(calendarMonth.getFullYear(), Number(month), 1);
+    renderCalendar();
+}
+
+function changeCalendarYear(year) {
+    calendarMonth = new Date(Number(year), calendarMonth.getMonth(), 1);
+    renderCalendar();
+}
+
 function toggleStatusDropdown() {
     document.getElementById('advStatusDropdown')?.classList.toggle('open');
 }
 
+function toggleDateDropdown() {
+    document.getElementById('advDateDropdown')?.classList.toggle('open');
+    renderCalendar();
+}
+
 document.addEventListener('click', (event) => {
-    const dropdown = document.getElementById('advStatusDropdown');
-    if (dropdown && !dropdown.contains(event.target)) dropdown.classList.remove('open');
+    const statusDropdown = document.getElementById('advStatusDropdown');
+    const dateDropdown = document.getElementById('advDateDropdown');
+    if (statusDropdown && !statusDropdown.contains(event.target)) statusDropdown.classList.remove('open');
+    if (dateDropdown && !dateDropdown.contains(event.target)) dateDropdown.classList.remove('open');
 });
 
 function updateStatusDropdownLabel() {
@@ -1261,22 +1620,51 @@ function updateStatusDropdownLabel() {
     if (!btn) return;
 
     if (selected.length === 0) {
-        btn.innerText = "Любой статус";
+        btn.innerText = "";
     } else if (selected.length === 1) {
         btn.innerText = selected[0].dataset.name || "1 статус";
     } else {
-        btn.innerText = `Выбрано статусов: ${selected.length}`;
+        btn.innerText = `Выбрано ${selected.length}`;
+    }
+}
+
+function updateDateDropdownLabel() {
+    const btn = document.querySelector('#advDateDropdown .date-range-btn');
+    const dateFrom = document.getElementById('advDateFrom')?.value || "";
+    const dateTo = document.getElementById('advDateTo')?.value || "";
+    if (!btn) return;
+
+    if (dateFrom && dateTo) {
+        btn.innerText = `${formatDateForWebhook(dateFrom)} - ${formatDateForWebhook(dateTo)}`;
+    } else if (dateFrom) {
+        btn.innerText = `с ${formatDateForWebhook(dateFrom)}`;
+    } else if (dateTo) {
+        btn.innerText = `до ${formatDateForWebhook(dateTo)}`;
+    } else {
+        btn.innerText = "";
     }
 }
 
 function clearAdvFilters() {
+    const searchInput = document.getElementById('advSearchInput');
     const dateFrom = document.getElementById('advDateFrom');
     const dateTo = document.getElementById('advDateTo');
 
     document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => input.checked = false);
     updateStatusDropdownLabel();
+    if (searchInput) searchInput.value = "";
     if (dateFrom) dateFrom.value = "";
     if (dateTo) dateTo.value = "";
+    calendarRangeStart = "";
+    calendarRangeEnd = "";
+    calendarMonth = new Date();
+    updateDateDropdownLabel();
+    renderCalendar();
+}
+
+function clearMainSearch() {
+    const input = document.getElementById('crmSearchInput');
+    if (input) input.value = "";
 }
 
 // Функция для определения иконок и цветов статуса
@@ -1339,12 +1727,12 @@ function renderDealsList(deals, targetDiv) {
 
         const isClosed = statusName.toLowerCase().includes("завершено");
         const dealLink = (currentUser.role === 'staff') 
-            ? `<a href="https://crm.heavendevelop.ru/editDeal/${deal.id}" target="_blank" style="color: #2f7df6; text-decoration: none;">№ ${deal.num || deal.id} 🔗</a>`
+            ? `<a href="https://crm.heavendevelop.ru/editDeal/${deal.id}" target="_blank" style="color: #2f7df6; text-decoration: none;">№ ${deal.num || deal.id}</a>`
             : `№ ${deal.num || deal.id}`;
         const createDealButton = currentUser.role === 'staff'
             ? `<button onclick="createDealFromDeal(${deal.id}, this)" 
                     style="margin:0 0 0 10px; width:auto; padding:3px 8px; font-size:11px; border-radius:4px; background:#f4f6f8; color:#777; border:1px solid #d9dde3;">
-                    + новая сделка
+                    + новая
                </button>`
             : "";
 
@@ -1609,6 +1997,7 @@ window.onload = () => {
     updateType(); 
     setFormat(); 
     fillStatusFilter();
+    renderCalendar();
     applyPermissions();
     
     document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
