@@ -67,6 +67,7 @@
     #auth-modal .auth-box {
         max-width: 350px;
         width: 100%;
+        margin: 0;
         padding: 30px;
         border-radius: 15px;
         position: relative;
@@ -239,6 +240,17 @@
 // --- КОНФИГУРАЦИЯ ---
 const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
+const SERVER_TIMEOUT_MS = 15000;
+const SERVER_UNAVAILABLE_MESSAGE = "Сервер не отвечает, попробуйте позднее";
+
+function fetchWithTimeout(url, options = {}, timeoutMs = SERVER_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(timeoutId));
+}
+
 function readSession() {
     try {
         return JSON.parse(localStorage.getItem('calc_session')) || { role: 'guest', login: '', token: '' };
@@ -275,7 +287,7 @@ async function attemptLogin(event) {
     btn.innerText = "Проверка..."; btn.disabled = true;
 
     try {
-        const response = await fetch(N8N_URL, {
+        const response = await fetchWithTimeout(N8N_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'auth', clientId: clientId, password: pass })
@@ -298,7 +310,7 @@ async function attemptLogin(event) {
             errorDiv.innerText = "За получением логина и пароля обратитесь к вашему менеджеру";
         }
     } catch (e) {
-        errorDiv.innerText = "За получением логина и пароля обратитесь к вашему менеджеру";
+        errorDiv.innerText = SERVER_UNAVAILABLE_MESSAGE;
     } finally {
         btn.innerText = "Войти в систему"; btn.disabled = false;
     }
@@ -885,7 +897,7 @@ async function calc() {
         // Запускаем таймер на 1 секунды одновременно с запросом
         const timerPromise = new Promise(res => setTimeout(res, 1000));
         
-        const fetchPromise = fetch(N8N_URL, {
+        const fetchPromise = fetchWithTimeout(N8N_URL, {
             method: 'POST',
             headers: authHeaders(),
             body: JSON.stringify(calcData)
@@ -980,7 +992,7 @@ async function calc() {
         resultMain.classList.add("price-animate");
 
     } catch (e) {
-        alert("Ошибка расчета. Попробуйте позже.");
+        alert(SERVER_UNAVAILABLE_MESSAGE);
         console.error(e);
     } finally {
         // Разблокируем кнопку через 2 секунды после завершения (включая ожидание выше)
