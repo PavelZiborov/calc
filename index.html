@@ -1218,7 +1218,8 @@ async function createDealFromDeal(sourceDealId, btn) {
             headers: authHeaders(),
             body: JSON.stringify({
                 action: 'createDeal',
-                sourceDealId: sourceDealId
+                sourceDealId: sourceDealId,
+                staffId: currentUser.crmId || null
             })
         });
 
