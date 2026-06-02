@@ -26,6 +26,8 @@
     .tabs-nav { display: flex; gap: 5px; max-width: 900px; margin: 0 auto 15px auto; border-bottom: 2px solid #ddd; }
     .tab-btn { padding: 12px 25px; background: #e0e0e0; border: none; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; color: #666; transition: 0.3s; }
     .tab-btn.active { background: #2f7df6; color: white; }
+    .tab-close-btn { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:8px; border-radius:50%; font-size:13px; line-height:1; color:inherit; opacity:0.75; }
+    .tab-close-btn:hover { background:rgba(0,0,0,0.12); opacity:1; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -43,12 +45,26 @@
 
     .crm-item { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-top: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
     .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .editable-status { margin:0; width:auto; padding:3px 8px; border-radius:4px; border:none; font-size:11px; line-height:1.2; font-weight:bold; text-transform:uppercase; cursor:pointer; }
+    .editable-status:hover { filter: brightness(0.96); box-shadow: 0 0 0 2px rgba(47,125,246,0.12); }
+    .item-status-control { margin:0 10px 0 0; width:auto; max-width:150px; padding:4px 7px; border-radius:999px; border:1px solid #dde3ea; background:#fff; color:#333; font-size:12px; line-height:1.15; font-weight:normal; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .item-status-control:hover { background:#eef4ff; color:#2f7df6; }
+    .status-menu { position: fixed; z-index: 2100; width: 260px; max-height: 320px; overflow-y: auto; padding: 6px; background: white; border: 1px solid #d9dde3; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+    .status-menu-option { display:flex; align-items:center; gap:8px; width:100%; margin:0; padding:8px 10px; background:white; color:#333; border:none; border-radius:7px; font-size:14px; font-weight:normal; text-align:left; }
+    .status-menu-option:hover { background:#f2f5f8; }
+    .status-menu-color { width:14px; height:14px; border-radius:4px; flex:0 0 14px; }
     .elements-list { background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 8px 12px; }
     .element-row { border-bottom: 1px solid #eee; transition: background 0.5s; display: flex; align-items: center; padding: 8px 0; position: relative; }
     .element-row:last-child { border-bottom: none; }
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
     .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
     .readonly-mode .add-btn, .readonly-mode [id^="save-area-"] { display: none !important; }
+    .deal-num-btn { margin:0; padding:0; width:auto; background:transparent; color:#2f7df6; border:none; font-size:16px; line-height:1.2; }
+    .deal-num-btn:hover { background:transparent; color:#1e5fcb; text-decoration: underline; }
+    .deal-action-btn { margin:0 0 0 6px; width:24px; height:24px; min-width:24px; padding:0; border-radius:6px; background:#f4f6f8; color:#555; border:1px solid #d9dde3; font-size:13px; line-height:22px; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; }
+    .deal-action-btn:hover { background:#e8eef6; color:#2f7df6; }
+    .deal-confirm-popover { position: fixed; z-index: 2000; width: 260px; padding: 12px; background: white; border: 1px solid #d9dde3; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); font-size: 13px; color: #333; }
+    .deal-confirm-popover button { margin:0; width:auto; padding:6px 12px; font-size:12px; border-radius:6px; }
     .filter-btn { margin-top:0; padding:10px; min-height:39px; font-size:14px; }
     .status-dropdown { position: relative; }
     .status-dropdown-btn {
@@ -383,8 +399,8 @@
 </div>
 
 <div class="tabs-nav">
-    <button class="tab-btn active" onclick="switchTab('main-tab')">Калькулятор и Сделки</button>
-    <button class="tab-btn" id="adv-tab-btn" onclick="switchTab('search-tab')" style="display:none;">Расширенный поиск</button>
+    <button class="tab-btn active" onclick="switchTab('main-tab')">Калькулятор</button>
+    <button class="tab-btn" id="adv-tab-btn" onclick="switchTab('search-tab')" style="display:none;">Поиск</button>
 </div>
 
 <div id="main-tab" class="tab-content active">
@@ -489,8 +505,7 @@
     </div>
 
     <div class="container" id="crm-search-container" style="display:none;">
-        <h3>Поиск сделок в Heaven CRM</h3>
-        <label>Поиск</label>
+        <label>Поиск заказов</label>
         <div class="advanced-search-row">
             <input type="text" id="crmSearchInput" placeholder="">
             <button onclick="searchCRM('main')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
@@ -534,7 +549,7 @@
                 </div>
             </div>
         </div>
-        <label>Поиск</label>
+        <label>Поиск заказов</label>
         <div class="advanced-search-row">
             <input type="text" id="advSearchInput" placeholder="">
             <button onclick="searchCRM('adv')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
@@ -585,6 +600,7 @@ function readSession() {
 }
 let currentUser = readSession();
 let lastCalcData = null;
+const dealsCache = new Map();
 let calendarMonth = new Date();
 let calendarRangeStart = "";
 let calendarRangeEnd = "";
@@ -750,7 +766,19 @@ const stickerFormats = { "30x30": [30, 30], "40x40": [40, 40], "50x50": [50, 50]
 const stickerPackFormats = { "A4": [210, 297], "A5": [148, 210], "A6": [105, 148], "A7": [74, 105], "custom": "Произвольный" };
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-function switchTab(id) { document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); event.currentTarget.classList.add('active'); }
+function switchTab(id, trigger = null) {
+    const target = document.getElementById(id);
+    if (!target) return;
+
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    target.classList.add('active');
+
+    const activeBtn = trigger
+        || (typeof event !== "undefined" ? event.currentTarget : null)
+        || document.querySelector(`.tab-btn[data-tab-target="${id}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+}
 function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }
 function fillFormatOptions(p) { let el = document.getElementById("format"); el.innerHTML = ""; let data = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); for (let k in data) { let o = document.createElement("option"); o.value = k; o.text = Array.isArray(data[k]) ? `${k} (${data[k][0]}x${data[k][1]} мм)` : data[k]; el.appendChild(o); } }
 function setFormat() { let f = document.getElementById("format").value, p = document.getElementById("product").value; let d = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); if(d[f] && Array.isArray(d[f])){ document.getElementById("width").value = d[f][0]; document.getElementById("height").value = d[f][1]; } calcLayout(); }
@@ -815,6 +843,12 @@ function getSelectedOptionText(id) {
     return (el.selectedOptions[0].text || "").trim();
 }
 
+function formatLaminationPart(laminationText) {
+    const normalized = (laminationText || "").trim();
+    const hasLamination = normalized && !/^без\s*ламинац/i.test(normalized) && normalized !== "lam_none";
+    return hasLamination ? `ламинация ${normalized}` : "";
+}
+
 function normalizePaperText(paperText) {
     let t = (paperText || "").trim();
     // Приводим к виду "бумага 100 гр." (как в примере пользователя)
@@ -838,11 +872,7 @@ function buildFullNameForSheet() {
     const paperText = getSelectedOptionText("paper");
     const paperPart = normalizePaperText(paperText);
 
-    const laminationTextRaw = getSelectedOptionText("lamSheet");
-    // UI может быть "Без ламинации" или "lam_none" — в обоих случаях ничего не показываем
-    const laminationNormalized = (laminationTextRaw || "").trim();
-    const hasLamination = laminationNormalized && !/^без\s*ламинац/i.test(laminationNormalized) && laminationNormalized !== "lam_none";
-    const laminationPart = hasLamination ? `ламинация ${laminationNormalized}` : "";
+    const laminationPart = formatLaminationPart(getSelectedOptionText("lamSheet"));
 
     const extras = [];
 
@@ -867,7 +897,7 @@ function buildFullNameForSheet() {
 }
 
 function buildFullNameForCatalog() {
-    // Формат: "Каталог А5; 32 полосы; Обложка Бумага 300 гр., Блок: Бумага 150 гр.; сборка на скобы"
+    // Формат: "Каталог А5; 32 полосы; Обложка Бумага 300 гр., ламинация ...; Блок: Бумага 150 гр.; сборка на скобы"
     const product = document.getElementById("product")?.value || "";
     const formatVal = document.getElementById("format")?.value || "";
     const w = Number(document.getElementById("width")?.value);
@@ -876,11 +906,13 @@ function buildFullNameForCatalog() {
 
     const pages = Number(document.getElementById("pages")?.value || 0);
     const paperCover = getSelectedOptionText("paperCover");
+    const coverLaminationPart = formatLaminationPart(getSelectedOptionText("lamCover"));
+    const coverPart = coverLaminationPart ? `${paperCover}, ${coverLaminationPart}` : paperCover;
     const paperBlock = getSelectedOptionText("paperBlock");
     const binding = document.getElementById("binding")?.value;
     const bindingText = binding === "spring" ? "сборка на пружину" : "сборка на скобы";
 
-    return `${product} ${size}; ${pages} полосы; Обложка ${paperCover}, Блок: ${paperBlock}; ${bindingText}`;
+    return `${product} ${size}; ${pages} полосы; Обложка ${coverPart}; Блок: ${paperBlock}; ${bindingText}`;
 }
 
 async function copyCustomerOrderText() {
@@ -1064,26 +1096,29 @@ function handleMarkupSelectChange() {
 function enableFullNameEdit() {
     const input = document.getElementById("staffFullNameInput");
     const text = document.getElementById("staffFullNameVal");
-    const editBtn = document.getElementById("editFullNameBtn");
-    const saveBtn = document.getElementById("saveFullNameBtn");
 
-    if (!input || !text || !editBtn || !saveBtn) return;
+    if (!input || !text) return;
 
     input.value = lastCalcData?.fullName || lastCalcData?.name || "";
     text.style.display = "none";
     input.style.display = "block";
-    editBtn.style.display = "none";
-    saveBtn.style.display = "inline-block";
     input.focus();
+    input.select();
 }
 
 function saveFullNameEdit() {
     const input = document.getElementById("staffFullNameInput");
     const text = document.getElementById("staffFullNameVal");
-    const editBtn = document.getElementById("editFullNameBtn");
-    const saveBtn = document.getElementById("saveFullNameBtn");
 
     if (!input || !lastCalcData) return;
+
+    if (input.dataset.cancelEdit === "1") {
+        input.dataset.cancelEdit = "";
+        if (text) text.style.display = "";
+        input.style.display = "none";
+        syncStaffTechAndCopyUI();
+        return;
+    }
 
     const val = input.value.trim();
     if (val) {
@@ -1092,8 +1127,16 @@ function saveFullNameEdit() {
 
     if (text) text.style.display = "";
     input.style.display = "none";
-    if (editBtn) editBtn.style.display = "inline-block";
-    if (saveBtn) saveBtn.style.display = "none";
+    syncStaffTechAndCopyUI();
+}
+
+function cancelFullNameEdit() {
+    const input = document.getElementById("staffFullNameInput");
+    const text = document.getElementById("staffFullNameVal");
+
+    if (input) input.dataset.cancelEdit = "1";
+    if (text) text.style.display = "";
+    if (input) input.style.display = "none";
     syncStaffTechAndCopyUI();
 }
 
@@ -1140,21 +1183,17 @@ function renderStaffTechAndCopyUI() {
         <div class="section-title" style="margin-top: 0;">Для отправки заказчику</div>
         <div style="display:flex; align-items:stretch; gap:10px; margin-top:8px;">
             <textarea id="customerOrderText" rows="3" readonly
-                style="flex:1; min-width:0; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; font-size: 14px; resize: vertical; box-sizing: border-box;"></textarea>
+                style="display:none;"></textarea>
             <button id="copyCustomerOrderBtn" onclick="copyCustomerOrderText()" 
-                style="margin:0; width:auto; align-self:flex-start; padding:10px 12px; font-size:12px; border-radius:6px;">Скопировать</button>
+                style="margin:0; width:auto; align-self:flex-start; padding:10px 12px; font-size:12px; border-radius:6px;">Скопировать текст для заказчика</button>
         </div>
 
         <div class="section-title" style="margin-top: 18px;">Технические характеристики</div>
         <div style="margin-top: 8px; font-size: 14px; color: #333;">
             <div style="margin-bottom: 6px;">
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <b>Полное наименование:</b>
-                    <button id="editFullNameBtn" onclick="enableFullNameEdit()" style="margin:0; width:auto; padding:3px 8px; font-size:12px; border-radius:5px;">Редактировать</button>
-                    <button id="saveFullNameBtn" onclick="saveFullNameEdit()" style="display:none; margin:0; width:auto; padding:3px 8px; font-size:12px; border-radius:5px; background:#27ae60;">Сохранить</button>
-                </div>
-                <span id="staffFullNameVal" style="display:block; margin-top:4px;"></span>
-                <input id="staffFullNameInput" type="text" onkeydown="if(event.key === 'Enter') saveFullNameEdit()" style="display:none; margin-top:6px;">
+                <span id="staffFullNameVal" onclick="enableFullNameEdit()" title="Нажмите, чтобы изменить"
+                    style="display:block; cursor:text; border-bottom:1px dashed #b8c7d9;"></span>
+                <input id="staffFullNameInput" type="text" onblur="saveFullNameEdit()" onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); } else if (event.key === 'Escape') { event.preventDefault(); cancelFullNameEdit(); }" style="display:none; margin-top:6px;">
             </div>
             <div style="margin-bottom: 6px;"><b>Количество листов SRA3:</b> <span id="staffSra3Val"></span></div>
             <div style="margin-bottom: 6px;"><b>Наценка:</b> <span id="staffMarkupVal"></span></div>
@@ -1468,6 +1507,171 @@ function findCrmStatus(status) {
     return getCrmStatuses().find(s => s.name.toLowerCase() === normalized) || null;
 }
 
+function getStatusMeta(statusName, statusObj = {}) {
+    const knownStatus = findCrmStatus(statusObj) || findCrmStatus(statusObj.id || statusObj.status_id) || findCrmStatus(statusName);
+    const name = knownStatus?.name || statusObj.name || statusName || "Статус не установлен";
+    return {
+        id: knownStatus?.id || Number(statusObj.id ?? statusObj.status_id) || null,
+        name: name,
+        bk_color: knownStatus?.bk_color || statusObj.bk_color || "#dfdfdf",
+        text_color: knownStatus?.text_color || statusObj.text_color || "black"
+    };
+}
+
+function getElementId(element) {
+    return element?.id ?? element?.element_id ?? element?.elementId ?? element?.item_id ?? element?.itemId ?? "";
+}
+
+function renderDealStatusControl(dealId, statusMeta, isLocked = false) {
+    if (currentUser.role !== 'staff' || isLocked) {
+        return `<div class="status-badge" style="background:${statusMeta.bk_color}; color:${statusMeta.text_color};">${escapeHtml(statusMeta.name)}</div>`;
+    }
+
+    return `<button type="button" class="editable-status" data-status-scope="deal" data-deal-id="${dealId}" onclick="showStatusMenu(event, this)" style="background:${statusMeta.bk_color}; color:${statusMeta.text_color};">${escapeHtml(statusMeta.name)}</button>`;
+}
+
+function renderElementStatusControl(dealId, element, elementIndex, statusMeta, isLocked = false) {
+    const s = getStatusIcon(statusMeta.name);
+    const elementId = getElementId(element);
+
+    if (currentUser.role !== 'staff' || isLocked) {
+        return `<span title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${s.icon}</span>`;
+    }
+
+    return `<button type="button" class="item-status-control" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}">${s.icon}</button>`;
+}
+
+function showStatusMenu(event, trigger) {
+    event.stopPropagation();
+    if (!trigger || currentUser.role !== 'staff') return;
+
+    document.querySelectorAll('.status-menu').forEach(el => el.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'status-menu';
+    const statuses = trigger.dataset.statusScope === "element" ? getElementStatuses() : getCrmStatuses();
+
+    statuses.forEach(status => {
+        const option = document.createElement('button');
+        option.type = "button";
+        option.className = "status-menu-option";
+        option.innerHTML = `
+            <span class="status-menu-color" style="background:${status.bk_color};"></span>
+            <span>${escapeHtml(status.name)}</span>`;
+        option.onclick = () => updateCrmStatus(trigger, status, menu);
+        menu.appendChild(option);
+    });
+
+    document.body.appendChild(menu);
+
+    const rect = trigger.getBoundingClientRect();
+    const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 12);
+    menu.style.left = `${Math.max(12, left)}px`;
+    menu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - menu.offsetHeight - 12)}px`;
+}
+
+function updateCachedStatus(trigger, status) {
+    const scope = trigger.dataset.statusScope;
+    const dealId = String(trigger.dataset.dealId || "");
+    const deal = dealsCache.get(dealId);
+    if (!deal) return;
+
+    const nextStatus = {
+        id: status.id,
+        name: status.name,
+        bk_color: status.bk_color,
+        text_color: status.text_color
+    };
+
+    if (scope === "deal") {
+        deal.status = nextStatus;
+        deal.status_id = status.id;
+        deal.status_name = status.name;
+        deal.status_text = status.name;
+    } else if (scope === "element" && Array.isArray(deal.elements)) {
+        const elementId = trigger.dataset.elementId || "";
+        const elementIndex = Number(trigger.dataset.elementIndex);
+        const element = (elementId ? deal.elements.find(e => String(getElementId(e)) === String(elementId)) : null)
+            || deal.elements[elementIndex];
+
+        if (element) {
+            element.status = nextStatus;
+            element.status_id = status.id;
+            element.status_name = status.name;
+        }
+    }
+
+    dealsCache.set(dealId, deal);
+}
+
+function refreshStatusControls(trigger, status) {
+    const scope = trigger.dataset.statusScope;
+    const dealId = trigger.dataset.dealId;
+    const selector = scope === "deal"
+        ? `.editable-status[data-status-scope="deal"][data-deal-id="${dealId}"]`
+        : `.item-status-control[data-status-scope="element"][data-deal-id="${dealId}"][data-element-index="${trigger.dataset.elementIndex}"]`;
+
+    document.querySelectorAll(selector).forEach(control => {
+        if (scope === "deal") {
+            control.innerText = status.name;
+            control.style.background = status.bk_color;
+            control.style.color = status.text_color;
+        } else {
+            const s = getStatusIcon(status.name);
+            control.innerText = s.icon;
+            control.title = status.name;
+        }
+    });
+}
+
+async function updateCrmStatus(trigger, status, menu) {
+    const scope = trigger.dataset.statusScope;
+    const dealId = Number(trigger.dataset.dealId);
+    const elementId = trigger.dataset.elementId || null;
+    const elementIndex = Number(trigger.dataset.elementIndex);
+
+    if (!dealId || status?.id == null) return;
+
+    trigger.disabled = true;
+    if (menu) menu.remove();
+
+    try {
+        const payload = {
+            action: 'updateStatus',
+            entity: scope,
+            dealId: dealId,
+            statusId: status.id,
+            statusName: status.name
+        };
+
+        if (scope === "element") {
+            payload.elementId = elementId;
+            payload.elementIndex = Number.isFinite(elementIndex) ? elementIndex : null;
+        }
+
+        const response = await fetch(N8N_URL, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        if (response.status === 401) {
+            alert("Сессия истекла. Войдите снова.");
+            logout();
+            return;
+        }
+        if (!response.ok) throw new Error("Ошибка обновления статуса");
+
+        updateCachedStatus(trigger, status);
+        refreshStatusControls(trigger, status);
+    } catch (e) {
+        alert("Не удалось обновить статус");
+        console.error(e);
+    } finally {
+        trigger.disabled = false;
+    }
+}
+
 function fillStatusFilter() {
     const list = document.getElementById('advStatusList');
     if (!list) return;
@@ -1610,8 +1814,16 @@ function toggleDateDropdown() {
 document.addEventListener('click', (event) => {
     const statusDropdown = document.getElementById('advStatusDropdown');
     const dateDropdown = document.getElementById('advDateDropdown');
+    const confirmPopover = document.querySelector('.deal-confirm-popover');
+    const statusMenu = document.querySelector('.status-menu');
     if (statusDropdown && !statusDropdown.contains(event.target)) statusDropdown.classList.remove('open');
     if (dateDropdown && !dateDropdown.contains(event.target)) dateDropdown.classList.remove('open');
+    if (confirmPopover && !confirmPopover.contains(event.target) && !event.target.closest('.deal-create-btn')) {
+        confirmPopover.remove();
+    }
+    if (statusMenu && !statusMenu.contains(event.target) && !event.target.closest('.editable-status, .item-status-control')) {
+        statusMenu.remove();
+    }
 });
 
 function updateStatusDropdownLabel() {
@@ -1677,19 +1889,142 @@ function getStatusIcon(statusName) {
     return { icon: "📦", color: "#9b59b6", label: statusName || "Статус" };
 }
 
-// Функция для создания HTML строки товара (элемента сделки)
-function createRowHtml(name, qty, price, statusName, isNew = false) {
+const ELEMENT_STATUS_IDS = {
+    "Без статуса": 0,
+    "Печать": 1,
+    "Постпечать": 2,
+    "Завершено": 3
+};
+
+function getElementStatuses() {
+    return ["Без статуса", "Печать", "Завершено"].map((name) => {
+        const s = getStatusIcon(name);
+        return {
+            id: ELEMENT_STATUS_IDS[s.label],
+            name: s.label,
+            bk_color: s.color,
+            text_color: "white"
+        };
+    });
+}
+
+function getElementStatusMeta(statusName) {
     const s = getStatusIcon(statusName);
+    return {
+        id: ELEMENT_STATUS_IDS[s.label] ?? null,
+        name: s.label,
+        bk_color: s.color,
+        text_color: "white"
+    };
+}
+
+// Функция для создания HTML строки товара (элемента сделки)
+function createRowHtml(name, qty, price, statusName, isNew = false, options = {}) {
     const q = Number(qty) || 0;
     const p = Number(price) || 0;
     const rowTotal = q * p;
+    const statusMeta = options.dealId
+        ? getElementStatusMeta(statusName)
+        : getStatusMeta(statusName, options.statusObj || {});
+    const statusControl = options.dealId
+        ? renderElementStatusControl(options.dealId, options.element || {}, options.elementIndex || 0, statusMeta, Boolean(options.lockStatus))
+        : `<span title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${getStatusIcon(statusMeta.name).icon}</span>`;
+
     return `
         <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}" style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; position: relative;">
-            <span title="${s.label}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${s.icon}</span>
-            <span style="flex: 1; padding-right: 10px; font-size: 14px; line-height: 1.2;">${name}, ${q} шт, ${p} руб.</span>
+            ${statusControl}
+            <span style="flex: 1; padding-right: 10px; font-size: 14px; line-height: 1.2;">${escapeHtml(name)}, ${q} шт, ${p} руб.</span>
             <span style="font-weight: bold; white-space: nowrap; font-size: 14px; margin-right: ${isNew ? '30px' : '0'};">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} руб.</span>
             ${isNew ? `<button onclick="this.parentElement.remove(); updateDealTotal(this.closest('.elements-list'));" style="position: absolute; right: 0; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">&times;</button>` : ''}
         </div>`;
+}
+
+function getDealUrl(dealId) {
+    return `https://crm.heavendevelop.ru/editDeal/${dealId}`;
+}
+
+function openCrmDealUrl(dealId) {
+    window.open(getDealUrl(dealId), '_blank', 'noopener');
+}
+
+function getDealClientName(deal) {
+    return deal?.client?.name || deal?.client_name || "клиента";
+}
+
+function openDealInTab(dealId) {
+    const deal = dealsCache.get(String(dealId));
+    if (!deal) return;
+
+    const tabId = "deal-tab";
+    let tabBtn = document.querySelector(`.tab-btn[data-tab-target="${tabId}"]`);
+    let tabContent = document.getElementById(tabId);
+    const shortTitle = `№${deal.num || deal.id}`;
+
+    if (!tabBtn) {
+        tabBtn = document.createElement('button');
+        tabBtn.className = 'tab-btn';
+        tabBtn.dataset.tabTarget = tabId;
+        tabBtn.onclick = () => switchTab(tabId, tabBtn);
+        document.querySelector('.tabs-nav')?.appendChild(tabBtn);
+    }
+    tabBtn.innerHTML = `${escapeHtml(shortTitle)} <span class="tab-close-btn" onclick="event.stopPropagation(); closeDealTab()" title="Закрыть вкладку">&times;</span>`;
+
+    if (!tabContent) {
+        tabContent = document.createElement('div');
+        tabContent.id = tabId;
+        tabContent.className = 'tab-content';
+        document.body.appendChild(tabContent);
+    }
+
+    tabContent.innerHTML = `
+        <div class="container">
+            <h3>Заказ ${escapeHtml(shortTitle)}</h3>
+            <div id="deal-detail"></div>
+        </div>`;
+
+    const detailContainer = tabContent.querySelector('#deal-detail');
+    renderDealsList([deal], detailContainer);
+    switchTab(tabId, tabBtn);
+}
+
+function closeDealTab() {
+    const tabBtn = document.querySelector('.tab-btn[data-tab-target="deal-tab"]');
+    const tabContent = document.getElementById('deal-tab');
+    const wasActive = tabContent?.classList.contains('active');
+
+    if (tabBtn) tabBtn.remove();
+    if (tabContent) tabContent.remove();
+    if (wasActive) switchTab('main-tab', document.querySelector('.tab-btn[onclick*="main-tab"]'));
+}
+
+function showCreateDealConfirm(sourceDealId, btn) {
+    if (!sourceDealId || !btn) return;
+
+    document.querySelectorAll('.deal-confirm-popover').forEach(el => el.remove());
+
+    const deal = dealsCache.get(String(sourceDealId));
+    const clientName = getDealClientName(deal);
+    const rect = btn.getBoundingClientRect();
+    const popover = document.createElement('div');
+    popover.className = 'deal-confirm-popover';
+    popover.innerHTML = `
+        <div style="margin-bottom:10px;">Добавить новую сделку для клиента "${escapeHtml(clientName)}"?</div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button type="button" class="confirm-no" style="background:#eef1f5; color:#555;">нет</button>
+            <button type="button" class="confirm-yes" style="background:#27ae60; color:white;">да</button>
+        </div>`;
+
+    document.body.appendChild(popover);
+
+    const left = Math.min(rect.left, window.innerWidth - popover.offsetWidth - 12);
+    popover.style.left = `${Math.max(12, left)}px`;
+    popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - popover.offsetHeight - 12)}px`;
+
+    popover.querySelector('.confirm-no').onclick = () => popover.remove();
+    popover.querySelector('.confirm-yes').onclick = () => {
+        popover.remove();
+        createDealFromDeal(sourceDealId, btn);
+    };
 }
 
 function renderDealsList(deals, targetDiv) {
@@ -1698,54 +2033,61 @@ function renderDealsList(deals, targetDiv) {
 
     deals.forEach(deal => {
         if (!isValidDeal(deal)) return;
+        dealsCache.set(String(deal.id), deal);
 
         const card = document.createElement('div');
         card.className = 'crm-item';
         card.id = `deal-${deal.id}`;
 
         // 1. Получаем статус основной сделки
-        const statusObj = deal.status || {};
+        const statusObj = (deal.status && typeof deal.status === "object") ? deal.status : {};
         // Если статуса нет совсем, пишем "Статус не установлен"
-        const statusName = statusObj.name || deal.status_name || deal.status_text || 'Статус не установлен';
-        const knownStatus = findCrmStatus(statusObj) || findCrmStatus(deal.status_id || deal.statusId) || findCrmStatus(statusName);
-        
-        const bkColor = knownStatus?.bk_color || statusObj.bk_color || '#dfdfdf';
-        const txtColor = knownStatus?.text_color || statusObj.text_color || 'black';
+        const statusName = statusObj.name || (typeof deal.status === "string" ? deal.status : "") || deal.status_name || deal.status_text || 'Статус не установлен';
+        const statusMeta = getStatusMeta(statusName, {
+            ...statusObj,
+            id: statusObj.id ?? statusObj.status_id ?? deal.status_id ?? deal.statusId
+        });
+        const isClosed = statusMeta.name.toLowerCase().includes("завершено");
+        const statusControl = renderDealStatusControl(deal.id, statusMeta, isClosed);
 
         // 2. Формируем список товаров
         let elementsHtml = "";
         if (deal.elements && Array.isArray(deal.elements)) {
-            elementsHtml = deal.elements.map(e => {
+            elementsHtml = deal.elements.map((e, idx) => {
                 // ПРИОРИТЕТ СТАТУСА ЭЛЕМЕНТА:
                 // Берем статус только из самого элемента. Если его нет — передаем пустую строку.
                 // Наша функция getStatusIcon при пустой строке автоматически вернет ⚪
-                const itemStatus = (e.status && e.status.name) ? e.status.name : (e.status_name || "");
+                const itemStatus = (e.status && typeof e.status === "object" && e.status.name)
+                    ? e.status.name
+                    : (typeof e.status === "string" ? e.status : (e.status_name || ""));
                 
-                return createRowHtml(e.name, e.quantity, e.price, itemStatus, false);
+                return createRowHtml(e.name, e.quantity, e.price, itemStatus, false, {
+                    dealId: deal.id,
+                    element: e,
+                    elementIndex: idx,
+                    statusObj: {
+                        ...(e.status || {}),
+                        id: e.status?.id ?? e.status_id ?? e.statusId
+                    },
+                    lockStatus: isClosed
+                });
             }).join('');
         }
 
-        const isClosed = statusName.toLowerCase().includes("завершено");
-        const dealLink = (currentUser.role === 'staff') 
-            ? `<a href="https://crm.heavendevelop.ru/editDeal/${deal.id}" target="_blank" style="color: #2f7df6; text-decoration: none;">№ ${deal.num || deal.id}</a>`
-            : `№ ${deal.num || deal.id}`;
-        const createDealButton = currentUser.role === 'staff'
-            ? `<button onclick="createDealFromDeal(${deal.id}, this)" 
-                    style="margin:0 0 0 10px; width:auto; padding:3px 8px; font-size:11px; border-radius:4px; background:#f4f6f8; color:#777; border:1px solid #d9dde3;">
-                    + новая
-               </button>`
+        const dealLink = `<button type="button" class="deal-num-btn" onclick="openDealInTab(${deal.id})">№ ${escapeHtml(deal.num || deal.id)}</button>`;
+        const dealActionButtons = currentUser.role === 'staff'
+            ? `<button type="button" class="deal-action-btn" onclick="openCrmDealUrl(${deal.id})" title="Открыть заказ в CRM" aria-label="Открыть заказ в CRM">↗</button>
+               <button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`
             : "";
 
         card.innerHTML = `
             <div class="crm-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                 <div class="deal-num" style="font-weight: bold; font-size: 16px;">
                     ${dealLink}
-                    ${createDealButton}
+                    ${dealActionButtons}
                     <small style="font-weight:normal; color:#888; margin-left: 8px;">${deal.created_at || ''}</small>
                 </div>
-                <div class="status-badge" style="background:${bkColor}; color:${txtColor};">
-                    ${statusName}
-                </div>
+                ${statusControl}
             </div>
             <div class="client-name">👤 ${deal.client?.name || deal.client_name || 'Клиент не указан'}</div>
             <div class="elements-list">
@@ -1805,10 +2147,10 @@ function createDealCardById(id) {
 async function createDealFromDeal(sourceDealId, btn) {
     if (!sourceDealId) return;
 
-    const originalText = btn ? btn.innerText : "";
+    const originalHtml = btn ? btn.innerHTML : "";
     if (btn) {
         btn.disabled = true;
-        btn.innerText = "создаю...";
+        btn.innerHTML = "…";
         btn.style.opacity = "0.7";
     }
 
@@ -1852,7 +2194,7 @@ async function createDealFromDeal(sourceDealId, btn) {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerText = originalText;
+            btn.innerHTML = originalHtml;
             btn.style.opacity = "1";
         }
     }
@@ -1882,7 +2224,7 @@ function addToDeal(id) {
 
     row.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 8px; border-left:3px solid #8ab8ff; background:#f6f9ff; border-bottom:1px solid #e3ebf7; border-radius:4px; margin:4px 0;";
     row.innerHTML = `
-        <span style="flex: 1; font-size: 13px; line-height:1.25; padding-right:8px;">${fullName}, ${lastCalcData.qty} шт</span>
+        <span style="flex: 1; font-size: 13px; line-height:1.25; padding-right:8px;">${escapeHtml(fullName)}, ${lastCalcData.qty} шт</span>
         <b style="font-size:13px; white-space:nowrap;">${finalTotal.toLocaleString()} ₽</b>
         <button onclick="this.parentElement.remove(); updateDealTotal(document.getElementById('list-${id}'));" 
                 style="margin:0; width:18px; height:18px; min-width:18px; padding:0; background:#f3d5d5; color:#9b2c2c; border:1px solid #e2b5b5; border-radius:50%; cursor:pointer; font-size:13px; line-height:16px;">×</button>
