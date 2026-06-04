@@ -65,6 +65,27 @@
     .deal-action-btn:hover { background:#e8eef6; color:#2f7df6; }
     .deal-confirm-popover { position: fixed; z-index: 2000; width: 260px; padding: 12px; background: white; border: 1px solid #d9dde3; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); font-size: 13px; color: #333; }
     .deal-confirm-popover button { margin:0; width:auto; padding:6px 12px; font-size:12px; border-radius:6px; }
+    .crm-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid #f0f0f0; }
+    .payment-actions { display:flex; gap:5px; justify-content:center; }
+    .payment-action-btn { margin:0; width:21px; height:21px; min-width:21px; padding:0; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; border:0; box-shadow:0 2px 6px rgba(0,0,0,0.12); }
+    .payment-action-icon { width:12px; height:12px; border-radius:3px; display:inline-flex; align-items:center; justify-content:center; font-size:16px; line-height:10px; font-weight:bold; }
+    .payment-partial-btn { background:#40bd72; }
+    .payment-partial-btn .payment-action-icon { background:white; color:#40bd72; }
+    .payment-full-btn { background:white; }
+    .payment-full-btn .payment-action-icon { background:#40bd72; color:white; }
+    .payment-summary { width:230px; text-align:right; border:1px solid #eef1f5; border-radius:8px; overflow:hidden; font-size:12px; }
+    .payment-summary-row { display:grid; grid-template-columns: 70px 82px 62px; align-items:center; gap:4px; padding:3px 7px; background:#fff; border-bottom:1px solid #eef1f5; }
+    .payment-summary-row:last-child { border-bottom:none; }
+    .payment-summary-row.paid-row { background:#e9f8df; }
+    .payment-summary-label { color:#777; font-size:12px; font-weight:bold; }
+    .payment-summary-value { color:#333; font-size:12px; font-weight:bold; min-width:0; }
+    .payment-ok { color:#27ae60; }
+    .payment-alert { color:#e74c3c; }
+    .payment-modal-backdrop { position:fixed; inset:0; z-index:2200; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(0,0,0,0.35); box-sizing:border-box; }
+    .payment-modal { width:100%; max-width:420px; background:white; border-radius:12px; padding:18px; box-shadow:0 14px 36px rgba(0,0,0,0.22); }
+    .payment-modal h3 { margin-bottom:12px; }
+    .payment-modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+    .payment-modal-actions button { margin:0; width:auto; padding:9px 14px; font-size:14px; border-radius:7px; }
     .filter-btn { margin-top:0; padding:10px; min-height:39px; font-size:14px; }
     .status-dropdown { position: relative; }
     .status-dropdown-btn {
@@ -367,6 +388,13 @@
         .element-row span:nth-child(3) { font-size: 11px !important; }
         .crm-item > div:last-child { gap: 8px; flex-wrap: wrap; font-size: 11px !important; }
         .crm-item > div:last-child > div { font-size: 11px !important; }
+        .crm-footer { flex-wrap: nowrap !important; align-items: center !important; gap: 8px !important; }
+        .crm-footer .deal-payment-block { margin-left: auto; flex: 0 0 auto; }
+        .payment-summary { width: 218px; font-size: 11px; }
+        .payment-summary-row { grid-template-columns: 66px 78px 60px; gap: 4px; padding: 3px 6px; }
+        .payment-summary-label, .payment-summary-value { font-size: 11px !important; line-height: 1.15; }
+        .payment-action-btn { width: 20px; height: 20px; min-width: 20px; padding: 0 !important; }
+        .payment-action-icon { width: 11px; height: 11px; font-size: 15px !important; }
         .add-btn { font-size: 11px; padding: 5px 9px; }
     }
 </style>
@@ -399,8 +427,8 @@
 </div>
 
 <div class="tabs-nav">
-    <button class="tab-btn active" onclick="switchTab('main-tab')">Калькулятор</button>
-    <button class="tab-btn" id="adv-tab-btn" onclick="switchTab('search-tab')" style="display:none;">Поиск</button>
+    <button class="tab-btn active" data-tab-target="main-tab" onclick="switchTab('main-tab')">Калькулятор</button>
+    <button class="tab-btn" id="adv-tab-btn" data-tab-target="search-tab" onclick="switchTab('search-tab')" style="display:none;">Поиск</button>
 </div>
 
 <div id="main-tab" class="tab-content active">
@@ -601,6 +629,8 @@ function readSession() {
 let currentUser = readSession();
 let lastCalcData = null;
 const dealsCache = new Map();
+const tabScrollPositions = {};
+let lastNonDealTabId = "main-tab";
 let calendarMonth = new Date();
 let calendarRangeStart = "";
 let calendarRangeEnd = "";
@@ -770,6 +800,12 @@ function switchTab(id, trigger = null) {
     const target = document.getElementById(id);
     if (!target) return;
 
+    const currentTab = document.querySelector('.tab-content.active');
+    if (currentTab) {
+        tabScrollPositions[currentTab.id] = window.scrollY || window.pageYOffset || 0;
+        if (currentTab.id !== "deal-tab") lastNonDealTabId = currentTab.id;
+    }
+
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     target.classList.add('active');
@@ -778,6 +814,10 @@ function switchTab(id, trigger = null) {
         || (typeof event !== "undefined" ? event.currentTarget : null)
         || document.querySelector(`.tab-btn[data-tab-target="${id}"]`);
     if (activeBtn) activeBtn.classList.add('active');
+
+    requestAnimationFrame(() => {
+        window.scrollTo(0, tabScrollPositions[id] || 0);
+    });
 }
 function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }
 function fillFormatOptions(p) { let el = document.getElementById("format"); el.innerHTML = ""; let data = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); for (let k in data) { let o = document.createElement("option"); o.value = k; o.text = Array.isArray(data[k]) ? `${k} (${data[k][0]}x${data[k][1]} мм)` : data[k]; el.appendChild(o); } }
@@ -1951,6 +1991,209 @@ function getDealClientName(deal) {
     return deal?.client?.name || deal?.client_name || "клиента";
 }
 
+const PAYMENT_METHODS = [
+    "Безнал Р/С",
+    "перевод на карту",
+    "наличные",
+    "бартер",
+    "баланс клиента",
+    "пластиковой картой"
+];
+
+function toMoneyNumber(value, fallback = 0) {
+    if (value == null || value === "") return fallback;
+    if (typeof value === "string") {
+        const normalized = value.replace(/\s+/g, "").replace(",", ".").replace(/[^\d.-]/g, "");
+        const n = Number(normalized);
+        return Number.isFinite(n) ? n : fallback;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function getDealFinancials(deal) {
+    const total = toMoneyNumber(deal?.amount ?? deal?.total ?? deal?.sum, 0);
+    const explicitDebt = deal?.debt ?? deal?.debt_amount ?? deal?.debtAmount;
+    let paid = toMoneyNumber(
+        deal?.paid ?? deal?.paid_amount ?? deal?.paidAmount ?? deal?.payment_sum ?? deal?.paymentSum ?? deal?.payed ?? deal?.payed_amount,
+        null
+    );
+
+    if (paid == null && explicitDebt != null) {
+        paid = Math.max(0, total - toMoneyNumber(explicitDebt, 0));
+    }
+    if (paid == null) paid = 0;
+
+    const debt = Math.max(0, total - paid);
+    return {
+        total,
+        paid,
+        debt,
+        isPaid: total > 0 && debt <= 0.009
+    };
+}
+
+function formatMoney(value) {
+    return Number(value || 0).toLocaleString('ru-RU', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function renderPaymentSummary(deal, isClosed = false) {
+    const f = getDealFinancials(deal);
+    const debtClass = f.debt > 0.009 ? "payment-alert" : "payment-ok";
+    const canAddPayment = currentUser.role === 'staff' && !isClosed;
+    const actions = canAddPayment ? `
+        <div class="payment-actions">
+            <button type="button" class="payment-action-btn payment-partial-btn" onclick="openPaymentModal(${deal.id}, 'partial')" title="Добавить частичную сумму к оплате" aria-label="Добавить частичную сумму к оплате"><span class="payment-action-icon">+</span></button>
+            <button type="button" class="payment-action-btn payment-full-btn" onclick="openPaymentModal(${deal.id}, 'full')" title="Добавить всю сумму" aria-label="Добавить всю сумму"><span class="payment-action-icon">+</span></button>
+        </div>` : "";
+
+    return `
+        <div class="deal-payment-block" id="payment-block-${deal.id}" style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+            <div class="payment-summary">
+                <div class="payment-summary-row">
+                    <span class="payment-summary-label">Всего</span>
+                    <span class="payment-summary-value" id="payment-total-${deal.id}">${formatMoney(f.total)}</span>
+                    <span></span>
+                </div>
+                <div class="payment-summary-row paid-row">
+                    <span class="payment-summary-label">Оплачено</span>
+                    <span class="payment-summary-value" id="payment-paid-${deal.id}">${formatMoney(f.paid)}</span>
+                    ${actions || "<span></span>"}
+                </div>
+                <div class="payment-summary-row">
+                    <span class="payment-summary-label">Долг</span>
+                    <span class="payment-summary-value ${debtClass}" id="payment-debt-${deal.id}">${formatMoney(f.debt)}</span>
+                    <span></span>
+                </div>
+            </div>
+        </div>`;
+}
+
+function renderDealTotalOnly(deal) {
+    const f = getDealFinancials(deal);
+    const totalClass = f.isPaid ? "payment-ok" : "payment-alert";
+    return `<div id="deal-total-only-${deal.id}" class="${totalClass}" style="font-weight: bold; font-size: 16px;">Итого: ${formatMoney(f.total)} ₽</div>`;
+}
+
+function refreshPaymentBlock(dealId) {
+    const deal = dealsCache.get(String(dealId));
+    const block = document.getElementById(`payment-block-${dealId}`);
+    if (!deal || !block) return;
+
+    const statusObj = (deal.status && typeof deal.status === "object") ? deal.status : {};
+    const statusName = statusObj.name || (typeof deal.status === "string" ? deal.status : "") || deal.status_name || deal.status_text || "";
+    const isClosed = statusName.toLowerCase().includes("завершено");
+    block.outerHTML = renderPaymentSummary(deal, isClosed);
+}
+
+function openPaymentModal(dealId, mode = "partial") {
+    const deal = dealsCache.get(String(dealId));
+    if (!deal) return;
+
+    const f = getDealFinancials(deal);
+    const defaultAmount = mode === "full" ? f.debt : "";
+    const isFullPayment = mode === "full";
+    document.querySelectorAll('.payment-modal-backdrop').forEach(el => el.remove());
+
+    const modal = document.createElement('div');
+    modal.className = 'payment-modal-backdrop';
+    modal.innerHTML = `
+        <div class="payment-modal" onclick="event.stopPropagation()">
+            <h3>Добавить оплату</h3>
+            <label>Сумма</label>
+            <input id="paymentAmountInput" type="number" min="0" step="0.01" inputmode="decimal" value="${isFullPayment ? Number(defaultAmount).toFixed(2) : ""}" ${isFullPayment ? 'readonly style="background:#f1f3f5;"' : ''}>
+            <label>Метод оплаты</label>
+            <select id="paymentMethodSelect">
+                ${PAYMENT_METHODS.map(method => `<option value="${escapeHtml(method)}">${escapeHtml(method)}</option>`).join('')}
+            </select>
+            <label>Основание</label>
+            <textarea id="paymentReasonInput" rows="3" placeholder="Можно оставить пустым"></textarea>
+            <div class="payment-modal-actions">
+                <button type="button" onclick="closePaymentModal()" style="background:#eef1f5; color:#555;">Отмена</button>
+                <button type="button" onclick="submitPayment(${dealId}, this)" style="background:#27ae60;">Добавить оплату</button>
+            </div>
+        </div>`;
+
+    modal.onclick = closePaymentModal;
+    document.body.appendChild(modal);
+    document.getElementById('paymentAmountInput')?.focus();
+}
+
+function closePaymentModal() {
+    document.querySelectorAll('.payment-modal-backdrop').forEach(el => el.remove());
+}
+
+async function submitPayment(dealId, btn) {
+    const deal = dealsCache.get(String(dealId));
+    const amountInput = document.getElementById('paymentAmountInput');
+    const methodSelect = document.getElementById('paymentMethodSelect');
+    const reasonInput = document.getElementById('paymentReasonInput');
+    const amount = toMoneyNumber(amountInput?.value, 0);
+    const f = getDealFinancials(deal);
+
+    if (!deal || amount <= 0) {
+        alert("Введите сумму оплаты");
+        return;
+    }
+    if (amount - f.debt > 0.009) {
+        alert("Сумма оплаты больше долга");
+        return;
+    }
+
+    const originalText = btn?.innerText || "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Сохраняем...";
+    }
+
+    try {
+        const response = await fetch(N8N_URL, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: 'addPayment',
+                dealId: dealId,
+                amount: amount,
+                method: methodSelect?.value || "",
+                reason: reasonInput?.value?.trim() || "",
+                staffId: currentUser.crmId || null
+            })
+        });
+
+        if (response.status === 401) {
+            alert("Сессия истекла. Войдите снова.");
+            logout();
+            return;
+        }
+        if (!response.ok) throw new Error("Ошибка добавления оплаты");
+
+        let data = null;
+        try { data = await response.json(); } catch (e) {}
+        const updatedDeal = normalizeDealResponse(data, true);
+        if (updatedDeal && updatedDeal.id) {
+            dealsCache.set(String(updatedDeal.id), { ...deal, ...updatedDeal });
+        } else {
+            deal.paid = f.paid + amount;
+            deal.debt = Math.max(0, f.debt - amount);
+            dealsCache.set(String(dealId), deal);
+        }
+
+        closePaymentModal();
+        refreshPaymentBlock(dealId);
+    } catch (e) {
+        alert("Не удалось добавить оплату");
+        console.error(e);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    }
+}
+
 function openDealInTab(dealId) {
     const deal = dealsCache.get(String(dealId));
     if (!deal) return;
@@ -1983,7 +2226,7 @@ function openDealInTab(dealId) {
         </div>`;
 
     const detailContainer = tabContent.querySelector('#deal-detail');
-    renderDealsList([deal], detailContainer);
+    renderDealsList([deal], detailContainer, { detailMode: true });
     switchTab(tabId, tabBtn);
 }
 
@@ -1992,9 +2235,15 @@ function closeDealTab() {
     const tabContent = document.getElementById('deal-tab');
     const wasActive = tabContent?.classList.contains('active');
 
+    if (tabContent) tabScrollPositions["deal-tab"] = window.scrollY || window.pageYOffset || 0;
     if (tabBtn) tabBtn.remove();
     if (tabContent) tabContent.remove();
-    if (wasActive) switchTab('main-tab', document.querySelector('.tab-btn[onclick*="main-tab"]'));
+    if (wasActive) {
+        const fallbackTabId = document.getElementById(lastNonDealTabId) ? lastNonDealTabId : "main-tab";
+        const fallbackBtn = document.querySelector(`.tab-btn[data-tab-target="${fallbackTabId}"]`) 
+            || document.querySelector(`.tab-btn[onclick*="${fallbackTabId}"]`);
+        switchTab(fallbackTabId, fallbackBtn);
+    }
 }
 
 function showCreateDealConfirm(sourceDealId, btn) {
@@ -2027,9 +2276,10 @@ function showCreateDealConfirm(sourceDealId, btn) {
     };
 }
 
-function renderDealsList(deals, targetDiv) {
+function renderDealsList(deals, targetDiv, options = {}) {
     if (!targetDiv) return;
     targetDiv.innerHTML = ""; 
+    const isDetailMode = Boolean(options.detailMode);
 
     deals.forEach(deal => {
         if (!isValidDeal(deal)) return;
@@ -2097,12 +2347,12 @@ function renderDealsList(deals, targetDiv) {
                     <button class="add-btn" onclick="addToDeal(${deal.id})">+ Добавить расчет</button>
                 </div>` : ''}
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f0f0f0;">
+            <div class="crm-footer">
                 <div id="save-area-${deal.id}" style="display: none;">
                     <button onclick="saveDeal(${deal.id})" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
                 </div>
                 <div style="font-size: 12px; color: #777;">Менеджер: <b>${deal.employee_name || '—'}</b></div>
-                <div style="font-weight: bold; font-size: 16px;">Итого: <span id="total-${deal.id}">${Number(deal.amount || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2})}</span> ₽</div>
+                ${isDetailMode ? renderPaymentSummary(deal, isClosed) : renderDealTotalOnly(deal)}
             </div>`;
             
         targetDiv.appendChild(card);
@@ -2111,6 +2361,9 @@ function renderDealsList(deals, targetDiv) {
 
 function createDealCardById(id) {
     if (!id) return null;
+
+    const deal = { id: id, amount: 0, paid: 0, debt: 0 };
+    dealsCache.set(String(id), deal);
 
     const card = document.createElement('div');
     card.className = 'crm-item';
@@ -2133,12 +2386,12 @@ function createDealCardById(id) {
                 <button class="add-btn" onclick="addToDeal(${id})">+ Добавить расчет</button>
             </div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f0f0f0;">
+        <div class="crm-footer">
             <div id="save-area-${id}" style="display: none;">
                 <button onclick="saveDeal(${id})" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
             </div>
             <div style="font-size: 12px; color: #777;">Менеджер: <b>—</b></div>
-            <div style="font-weight: bold; font-size: 16px;">Итого: <span id="total-${id}">0</span> ₽</div>
+            ${renderDealTotalOnly(deal)}
         </div>`;
 
     return card;
@@ -2319,7 +2572,25 @@ function updateDealTotal(el) {
             if (Number.isFinite(intPart)) sum += Math.round(intPart + decPart);
         }
     });
-    const id = el.id.replace('list-', ''); document.getElementById(`total-${id}`).innerText = sum.toLocaleString();
+    const id = el.id.replace('list-', '');
+    const deal = dealsCache.get(String(id));
+    if (deal) {
+        const financials = getDealFinancials(deal);
+        deal.amount = sum;
+        deal.debt = Math.max(0, sum - financials.paid);
+        dealsCache.set(String(id), deal);
+        const paymentBlock = document.getElementById(`payment-block-${id}`);
+        if (paymentBlock) {
+            refreshPaymentBlock(id);
+        } else {
+            const totalOnlyEl = document.getElementById(`deal-total-only-${id}`);
+            if (totalOnlyEl) totalOnlyEl.outerHTML = renderDealTotalOnly(deal);
+        }
+        return;
+    }
+
+    const oldTotalEl = document.getElementById(`total-${id}`);
+    if (oldTotalEl) oldTotalEl.innerText = sum.toLocaleString();
 }
 
 // --- ИНИЦИАЛИЗАЦИЯ ---
