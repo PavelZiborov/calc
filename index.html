@@ -54,16 +54,32 @@
     .status-menu-option:hover { background:#f2f5f8; }
     .status-menu-color { width:14px; height:14px; border-radius:4px; flex:0 0 14px; }
     .elements-list { background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 8px 12px; }
-    .element-row { border-bottom: 1px solid #eee; transition: background 0.5s; display: flex; align-items: center; padding: 8px 0; position: relative; }
+    .element-row { border-bottom: 1px solid #eee; transition: background 0.5s; display: flex; align-items: flex-start; flex-wrap: nowrap; gap: 6px; padding: 8px 0; position: relative; }
     .element-row:last-child { border-bottom: none; }
+    .element-row > .item-status-control,
+    .element-row > span:first-child { flex: 0 0 auto; }
+    .element-row-text { flex: 1 1 auto; min-width: 0; padding-right: 6px; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; word-break: break-word; }
+    .element-row-total { flex: 0 0 auto; margin-left: auto; font-weight: bold; white-space: nowrap; font-size: 12px; line-height: 1.2; text-align: right; }
+    .deal-total-only { font-weight: bold; font-size: 12px; line-height: 1.2; }
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
     .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
-    .readonly-mode .add-btn, .readonly-mode [id^="save-area-"] { display: none !important; }
+    .readonly-mode .add-btn, .readonly-mode .deal-save-area { display: none !important; }
     .deal-num-btn { margin:0; padding:0; width:auto; background:transparent; color:#2f7df6; border:none; font-size:16px; line-height:1.2; }
     .deal-num-btn:hover { background:transparent; color:#1e5fcb; text-decoration: underline; }
     .deal-action-btn { margin:0 0 0 6px; width:24px; height:24px; min-width:24px; padding:0; border-radius:6px; background:#f4f6f8; color:#555; border:1px solid #d9dde3; font-size:13px; line-height:22px; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; }
     .deal-action-btn:hover { background:#e8eef6; color:#2f7df6; }
-    .deal-confirm-popover { position: fixed; z-index: 2000; width: 260px; padding: 12px; background: white; border: 1px solid #d9dde3; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); font-size: 13px; color: #333; }
+    .deal-action-group { display:inline-flex; align-items:center; gap:2px; margin-left:6px; vertical-align:middle; }
+    .deal-action-group .deal-action-btn { margin:0; width:17px; height:17px; min-width:17px; font-size:10px; line-height:15px; border-radius:4px; }
+    .deal-action-group .deal-crm-btn { margin-left:5px; }
+    .deal-header-detail { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+    .deal-num-line { display:flex; align-items:center; flex-wrap:wrap; gap:4px; min-width:0; }
+    .deal-header-side { display:flex; align-items:flex-start; gap:8px; flex-shrink:0; }
+    .deal-footer-left { display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; }
+    .deal-footer-meta { font-size:12px; color:#777; line-height:1.45; }
+    .deal-footer-meta b { color:#444; font-weight:bold; }
+    .deal-confirm-popover, .deal-contact-popover { position: fixed; z-index: 2000; width: 260px; padding: 12px; background: white; border: 1px solid #d9dde3; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); font-size: 13px; color: #333; }
+    .deal-contact-popover a { color:#2f7df6; text-decoration:none; }
+    .deal-contact-popover a:hover { text-decoration:underline; }
     .deal-confirm-popover button { margin:0; width:auto; padding:6px 12px; font-size:12px; border-radius:6px; }
     .crm-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid #f0f0f0; }
     .payment-actions { display:flex; gap:5px; justify-content:center; }
@@ -169,19 +185,24 @@
         align-items: flex-end;
         gap: 10px;
         margin-bottom: 14px;
+        flex-wrap: nowrap;
     }
-    .advanced-toolbar .col { min-width: 0; }
-    .clear-filters-btn {
+    .advanced-toolbar .col { flex: 1 1 0; min-width: 0; }
+    .advanced-toolbar .clear-filters-btn {
+        flex: 0 0 auto;
+        margin-left: auto;
+        align-self: flex-end;
         width: 44px;
         min-width: 44px;
-        height: 44px;
+        height: 40px;
         margin-top: 0;
         padding: 0;
         border-radius: 8px;
         background: #2f7df6;
-        font-size: 24px;
+        font-size: 22px;
         line-height: 1;
     }
+    .manager-option { padding-left: 10px; }
     .advanced-search-row {
         display: flex;
         align-items: stretch;
@@ -358,9 +379,10 @@
         .row { gap: 12px; }
         .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
         #search-tab .row { flex-direction: column; align-items: stretch !important; }
-        #search-tab .advanced-toolbar { gap: 8px; align-items: flex-end; }
+        #search-tab .advanced-toolbar { gap: 6px; align-items: flex-end; flex-wrap: nowrap; }
         #search-tab .advanced-toolbar .col { flex: 1 1 0; min-width: 0; }
-        #search-tab .advanced-toolbar label { font-size: 13px; white-space: nowrap; }
+        #search-tab .advanced-toolbar label { font-size: 12px; white-space: nowrap; }
+        #search-tab .advanced-toolbar .clear-filters-btn { width: 40px; min-width: 40px; height: 42px; font-size: 20px; }
         .advanced-search-row button { width: 52px; min-width: 52px; }
         #main-tab .row { flex-direction: row; gap: 10px; }
         #main-tab .col { min-width: 0; }
@@ -382,10 +404,10 @@
         .status-badge { max-width: 100%; font-size: 9px; line-height: 1.2; white-space: normal; padding: 3px 7px; }
         .client-name { font-size: 12px; line-height: 1.25; }
         .elements-list { padding: 8px; overflow: hidden; }
-        .element-row { align-items: flex-start; gap: 6px; flex-wrap: wrap; }
-        .element-row span { font-size: 11px !important; line-height: 1.2; }
-        .element-row span:nth-child(2) { flex: 1 1 calc(100% - 36px); min-width: 0; overflow-wrap: anywhere; }
-        .element-row span:nth-child(3) { font-size: 11px !important; }
+        .element-row { align-items: flex-start; gap: 6px; flex-wrap: nowrap; }
+        .element-row-text, .element-row-total, .deal-total-only { font-size: 11px !important; line-height: 1.2; }
+        .element-row-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+        .element-row-total { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
         .crm-item > div:last-child { gap: 8px; flex-wrap: wrap; font-size: 11px !important; }
         .crm-item > div:last-child > div { font-size: 11px !important; }
         .crm-footer { flex-wrap: nowrap !important; align-items: center !important; gap: 8px !important; }
@@ -576,12 +598,19 @@
                     </div>
                 </div>
             </div>
+            <div class="col">
+                <label>Менеджер</label>
+                <div class="status-dropdown" id="advManagerDropdown">
+                    <button type="button" class="status-dropdown-btn" onclick="toggleManagerDropdown()"></button>
+                    <div class="status-dropdown-list" id="advManagerList"></div>
+                </div>
+            </div>
+            <button type="button" class="clear-filters-btn" onclick="clearAdvFilters()" title="Сбросить фильтры" aria-label="Сбросить фильтры">🔄</button>
         </div>
         <label>Поиск заказов</label>
         <div class="advanced-search-row">
             <input type="text" id="advSearchInput" placeholder="">
             <button onclick="searchCRM('adv')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
-            <button onclick="clearAdvFilters()" style="background:#2f7df6;" title="Очистить фильтры" aria-label="Очистить фильтры">🔄</button>
         </div>
         <div id="advCrmLoader" class="loader">Поиск по архиву...</div>
         <div id="advCrmResults" class="readonly-mode"></div>
@@ -594,22 +623,6 @@ const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 const SERVER_TIMEOUT_MS = 15000;
 const SERVER_UNAVAILABLE_MESSAGE = "Сервер не отвечает, попробуйте позднее";
-const DEFAULT_CRM_STATUSES = [
-    { id: 6059, name: "Дизайн", bk_color: "#FC3BFF", text_color: "white" },
-    { id: 6058, name: "Согласование", bk_color: "#7E57C2", text_color: "white" },
-    { id: 6060, name: "Печать", bk_color: "#29b6f6", text_color: "black" },
-    { id: 6057, name: "Завершено", bk_color: "#33B86C", text_color: "black" },
-    { id: 20606, name: "Документы", bk_color: "#A2F6FF", text_color: "black" },
-    { id: 24873, name: "Заказ готов", bk_color: "#3EE084", text_color: "black" },
-    { id: 6330, name: "Ждем оплату", bk_color: "#FF5955", text_color: "white" },
-    { id: 7762, name: "Отгружено, ждем оплату", bk_color: "#D44A47", text_color: "white" },
-    { id: 15913, name: "Заказ готов к выдаче", bk_color: "#95FF1C", text_color: "black" },
-    { id: 10132, name: "Выставить счет", bk_color: "#E67E22", text_color: "black" },
-    { id: 6335, name: "Оплачено, ожидает выдачи", bk_color: "#34495e", text_color: "white" },
-    { id: 23912, name: "Перезаказ", bk_color: "#D3D3D3", text_color: "black" },
-    { id: 20605, name: "Отменен", bk_color: "#6E49C2", text_color: "white" }
-];
-
 function fetchWithTimeout(url, options = {}, timeoutMs = SERVER_TIMEOUT_MS) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -620,7 +633,12 @@ function fetchWithTimeout(url, options = {}, timeoutMs = SERVER_TIMEOUT_MS) {
 
 function readSession() {
     try {
-        return JSON.parse(localStorage.getItem('calc_session')) || { role: 'guest', login: '', token: '' };
+        const raw = JSON.parse(localStorage.getItem('calc_session'));
+        if (!raw) return { role: 'guest', login: '', token: '' };
+        if (raw.token && (raw.role === 'staff' || raw.role === 'client')) {
+            return buildUserSession(raw, raw.login || '');
+        }
+        return raw;
     } catch (e) {
         localStorage.removeItem('calc_session');
         return { role: 'guest', login: '', token: '' };
@@ -629,18 +647,85 @@ function readSession() {
 let currentUser = readSession();
 let lastCalcData = null;
 const dealsCache = new Map();
+let dealTabFetchToken = 0;
 const tabScrollPositions = {};
 let lastNonDealTabId = "main-tab";
 let calendarMonth = new Date();
 let calendarRangeStart = "";
 let calendarRangeEnd = "";
 
+function getSessionExpiryTime(session = currentUser) {
+    const value = session?.expiresAt;
+    if (!value) return null;
+
+    if (typeof value === "number") {
+        return value < 1000000000000 ? value * 1000 : value;
+    }
+
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber)) {
+        return asNumber < 1000000000000 ? asNumber * 1000 : asNumber;
+    }
+
+    const asDate = Date.parse(value);
+    return Number.isFinite(asDate) ? asDate : null;
+}
+
+function isSessionExpired(session = currentUser) {
+    if (session?.role !== 'staff' && session?.role !== 'client') return false;
+    if (!session?.token) return true;
+
+    const expiresAt = getSessionExpiryTime(session);
+    return expiresAt != null && Date.now() >= expiresAt;
+}
+
+function resetAuthToGuest() {
+    localStorage.removeItem('calc_session');
+    currentUser = { role: 'guest', login: '', token: '' };
+
+    const badge = document.getElementById('role-badge');
+    const nameDisp = document.getElementById('user-display-name');
+    const authBtn = document.getElementById('authBtn');
+    const crmContainer = document.getElementById('crm-search-container');
+    const advTabBtn = document.getElementById('adv-tab-btn');
+
+    if (badge) {
+        badge.innerText = "ГОСТЬ";
+        badge.style.background = "#7f8c8d";
+    }
+    if (nameDisp) nameDisp.innerText = "Режим просмотра";
+    if (authBtn) {
+        authBtn.innerText = "Войти";
+        authBtn.onclick = toggleAuthModal;
+    }
+    if (crmContainer) crmContainer.style.display = 'none';
+    if (advTabBtn) advTabBtn.style.display = 'none';
+}
+
+function ensureActiveSession(options = {}) {
+    if (!isSessionExpired()) return true;
+
+    resetAuthToGuest();
+    if (!options.silent) alert("Сессия истекла. Войдите снова.");
+
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.style.display = 'flex';
+    return false;
+}
+
+function handleUnauthorized() {
+    resetAuthToGuest();
+    alert("Сессия истекла. Войдите снова.");
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
 function normalizeStatuses(statuses) {
     if (!Array.isArray(statuses)) return [];
 
     return statuses
         .map(status => ({
-            id: Number(status.status_id ?? status.id),
+            id: Number(status.status_id ?? status.statusId ?? status.id),
             name: status.name || "",
             bk_color: status.bk_color || "#dfdfdf",
             text_color: status.text_color || "black",
@@ -651,9 +736,88 @@ function normalizeStatuses(statuses) {
         .filter(status => Number.isInteger(status.id) && status.name);
 }
 
+function normalizePaymentMethods(methods) {
+    if (!Array.isArray(methods)) return [];
+
+    return methods
+        .map(method => ({
+            id: Number(method.payment_id ?? method.payment_method_id ?? method.paymentMethodId ?? method.id),
+            name: method.name || "",
+            show_in_expenses: Boolean(method.show_in_expenses),
+            is_cash: Boolean(method.is_cash),
+            is_balance: Boolean(method.is_balance)
+        }))
+        .filter(method => Number.isFinite(method.id) && method.name);
+}
+
+function normalizeElementStatuses(statuses) {
+    if (!Array.isArray(statuses)) return [];
+
+    return statuses
+        .map(status => {
+            const name = (status.name || "").trim();
+            const iconMeta = getStatusIcon(name);
+            const isManual = typeof status.is_manual === "boolean"
+                ? status.is_manual
+                : name.toLowerCase() !== "постпечать";
+
+            return {
+                id: Number(status.status_id ?? status.statusId ?? status.id),
+                name: name || iconMeta.label,
+                bk_color: status.bk_color || iconMeta.color,
+                text_color: status.text_color || "white",
+                is_manual: isManual,
+                icon: status.icon || iconMeta.icon
+            };
+        })
+        .filter(status => Number.isFinite(status.id) && status.name);
+}
+
+function parseAuthResponse(data) {
+    let session = Array.isArray(data) ? data[0] : data;
+    if (Array.isArray(session)) session = session[0];
+    if (session?.json) session = session.json;
+    return session;
+}
+
+function buildUserSession(session, fallbackLogin = "") {
+    return {
+        role: session.role,
+        login: session.name || session.login || fallbackLogin,
+        token: session.token,
+        crmId: session.crmId,
+        clientName: session.name || session.clientName || "",
+        expiresAt: session.expiresAt,
+        statuses: normalizeStatuses(session.dealStatuses || session.statuses),
+        paymentMethods: normalizePaymentMethods(session.paymentMethods),
+        elementStatuses: normalizeElementStatuses(session.elementStatuses),
+        managers: normalizeManagers(session.managers || session.employees || session.responsibles)
+    };
+}
+
+function normalizeManagers(managers) {
+    if (!Array.isArray(managers)) return [];
+
+    return managers
+        .filter(manager => manager?.fired !== true && manager?.active !== false)
+        .map(manager => ({
+            id: Number(manager.user_id ?? manager.userId ?? manager.employee_id ?? manager.manager_id ?? manager.crmId ?? manager.id),
+            name: (manager.fio || manager.name || "").trim()
+        }))
+        .filter(manager => Number.isFinite(manager.id) && manager.name)
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+}
+
 function getCrmStatuses() {
-    const sessionStatuses = normalizeStatuses(currentUser.statuses);
-    return sessionStatuses.length ? sessionStatuses : DEFAULT_CRM_STATUSES;
+    return normalizeStatuses(currentUser.statuses);
+}
+
+function getManagers() {
+    return normalizeManagers(currentUser.managers);
+}
+
+function getPaymentMethods() {
+    return normalizePaymentMethods(currentUser.paymentMethods);
 }
 
 function authHeaders() {
@@ -687,20 +851,13 @@ async function attemptLogin(event) {
             body: JSON.stringify({ action: 'auth', clientId: clientId, password: pass })
         });
         const data = await response.json();
-        const session = Array.isArray(data) ? data[0] : data;
+        const session = parseAuthResponse(data);
 
         if (response.ok && session?.role && session?.token) {
-            currentUser = {
-                role: session.role,
-                login: session.name || clientId,
-                token: session.token,
-                crmId: session.crmId,
-                clientName: session.name,
-                expiresAt: session.expiresAt,
-                statuses: normalizeStatuses(session.statuses)
-            };
+            currentUser = buildUserSession(session, clientId);
             localStorage.setItem('calc_session', JSON.stringify(currentUser));
-            location.reload();
+            toggleAuthModal();
+            applyPermissions();
         } else {
             errorDiv.innerText = "За получением логина и пароля обратитесь к вашему менеджеру";
         }
@@ -711,7 +868,11 @@ async function attemptLogin(event) {
     }
 }
 
-function logout() { localStorage.removeItem('calc_session'); location.reload(); }
+function logout() {
+    localStorage.removeItem('calc_session');
+    clearOpenDealState();
+    location.reload();
+}
 
 function applyPermissions() {
     const badge = document.getElementById('role-badge');
@@ -741,6 +902,8 @@ function applyPermissions() {
         
         if (currentUser.role === 'staff') {
             document.getElementById('adv-tab-btn').style.display = 'block';
+            fillStatusFilter();
+            fillManagerFilter();
         }
     }
 }
@@ -1260,6 +1423,8 @@ function updateSelectedPrice(pOne, total, mult) {
 
 // --- РАСЧЕТ ---
 async function calc() {
+    if (!ensureActiveSession()) return;
+
     const type = document.getElementById("type").value;
     const tir = Number(document.getElementById("tirazh").value);
     const lay = Number(document.getElementById("layout").value);
@@ -1432,6 +1597,8 @@ async function calc() {
 
 // --- CRM ЛОГИКА ---
 async function searchCRM(mode) {
+    if (!ensureActiveSession()) return;
+
     const resId = mode === 'main' ? 'crmResults' : 'advCrmResults';
     const loadId = mode === 'main' ? 'crmLoader' : 'advCrmLoader';
     const resDiv = document.getElementById(resId);
@@ -1456,9 +1623,19 @@ async function searchCRM(mode) {
         .filter(Number.isInteger);
     const selectedStatusNames = selectedStatusInputs.map(input => input.dataset.name || "");
 
+    const selectedManagerInputs = mode === 'adv'
+        ? Array.from(document.querySelectorAll('#advManagerList input[type="checkbox"]:checked'))
+        : [];
+    const selectedManagers = selectedManagerInputs
+        .map(input => Number(input.value))
+        .filter(Number.isFinite);
+    const selectedManagerNames = selectedManagerInputs.map(input => input.dataset.name || "");
+
     const advFilters = mode === 'adv' ? {
         status: selectedStatuses,
         statusNames: selectedStatusNames,
+        managers: selectedManagers,
+        managerNames: selectedManagerNames,
         dateFrom: formatDateForWebhook(document.getElementById('advDateFrom')?.value || ""),
         dateTo: formatDateForWebhook(document.getElementById('advDateTo')?.value || "")
     } : {};
@@ -1490,8 +1667,8 @@ async function searchCRM(mode) {
         });
 
         if (res.status === 401) {
-            alert("Сессия истекла. Войдите снова.");
-            logout(); return;
+            handleUnauthorized();
+            return;
         }
 
         const data = await res.json();
@@ -1528,6 +1705,38 @@ function normalizeDealResponse(data, allowIdOnly = false) {
     let deal = Array.isArray(data) ? (data[0]?.json || data[0]) : (data?.item || data?.deal || data?.json || data);
     if (Array.isArray(deal)) deal = deal[0]?.json || deal[0];
     return isValidDeal(deal, allowIdOnly) ? deal : null;
+}
+
+async function fetchDealDetails(dealId) {
+    if (!dealId) return null;
+
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: 'getDeal',
+                dealId: Number(dealId)
+            })
+        });
+
+        if (response.status === 401) {
+            handleUnauthorized();
+            return null;
+        }
+        if (!response.ok) throw new Error("Ошибка загрузки заказа");
+
+        const data = await response.json();
+        const deal = normalizeDealForView(normalizeDealResponse(data));
+        if (deal) {
+            dealsCache.set(String(deal.id), deal);
+            return deal;
+        }
+        return null;
+    } catch (e) {
+        console.error("fetchDealDetails failed", e);
+        return null;
+    }
 }
 
 function findCrmStatus(status) {
@@ -1571,14 +1780,14 @@ function renderDealStatusControl(dealId, statusMeta, isLocked = false) {
 }
 
 function renderElementStatusControl(dealId, element, elementIndex, statusMeta, isLocked = false) {
-    const s = getStatusIcon(statusMeta.name);
+    const icon = statusMeta.icon || getStatusIcon(statusMeta.name).icon;
     const elementId = getElementId(element);
 
     if (currentUser.role !== 'staff' || isLocked) {
-        return `<span title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${s.icon}</span>`;
+        return `<span title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${icon}</span>`;
     }
 
-    return `<button type="button" class="item-status-control" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}">${s.icon}</button>`;
+    return `<button type="button" class="item-status-control" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}">${icon}</button>`;
 }
 
 function showStatusMenu(event, trigger) {
@@ -1589,7 +1798,7 @@ function showStatusMenu(event, trigger) {
 
     const menu = document.createElement('div');
     menu.className = 'status-menu';
-    const statuses = trigger.dataset.statusScope === "element" ? getElementStatuses() : getCrmStatuses();
+    const statuses = trigger.dataset.statusScope === "element" ? getElementStatuses({ manualOnly: true }) : getCrmStatuses();
 
     statuses.forEach(status => {
         const option = document.createElement('button');
@@ -1642,6 +1851,9 @@ function updateCachedStatus(trigger, status) {
     }
 
     dealsCache.set(dealId, deal);
+    if (document.getElementById('deal-tab') && String(dealId) === String(document.querySelector('#deal-detail .crm-item')?.id?.replace('deal-', ''))) {
+        saveOpenDealState(deal);
+    }
 }
 
 function refreshStatusControls(trigger, status) {
@@ -1657,14 +1869,16 @@ function refreshStatusControls(trigger, status) {
             control.style.background = status.bk_color;
             control.style.color = status.text_color;
         } else {
-            const s = getStatusIcon(status.name);
-            control.innerText = s.icon;
+            const icon = status.icon || getStatusIcon(status.name).icon;
+            control.innerText = icon;
             control.title = status.name;
         }
     });
 }
 
 async function updateCrmStatus(trigger, status, menu) {
+    if (!ensureActiveSession()) return;
+
     const scope = trigger.dataset.statusScope;
     const dealId = Number(trigger.dataset.dealId);
     const elementId = trigger.dataset.elementId || null;
@@ -1696,8 +1910,7 @@ async function updateCrmStatus(trigger, status, menu) {
         });
 
         if (response.status === 401) {
-            alert("Сессия истекла. Войдите снова.");
-            logout();
+            handleUnauthorized();
             return;
         }
         if (!response.ok) throw new Error("Ошибка обновления статуса");
@@ -1720,12 +1933,30 @@ function fillStatusFilter() {
         <label class="status-option">
             <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="updateStatusDropdownLabel()">
             <span class="status-color-marker" style="background:${s.bk_color};"></span>
-            <span class="status-option-name">${s.name}</span>
+            <span class="status-option-name">${escapeHtml(s.name)}</span>
             <span class="status-checkmark">✓</span>
         </label>
     `).join('');
 
     updateStatusDropdownLabel();
+}
+
+function fillManagerFilter() {
+    const list = document.getElementById('advManagerList');
+    if (!list) return;
+
+    const managers = getManagers();
+    list.innerHTML = managers.length
+        ? managers.map(manager => `
+            <label class="status-option manager-option">
+                <input type="checkbox" value="${manager.id}" data-name="${manager.name}" onchange="updateManagerDropdownLabel()">
+                <span class="status-option-name">${escapeHtml(manager.name)}</span>
+                <span class="status-checkmark">✓</span>
+            </label>
+        `).join('')
+        : `<div style="padding:10px; color:#888; font-size:13px;">Список менеджеров не загружен</div>`;
+
+    updateManagerDropdownLabel();
 }
 
 function formatDateForWebhook(dateValue) {
@@ -1843,20 +2074,32 @@ function changeCalendarYear(year) {
 }
 
 function toggleStatusDropdown() {
+    document.getElementById('advManagerDropdown')?.classList.remove('open');
+    document.getElementById('advDateDropdown')?.classList.remove('open');
     document.getElementById('advStatusDropdown')?.classList.toggle('open');
 }
 
+function toggleManagerDropdown() {
+    document.getElementById('advStatusDropdown')?.classList.remove('open');
+    document.getElementById('advDateDropdown')?.classList.remove('open');
+    document.getElementById('advManagerDropdown')?.classList.toggle('open');
+}
+
 function toggleDateDropdown() {
+    document.getElementById('advStatusDropdown')?.classList.remove('open');
+    document.getElementById('advManagerDropdown')?.classList.remove('open');
     document.getElementById('advDateDropdown')?.classList.toggle('open');
     renderCalendar();
 }
 
 document.addEventListener('click', (event) => {
     const statusDropdown = document.getElementById('advStatusDropdown');
+    const managerDropdown = document.getElementById('advManagerDropdown');
     const dateDropdown = document.getElementById('advDateDropdown');
     const confirmPopover = document.querySelector('.deal-confirm-popover');
     const statusMenu = document.querySelector('.status-menu');
     if (statusDropdown && !statusDropdown.contains(event.target)) statusDropdown.classList.remove('open');
+    if (managerDropdown && !managerDropdown.contains(event.target)) managerDropdown.classList.remove('open');
     if (dateDropdown && !dateDropdown.contains(event.target)) dateDropdown.classList.remove('open');
     if (confirmPopover && !confirmPopover.contains(event.target) && !event.target.closest('.deal-create-btn')) {
         confirmPopover.remove();
@@ -1875,6 +2118,20 @@ function updateStatusDropdownLabel() {
         btn.innerText = "";
     } else if (selected.length === 1) {
         btn.innerText = selected[0].dataset.name || "1 статус";
+    } else {
+        btn.innerText = `Выбрано ${selected.length}`;
+    }
+}
+
+function updateManagerDropdownLabel() {
+    const btn = document.querySelector('#advManagerDropdown .status-dropdown-btn');
+    const selected = Array.from(document.querySelectorAll('#advManagerList input[type="checkbox"]:checked'));
+    if (!btn) return;
+
+    if (selected.length === 0) {
+        btn.innerText = "";
+    } else if (selected.length === 1) {
+        btn.innerText = selected[0].dataset.name || "1 менеджер";
     } else {
         btn.innerText = `Выбрано ${selected.length}`;
     }
@@ -1903,7 +2160,9 @@ function clearAdvFilters() {
     const dateTo = document.getElementById('advDateTo');
 
     document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => input.checked = false);
+    document.querySelectorAll('#advManagerList input[type="checkbox"]').forEach(input => input.checked = false);
     updateStatusDropdownLabel();
+    updateManagerDropdownLabel();
     if (searchInput) searchInput.value = "";
     if (dateFrom) dateFrom.value = "";
     if (dateTo) dateTo.value = "";
@@ -1929,32 +2188,25 @@ function getStatusIcon(statusName) {
     return { icon: "📦", color: "#9b59b6", label: statusName || "Статус" };
 }
 
-const ELEMENT_STATUS_IDS = {
-    "Без статуса": 0,
-    "Печать": 1,
-    "Постпечать": 2,
-    "Завершено": 3
-};
-
-function getElementStatuses() {
-    return ["Без статуса", "Печать", "Завершено"].map((name) => {
-        const s = getStatusIcon(name);
-        return {
-            id: ELEMENT_STATUS_IDS[s.label],
-            name: s.label,
-            bk_color: s.color,
-            text_color: "white"
-        };
-    });
+function getElementStatuses(options = {}) {
+    const statuses = normalizeElementStatuses(currentUser.elementStatuses);
+    return options.manualOnly ? statuses.filter(status => status.is_manual !== false) : statuses;
 }
 
-function getElementStatusMeta(statusName) {
-    const s = getStatusIcon(statusName);
+function getElementStatusMeta(statusName, statusObj = {}) {
+    const statuses = getElementStatuses();
+    const statusId = statusObj.status_id ?? statusObj.statusId ?? statusObj.id;
+    const knownStatus = (statusId != null && statusId !== "")
+        ? statuses.find(status => status.id === Number(statusId))
+        : statuses.find(status => status.name.toLowerCase() === String(statusName || "").trim().toLowerCase());
+    const s = getStatusIcon(knownStatus?.name || statusName);
+
     return {
-        id: ELEMENT_STATUS_IDS[s.label] ?? null,
-        name: s.label,
-        bk_color: s.color,
-        text_color: "white"
+        id: knownStatus?.id ?? (Number.isFinite(Number(statusId)) ? Number(statusId) : null),
+        name: knownStatus?.name || s.label,
+        bk_color: knownStatus?.bk_color || s.color,
+        text_color: knownStatus?.text_color || "white",
+        icon: knownStatus?.icon || s.icon
     };
 }
 
@@ -1962,19 +2214,19 @@ function getElementStatusMeta(statusName) {
 function createRowHtml(name, qty, price, statusName, isNew = false, options = {}) {
     const q = Number(qty) || 0;
     const p = Number(price) || 0;
-    const rowTotal = q * p;
+    const rowTotal = options.lineTotal != null ? Number(options.lineTotal) : q * p;
     const statusMeta = options.dealId
-        ? getElementStatusMeta(statusName)
+        ? getElementStatusMeta(statusName, options.statusObj || {})
         : getStatusMeta(statusName, options.statusObj || {});
     const statusControl = options.dealId
         ? renderElementStatusControl(options.dealId, options.element || {}, options.elementIndex || 0, statusMeta, Boolean(options.lockStatus))
         : `<span title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${getStatusIcon(statusMeta.name).icon}</span>`;
 
     return `
-        <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}" style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; position: relative;">
+        <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}">
             ${statusControl}
-            <span style="flex: 1; padding-right: 10px; font-size: 14px; line-height: 1.2;">${escapeHtml(name)}, ${q} шт, ${p} руб.</span>
-            <span style="font-weight: bold; white-space: nowrap; font-size: 14px; margin-right: ${isNew ? '30px' : '0'};">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} руб.</span>
+            <span class="element-row-text">${escapeHtml(name)}, ${q} шт, ${p} руб.</span>
+            <span class="element-row-total" style="margin-right: ${isNew ? '30px' : '0'};">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} руб.</span>
             ${isNew ? `<button onclick="this.parentElement.remove(); updateDealTotal(this.closest('.elements-list'));" style="position: absolute; right: 0; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">&times;</button>` : ''}
         </div>`;
 }
@@ -1991,14 +2243,119 @@ function getDealClientName(deal) {
     return deal?.client?.name || deal?.client_name || "клиента";
 }
 
-const PAYMENT_METHODS = [
-    "Безнал Р/С",
-    "перевод на карту",
-    "наличные",
-    "бартер",
-    "баланс клиента",
-    "пластиковой картой"
-];
+function saveOpenDealState(deal) {
+    const dealId = typeof deal === "object" ? deal?.id : deal;
+    if (!dealId) return;
+
+    try {
+        localStorage.setItem('calc_open_deal', JSON.stringify({
+            dealId: dealId,
+            dealNum: typeof deal === "object" ? (deal.num || null) : null,
+            savedAt: Date.now()
+        }));
+    } catch (e) {
+        console.warn("Не удалось сохранить открытую сделку", e);
+    }
+}
+
+function clearOpenDealState() {
+    localStorage.removeItem('calc_open_deal');
+}
+
+function restoreOpenDealTab() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('calc_open_deal') || "null");
+        const dealId = saved?.dealId ?? saved?.deal?.id;
+        if (!dealId) return;
+
+        openDealInTab(dealId, { preserveScroll: true });
+    } catch (e) {
+        clearOpenDealState();
+    }
+}
+
+function getElementName(element) {
+    return element?.category_and_name || element?.name || element?.title || "";
+}
+
+function getElementQuantity(element) {
+    return Number(element?.quantity ?? element?.qty) || 0;
+}
+
+function getElementPrice(element) {
+    return toMoneyNumber(element?.price, 0);
+}
+
+function getElementLineTotal(element) {
+    const explicitTotal = toMoneyNumber(element?.total, null);
+    if (explicitTotal != null) return explicitTotal;
+    return getElementQuantity(element) * getElementPrice(element);
+}
+
+function getElementStatusInfo(element) {
+    const statusObj = (element?.status && typeof element.status === "object") ? element.status : {};
+    const name = statusObj.name
+        || (typeof element?.status === "string" ? element.status : "")
+        || element?.status_name
+        || "";
+
+    return {
+        name,
+        statusObj: {
+            ...statusObj,
+            id: statusObj.id ?? statusObj.status_id ?? element?.status_id ?? element?.statusId
+        }
+    };
+}
+
+function getDealResponsibleName(deal) {
+    return deal?.responsible?.name || deal?.employee_name || "—";
+}
+
+function getDealCreatedAt(deal) {
+    return deal?.created_at || deal?.createdAt || "";
+}
+
+function formatDealCreatedDate(raw) {
+    if (!raw) return "";
+    const value = String(raw).trim();
+    const match = value.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+    if (match) {
+        const day = match[1].padStart(2, "0");
+        const month = match[2].padStart(2, "0");
+        return `${day}.${month}.${match[3]} г.`;
+    }
+    return value;
+}
+
+function renderDealFooterMeta(deal) {
+    const date = formatDealCreatedDate(getDealCreatedAt(deal));
+    const manager = getDealResponsibleName(deal);
+
+    return `
+        <div class="deal-footer-meta">
+            ${date ? `<div>Дата заказа: <b>${escapeHtml(date)}</b></div>` : ""}
+            <div>Менеджер: <b>${escapeHtml(manager)}</b></div>
+        </div>`;
+}
+
+function sumDealElementsTotal(deal) {
+    if (!Array.isArray(deal?.elements)) return 0;
+    return deal.elements.reduce((sum, element) => sum + getElementLineTotal(element), 0);
+}
+
+function normalizeDealForView(deal) {
+    if (!deal) return null;
+
+    const financials = getDealFinancials(deal);
+    if (deal.amount == null && deal.total == null && deal.sum == null) {
+        deal.amount = financials.total;
+    }
+    if (deal.paid == null) deal.paid = financials.paid;
+    if (deal.debt == null) deal.debt = financials.debt;
+
+    return deal;
+}
 
 function toMoneyNumber(value, fallback = 0) {
     if (value == null || value === "") return fallback;
@@ -2012,19 +2369,25 @@ function toMoneyNumber(value, fallback = 0) {
 }
 
 function getDealFinancials(deal) {
-    const total = toMoneyNumber(deal?.amount ?? deal?.total ?? deal?.sum, 0);
-    const explicitDebt = deal?.debt ?? deal?.debt_amount ?? deal?.debtAmount;
-    let paid = toMoneyNumber(
+    const paid = toMoneyNumber(
         deal?.paid ?? deal?.paid_amount ?? deal?.paidAmount ?? deal?.payment_sum ?? deal?.paymentSum ?? deal?.payed ?? deal?.payed_amount,
-        null
+        0
     );
+    const explicitDebt = deal?.debt ?? deal?.debt_amount ?? deal?.debtAmount;
+    const debtFromApi = explicitDebt != null ? toMoneyNumber(explicitDebt, 0) : null;
 
-    if (paid == null && explicitDebt != null) {
-        paid = Math.max(0, total - toMoneyNumber(explicitDebt, 0));
+    let total = toMoneyNumber(deal?.amount ?? deal?.total ?? deal?.sum, null);
+    if (total == null && debtFromApi != null) {
+        total = paid + debtFromApi;
     }
-    if (paid == null) paid = 0;
+    if (total == null) {
+        const elementsSum = sumDealElementsTotal(deal);
+        if (elementsSum > 0) total = elementsSum;
+    }
+    if (total == null) total = paid + (debtFromApi ?? 0);
 
-    const debt = Math.max(0, total - paid);
+    const debt = debtFromApi != null ? debtFromApi : Math.max(0, total - paid);
+
     return {
         total,
         paid,
@@ -2051,7 +2414,7 @@ function renderPaymentSummary(deal, isClosed = false) {
         </div>` : "";
 
     return `
-        <div class="deal-payment-block" id="payment-block-${deal.id}" style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+        <div class="deal-payment-block" data-deal-id="${deal.id}" style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
             <div class="payment-summary">
                 <div class="payment-summary-row">
                     <span class="payment-summary-label">Всего</span>
@@ -2075,12 +2438,39 @@ function renderPaymentSummary(deal, isClosed = false) {
 function renderDealTotalOnly(deal) {
     const f = getDealFinancials(deal);
     const totalClass = f.isPaid ? "payment-ok" : "payment-alert";
-    return `<div id="deal-total-only-${deal.id}" class="${totalClass}" style="font-weight: bold; font-size: 16px;">Итого: ${formatMoney(f.total)} ₽</div>`;
+    return `<div class="deal-total-only ${totalClass}" data-deal-id="${deal.id}">Итого: ${formatMoney(f.total)} ₽</div>`;
 }
 
-function refreshPaymentBlock(dealId) {
+function getDealCard(dealId, trigger = null) {
+    if (trigger) {
+        const card = trigger.closest('.crm-item');
+        if (card) return card;
+    }
+
+    const dealTab = document.getElementById('deal-tab');
+    if (dealTab?.classList.contains('active')) {
+        const activeCard = dealTab.querySelector(`.crm-item#deal-${dealId}`);
+        if (activeCard) return activeCard;
+    }
+
+    return document.getElementById(`deal-${dealId}`);
+}
+
+function getDealUiParts(dealId, trigger = null) {
+    const card = getDealCard(dealId, trigger);
+    return {
+        card,
+        list: card?.querySelector('.deal-elements-list') || null,
+        saveArea: card?.querySelector('.deal-save-area') || null,
+        paymentBlock: card?.querySelector('.deal-payment-block') || null,
+        totalOnly: card?.querySelector('.deal-total-only') || null
+    };
+}
+
+function refreshPaymentBlock(dealId, card = null) {
     const deal = dealsCache.get(String(dealId));
-    const block = document.getElementById(`payment-block-${dealId}`);
+    const root = card || getDealCard(dealId);
+    const block = root?.querySelector('.deal-payment-block');
     if (!deal || !block) return;
 
     const statusObj = (deal.status && typeof deal.status === "object") ? deal.status : {};
@@ -2090,8 +2480,16 @@ function refreshPaymentBlock(dealId) {
 }
 
 function openPaymentModal(dealId, mode = "partial") {
+    if (!ensureActiveSession()) return;
+
     const deal = dealsCache.get(String(dealId));
     if (!deal) return;
+
+    const paymentMethods = getPaymentMethods();
+    if (!paymentMethods.length) {
+        alert("Справочник методов оплаты не загружен. Войдите в систему заново.");
+        return;
+    }
 
     const f = getDealFinancials(deal);
     const defaultAmount = mode === "full" ? f.debt : "";
@@ -2107,7 +2505,7 @@ function openPaymentModal(dealId, mode = "partial") {
             <input id="paymentAmountInput" type="number" min="0" step="0.01" inputmode="decimal" value="${isFullPayment ? Number(defaultAmount).toFixed(2) : ""}" ${isFullPayment ? 'readonly style="background:#f1f3f5;"' : ''}>
             <label>Метод оплаты</label>
             <select id="paymentMethodSelect">
-                ${PAYMENT_METHODS.map(method => `<option value="${escapeHtml(method)}">${escapeHtml(method)}</option>`).join('')}
+                ${paymentMethods.map(method => `<option value="${method.id}">${escapeHtml(method.name)}</option>`).join('')}
             </select>
             <label>Основание</label>
             <textarea id="paymentReasonInput" rows="3" placeholder="Можно оставить пустым"></textarea>
@@ -2127,12 +2525,15 @@ function closePaymentModal() {
 }
 
 async function submitPayment(dealId, btn) {
+    if (!ensureActiveSession()) return;
+
     const deal = dealsCache.get(String(dealId));
     const amountInput = document.getElementById('paymentAmountInput');
     const methodSelect = document.getElementById('paymentMethodSelect');
     const reasonInput = document.getElementById('paymentReasonInput');
     const amount = toMoneyNumber(amountInput?.value, 0);
     const f = getDealFinancials(deal);
+    const selectedMethod = getPaymentMethods().find(method => String(method.id) === String(methodSelect?.value));
 
     if (!deal || amount <= 0) {
         alert("Введите сумму оплаты");
@@ -2157,15 +2558,15 @@ async function submitPayment(dealId, btn) {
                 action: 'addPayment',
                 dealId: dealId,
                 amount: amount,
-                method: methodSelect?.value || "",
+                paymentMethodId: selectedMethod?.id ?? null,
+                method: selectedMethod?.name || methodSelect?.selectedOptions?.[0]?.text || "",
                 reason: reasonInput?.value?.trim() || "",
                 staffId: currentUser.crmId || null
             })
         });
 
         if (response.status === 401) {
-            alert("Сессия истекла. Войдите снова.");
-            logout();
+            handleUnauthorized();
             return;
         }
         if (!response.ok) throw new Error("Ошибка добавления оплаты");
@@ -2174,11 +2575,14 @@ async function submitPayment(dealId, btn) {
         try { data = await response.json(); } catch (e) {}
         const updatedDeal = normalizeDealResponse(data, true);
         if (updatedDeal && updatedDeal.id) {
-            dealsCache.set(String(updatedDeal.id), { ...deal, ...updatedDeal });
+            const mergedDeal = { ...deal, ...updatedDeal };
+            dealsCache.set(String(updatedDeal.id), mergedDeal);
+            saveOpenDealState(mergedDeal);
         } else {
             deal.paid = f.paid + amount;
             deal.debt = Math.max(0, f.debt - amount);
             dealsCache.set(String(dealId), deal);
+            saveOpenDealState(deal);
         }
 
         closePaymentModal();
@@ -2194,14 +2598,115 @@ async function submitPayment(dealId, btn) {
     }
 }
 
-function openDealInTab(dealId) {
+function renderDealTabTitle(tabBtn, dealId, dealNum) {
+    const shortTitle = `№${dealNum || dealId}`;
+    if (tabBtn) {
+        tabBtn.innerHTML = `${escapeHtml(shortTitle)} <span class="tab-close-btn" onclick="event.stopPropagation(); closeDealTab()" title="Закрыть вкладку">&times;</span>`;
+    }
+    return shortTitle;
+}
+
+function renderDealCrmButton(deal, extraClass = "") {
+    if (currentUser.role !== 'staff') return "";
+    return `<button type="button" class="deal-action-btn deal-crm-btn ${extraClass}" onclick="openCrmDealUrl(${deal.id})" title="Открыть заказ в CRM" aria-label="Открыть заказ в CRM">↗</button>`;
+}
+
+function renderDealActionButtonsLeft(deal) {
+    if (currentUser.role !== 'staff') return "";
+
+    const contact = deal.client_contact_person || {};
+    const hasContact = contact.telephone || contact.email || contact.name;
+    const contactBtn = hasContact
+        ? `<button type="button" class="deal-action-btn" onclick="event.stopPropagation(); showDealContactInfo(${deal.id}, this)" title="Контакты клиента" aria-label="Контакты клиента">👤</button>`
+        : "";
+    const createBtn = `<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`;
+
+    return `<span class="deal-action-group">${contactBtn}${createBtn}${renderDealCrmButton(deal)}</span>`;
+}
+
+function renderDealActionButtons(deal, isDetailMode = false) {
+    if (currentUser.role !== 'staff') return "";
+    if (isDetailMode) return "";
+
+    return `${renderDealCrmButton(deal)}<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`;
+}
+
+function renderDealDetailView(deal, detailContainer, tabBtn = null) {
+    if (!detailContainer || !deal) return false;
+
+    renderDealTabTitle(tabBtn, deal.id, deal.num);
+    saveOpenDealState(deal);
+    detailContainer.innerHTML = "";
+    renderDealsList([deal], detailContainer, { detailMode: true });
+    return true;
+}
+
+async function reloadDealTabContent(dealId) {
+    const detailContainer = document.getElementById('deal-detail');
+    if (!detailContainer || !document.getElementById('deal-tab')) return false;
+
+    detailContainer.innerHTML = `<p class="loader" style="display:block; margin:30px 0;">Обновление заказа...</p>`;
+
+    const fetchToken = ++dealTabFetchToken;
+    const freshDeal = await fetchDealDetails(dealId);
+    if (fetchToken !== dealTabFetchToken) return false;
+
+    if (freshDeal) {
+        const tabBtn = document.querySelector('.tab-btn[data-tab-target="deal-tab"]');
+        return renderDealDetailView(freshDeal, detailContainer, tabBtn);
+    }
+
+    detailContainer.innerHTML = `<p style="color:#e67e22; text-align:center; padding:20px;">Не удалось обновить заказ. Проверьте соединение.</p>`;
+    return false;
+}
+
+function showDealContactInfo(dealId, btn) {
+    document.querySelectorAll('.deal-contact-popover').forEach(el => el.remove());
+
     const deal = dealsCache.get(String(dealId));
     if (!deal) return;
 
+    const contact = deal.client_contact_person || {};
+    const phone = contact.telephone || "";
+    const email = contact.email || "";
+    const name = contact.name || deal.client?.name || deal.client_name || "";
+    const position = contact.position || "";
+
+    if (!phone && !email && !name) return;
+
+    const rect = btn.getBoundingClientRect();
+    const popover = document.createElement('div');
+    popover.className = 'deal-contact-popover';
+    popover.innerHTML = `
+        ${name ? `<div><b>${escapeHtml(name)}</b></div>` : ""}
+        ${position ? `<div style="color:#888; font-size:12px; margin-top:2px;">${escapeHtml(position)}</div>` : ""}
+        ${phone ? `<div style="margin-top:8px;">📞 <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></div>` : ""}
+        ${email ? `<div style="margin-top:4px;">✉️ <a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></div>` : ""}`;
+
+    document.body.appendChild(popover);
+
+    const left = Math.min(rect.left, window.innerWidth - popover.offsetWidth - 12);
+    popover.style.left = `${Math.max(12, left)}px`;
+    popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - popover.offsetHeight - 12)}px`;
+
+    const closePopover = (event) => {
+        if (!popover.contains(event.target) && event.target !== btn && !btn.contains(event.target)) {
+            popover.remove();
+            document.removeEventListener('click', closePopover, true);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closePopover, true), 0);
+}
+
+async function openDealInTab(dealId, options = {}) {
+    if (!ensureActiveSession()) return;
+
+    const id = String(dealId);
+    const cachedDeal = dealsCache.get(id);
+    const fetchToken = ++dealTabFetchToken;
     const tabId = "deal-tab";
     let tabBtn = document.querySelector(`.tab-btn[data-tab-target="${tabId}"]`);
     let tabContent = document.getElementById(tabId);
-    const shortTitle = `№${deal.num || deal.id}`;
 
     if (!tabBtn) {
         tabBtn = document.createElement('button');
@@ -2210,7 +2715,7 @@ function openDealInTab(dealId) {
         tabBtn.onclick = () => switchTab(tabId, tabBtn);
         document.querySelector('.tabs-nav')?.appendChild(tabBtn);
     }
-    tabBtn.innerHTML = `${escapeHtml(shortTitle)} <span class="tab-close-btn" onclick="event.stopPropagation(); closeDealTab()" title="Закрыть вкладку">&times;</span>`;
+    renderDealTabTitle(tabBtn, dealId, cachedDeal?.num);
 
     if (!tabContent) {
         tabContent = document.createElement('div');
@@ -2221,13 +2726,39 @@ function openDealInTab(dealId) {
 
     tabContent.innerHTML = `
         <div class="container">
-            <h3>Заказ ${escapeHtml(shortTitle)}</h3>
-            <div id="deal-detail"></div>
+            <div id="deal-detail">
+                <p id="deal-detail-loader" class="loader" style="display:block; margin:30px 0;">Загрузка актуальных данных...</p>
+            </div>
         </div>`;
 
-    const detailContainer = tabContent.querySelector('#deal-detail');
-    renderDealsList([deal], detailContainer, { detailMode: true });
     switchTab(tabId, tabBtn);
+    if (options.preserveScroll) {
+        requestAnimationFrame(() => window.scrollTo(0, tabScrollPositions[tabId] || 0));
+    }
+
+    const freshDeal = await fetchDealDetails(dealId);
+    if (fetchToken !== dealTabFetchToken) return;
+
+    const detailContainer = document.getElementById('deal-detail');
+    const activeDealTab = document.getElementById(tabId);
+    if (!detailContainer || !activeDealTab) return;
+
+    if (freshDeal) {
+        renderDealDetailView(freshDeal, detailContainer, tabBtn);
+        return;
+    }
+
+    if (cachedDeal) {
+        renderDealTabTitle(tabBtn, cachedDeal.id, cachedDeal.num);
+        saveOpenDealState(cachedDeal);
+        detailContainer.innerHTML = `
+            <p style="color:#e67e22; text-align:center; padding:12px 0 4px;">Не удалось загрузить актуальные данные. Показана версия из поиска.</p>
+            <div id="deal-detail-fallback"></div>`;
+        renderDealsList([cachedDeal], detailContainer.querySelector('#deal-detail-fallback'), { detailMode: true });
+        return;
+    }
+
+    detailContainer.innerHTML = `<p style="color:red; text-align:center; padding:30px 20px;">Не удалось загрузить заказ. Проверьте соединение и попробуйте снова.</p>`;
 }
 
 function closeDealTab() {
@@ -2236,6 +2767,7 @@ function closeDealTab() {
     const wasActive = tabContent?.classList.contains('active');
 
     if (tabContent) tabScrollPositions["deal-tab"] = window.scrollY || window.pageYOffset || 0;
+    clearOpenDealState();
     if (tabBtn) tabBtn.remove();
     if (tabContent) tabContent.remove();
     if (wasActive) {
@@ -2283,6 +2815,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
 
     deals.forEach(deal => {
         if (!isValidDeal(deal)) return;
+        deal = normalizeDealForView(deal);
         dealsCache.set(String(deal.id), deal);
 
         const card = document.createElement('div');
@@ -2304,54 +2837,65 @@ function renderDealsList(deals, targetDiv, options = {}) {
         let elementsHtml = "";
         if (deal.elements && Array.isArray(deal.elements)) {
             elementsHtml = deal.elements.map((e, idx) => {
-                // ПРИОРИТЕТ СТАТУСА ЭЛЕМЕНТА:
-                // Берем статус только из самого элемента. Если его нет — передаем пустую строку.
-                // Наша функция getStatusIcon при пустой строке автоматически вернет ⚪
-                const itemStatus = (e.status && typeof e.status === "object" && e.status.name)
-                    ? e.status.name
-                    : (typeof e.status === "string" ? e.status : (e.status_name || ""));
-                
-                return createRowHtml(e.name, e.quantity, e.price, itemStatus, false, {
-                    dealId: deal.id,
-                    element: e,
-                    elementIndex: idx,
-                    statusObj: {
-                        ...(e.status || {}),
-                        id: e.status?.id ?? e.status_id ?? e.statusId
-                    },
-                    lockStatus: isClosed
-                });
+                const elementStatus = getElementStatusInfo(e);
+
+                return createRowHtml(
+                    getElementName(e),
+                    getElementQuantity(e),
+                    getElementPrice(e),
+                    elementStatus.name,
+                    false,
+                    {
+                        dealId: deal.id,
+                        element: e,
+                        elementIndex: idx,
+                        statusObj: elementStatus.statusObj,
+                        lineTotal: getElementLineTotal(e),
+                        lockStatus: isClosed
+                    }
+                );
             }).join('');
         }
 
-        const dealLink = `<button type="button" class="deal-num-btn" onclick="openDealInTab(${deal.id})">№ ${escapeHtml(deal.num || deal.id)}</button>`;
-        const dealActionButtons = currentUser.role === 'staff'
-            ? `<button type="button" class="deal-action-btn" onclick="openCrmDealUrl(${deal.id})" title="Открыть заказ в CRM" aria-label="Открыть заказ в CRM">↗</button>
-               <button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`
-            : "";
-
-        card.innerHTML = `
+        const dealLink = isDetailMode
+            ? `<span style="font-weight:bold; font-size:16px; color:#2f7df6;">№ ${escapeHtml(deal.num || deal.id)}</span>`
+            : `<button type="button" class="deal-num-btn" onclick="openDealInTab(${deal.id})">№ ${escapeHtml(deal.num || deal.id)}</button>`;
+        const dealActionButtons = renderDealActionButtons(deal, isDetailMode);
+        const dealHeaderHtml = isDetailMode ? `
+            <div class="crm-header deal-header-detail">
+                <div class="deal-num-line">
+                    ${dealLink}
+                    ${renderDealActionButtonsLeft(deal)}
+                </div>
+                <div class="deal-header-side">
+                    ${statusControl}
+                </div>
+            </div>` : `
             <div class="crm-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                 <div class="deal-num" style="font-weight: bold; font-size: 16px;">
                     ${dealLink}
                     ${dealActionButtons}
-                    <small style="font-weight:normal; color:#888; margin-left: 8px;">${deal.created_at || ''}</small>
                 </div>
                 ${statusControl}
-            </div>
-            <div class="client-name">👤 ${deal.client?.name || deal.client_name || 'Клиент не указан'}</div>
+            </div>`;
+
+        card.innerHTML = `
+            ${dealHeaderHtml}
+            <div class="client-name">👤 ${escapeHtml(deal.client?.name || deal.client_name || 'Клиент не указан')}</div>
             <div class="elements-list">
-                <div id="list-${deal.id}">${elementsHtml}</div>
+                <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
                 ${(currentUser.role === 'staff' && !isClosed) ? `
                 <div class="add-btn-container" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; text-align: left;">
-                    <button class="add-btn" onclick="addToDeal(${deal.id})">+ Добавить расчет</button>
+                    <button class="add-btn" onclick="addToDeal(${deal.id}, this)">+ Добавить расчет</button>
                 </div>` : ''}
             </div>
             <div class="crm-footer">
-                <div id="save-area-${deal.id}" style="display: none;">
-                    <button onclick="saveDeal(${deal.id})" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                <div class="deal-footer-left">
+                    <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
+                        <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                    </div>
+                    ${renderDealFooterMeta(deal)}
                 </div>
-                <div style="font-size: 12px; color: #777;">Менеджер: <b>${deal.employee_name || '—'}</b></div>
                 ${isDetailMode ? renderPaymentSummary(deal, isClosed) : renderDealTotalOnly(deal)}
             </div>`;
             
@@ -2381,16 +2925,18 @@ function createDealCardById(id) {
         </div>
         <div class="client-name">👤 Новая сделка создана</div>
         <div class="elements-list">
-            <div id="list-${id}"></div>
+            <div class="deal-elements-list" data-deal-id="${id}"></div>
             <div class="add-btn-container" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; text-align: left;">
-                <button class="add-btn" onclick="addToDeal(${id})">+ Добавить расчет</button>
+                <button class="add-btn" onclick="addToDeal(${id}, this)">+ Добавить расчет</button>
             </div>
         </div>
         <div class="crm-footer">
-            <div id="save-area-${id}" style="display: none;">
-                <button onclick="saveDeal(${id})" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+            <div class="deal-footer-left">
+                <div class="deal-save-area" data-deal-id="${id}" style="display: none;">
+                    <button onclick="saveDeal(${id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                </div>
+                ${renderDealFooterMeta(deal)}
             </div>
-            <div style="font-size: 12px; color: #777;">Менеджер: <b>—</b></div>
             ${renderDealTotalOnly(deal)}
         </div>`;
 
@@ -2398,6 +2944,7 @@ function createDealCardById(id) {
 }
 
 async function createDealFromDeal(sourceDealId, btn) {
+    if (!ensureActiveSession()) return;
     if (!sourceDealId) return;
 
     const originalHtml = btn ? btn.innerHTML : "";
@@ -2453,10 +3000,13 @@ async function createDealFromDeal(sourceDealId, btn) {
     }
 }
 
-function addToDeal(id) {
+function addToDeal(id, trigger = null) {
+    if (!ensureActiveSession()) return;
     if (!lastCalcData) { alert("Сделайте расчет!"); return; }
-    
-    const list = document.getElementById(`list-${id}`);
+
+    const { list, saveArea } = getDealUiParts(id, trigger);
+    if (!list) return;
+
     const s = window.currentCalcState; // Состояние из n8n
     const row = document.createElement('div'); 
     row.className = 'element-row new-row';
@@ -2475,23 +3025,27 @@ function addToDeal(id) {
     row.setAttribute('data-total-sum', finalTotal); 
     row.setAttribute('data-price-one', finalPriceOne); // Сохраняем готовую строку/число
 
-    row.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 8px; border-left:3px solid #8ab8ff; background:#f6f9ff; border-bottom:1px solid #e3ebf7; border-radius:4px; margin:4px 0;";
+    row.style.cssText = "padding:6px 8px; border-left:3px solid #8ab8ff; background:#f6f9ff; border-bottom:1px solid #e3ebf7; border-radius:4px; margin:4px 0;";
     row.innerHTML = `
-        <span style="flex: 1; font-size: 13px; line-height:1.25; padding-right:8px;">${escapeHtml(fullName)}, ${lastCalcData.qty} шт</span>
-        <b style="font-size:13px; white-space:nowrap;">${finalTotal.toLocaleString()} ₽</b>
-        <button onclick="this.parentElement.remove(); updateDealTotal(document.getElementById('list-${id}'));" 
+        <span class="element-row-text" style="padding-right:8px;">${escapeHtml(fullName)}, ${lastCalcData.qty} шт</span>
+        <span class="element-row-total">${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽</span>
+        <button onclick="this.parentElement.remove(); updateDealTotal(this.closest('.deal-elements-list'));" 
                 style="margin:0; width:18px; height:18px; min-width:18px; padding:0; background:#f3d5d5; color:#9b2c2c; border:1px solid #e2b5b5; border-radius:50%; cursor:pointer; font-size:13px; line-height:16px;">×</button>
     `;
     
-    list.appendChild(row); 
-    document.getElementById(`save-area-${id}`).style.display = "block"; 
+    list.appendChild(row);
+    if (saveArea) saveArea.style.display = "block";
     updateDealTotal(list);
 }
 
-async function saveDeal(id) {
-    const list = document.getElementById(`list-${id}`);
+async function saveDeal(id, trigger = null) {
+    if (!ensureActiveSession()) return;
+
+    const { list, saveArea } = getDealUiParts(id, trigger);
+    if (!list) return;
+
     const rows = list.querySelectorAll('.new-row');
-    const btn = document.querySelector(`#save-area-${id} button`);
+    const btn = saveArea?.querySelector('button');
     
     if (rows.length === 0) return;
     
@@ -2535,21 +3089,30 @@ async function saveDeal(id) {
             });
 
             if (!response.ok) throw new Error("Ошибка сервера");
-            
-            r.classList.remove('new-row');
-            const delBtn = r.querySelector('button');
-            if (delBtn) delBtn.remove();
         }
-        
-        alert("Успешно сохранено!"); 
-        document.getElementById(`save-area-${id}`).style.display = "none";
+
+        const savedOnDealTab = Boolean(trigger?.closest('#deal-tab'));
+        if (saveArea) saveArea.style.display = "none";
+
+        if (savedOnDealTab) {
+            await reloadDealTabContent(id);
+        } else {
+            rows.forEach(r => {
+                r.classList.remove('new-row');
+                const delBtn = r.querySelector('button');
+                if (delBtn) delBtn.remove();
+            });
+            alert("Успешно сохранено!");
+            updateDealTotal(list);
+        }
     } catch (e) { 
         alert("Ошибка при сохранении в CRM"); 
         console.error(e);
     } finally { 
-        btn.innerText = "💾 Сохранить"; 
-        btn.disabled = false; 
-        updateDealTotal(list); 
+        if (btn) {
+            btn.innerText = "💾 Сохранить"; 
+            btn.disabled = false;
+        }
     }
 }
 
@@ -2572,24 +3135,27 @@ function updateDealTotal(el) {
             if (Number.isFinite(intPart)) sum += Math.round(intPart + decPart);
         }
     });
-    const id = el.id.replace('list-', '');
+    const id = el.dataset.dealId || el.id?.replace('list-', '');
+    const card = el.closest('.crm-item');
     const deal = dealsCache.get(String(id));
     if (deal) {
         const financials = getDealFinancials(deal);
         deal.amount = sum;
         deal.debt = Math.max(0, sum - financials.paid);
         dealsCache.set(String(id), deal);
-        const paymentBlock = document.getElementById(`payment-block-${id}`);
+        if (document.getElementById('deal-tab')) saveOpenDealState(deal);
+
+        const paymentBlock = card?.querySelector('.deal-payment-block');
         if (paymentBlock) {
-            refreshPaymentBlock(id);
+            refreshPaymentBlock(id, card);
         } else {
-            const totalOnlyEl = document.getElementById(`deal-total-only-${id}`);
+            const totalOnlyEl = card?.querySelector('.deal-total-only');
             if (totalOnlyEl) totalOnlyEl.outerHTML = renderDealTotalOnly(deal);
         }
         return;
     }
 
-    const oldTotalEl = document.getElementById(`total-${id}`);
+    const oldTotalEl = card?.querySelector(`#total-${id}`) || document.getElementById(`total-${id}`);
     if (oldTotalEl) oldTotalEl.innerText = sum.toLocaleString();
 }
 
@@ -2609,9 +3175,10 @@ window.onload = () => {
     
     updateType(); 
     setFormat(); 
-    fillStatusFilter();
     renderCalendar();
     applyPermissions();
+    ensureActiveSession({ silent: true });
+    if (!isSessionExpired()) restoreOpenDealTab();
     
     document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
     document.getElementById('advSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('adv'); });
