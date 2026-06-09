@@ -48,7 +48,7 @@ function setPreviewImgContent(container, preview, altText = "") {
         return false;
     }
 
-    container.innerHTML = `<img src="${escapeHtml(primary)}" alt="${escapeHtml(altText)}">`;
+    container.innerHTML = `<img src="${escapeHtml(primary)}" alt="${escapeHtml(altText)}" referrerpolicy="no-referrer">`;
     const img = container.querySelector("img");
     if (img && fallback) bindPreviewImgFallback(img, fallback);
     return true;
@@ -166,7 +166,7 @@ async function elementAssetsApi(action, body, options = {}) {
             hp: document.getElementById("honey_field")?.value || "",
             ...body
         })
-    });
+    }, options.timeoutMs ?? SERVER_TIMEOUT_MS);
 
     if (response.status === 401) {
         handleUnauthorized({ silent: options.silent401 === true });
@@ -464,7 +464,7 @@ function openPreviewLightbox(dealId, elementId, event) {
     lightbox.className = "preview-lightbox";
     lightbox.innerHTML = `
         <button type="button" class="preview-lightbox-close" aria-label="Закрыть">&times;</button>
-        <img src="${escapeHtml(String(url).trim())}" alt="Превью позиции">`;
+        <img src="${escapeHtml(String(url).trim())}" alt="Превью позиции" referrerpolicy="no-referrer">`;
 
     const close = () => {
         lightbox.remove();
@@ -968,7 +968,7 @@ async function handlePreviewUpload(event) {
             fileName: file.name,
             mimeType: file.type,
             fileData
-        });
+        }, { timeoutMs: UPLOAD_TIMEOUT_MS });
 
         const assets = normalizeAssetsResponse(data);
         const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
@@ -1076,7 +1076,7 @@ async function handleLayoutFileUpload(event) {
             fileName: file.name,
             mimeType: file.type || "application/octet-stream",
             fileData
-        });
+        }, { timeoutMs: UPLOAD_TIMEOUT_MS });
 
         const assets = normalizeAssetsResponse(data);
         const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
