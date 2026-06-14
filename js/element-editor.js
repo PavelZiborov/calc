@@ -8,6 +8,7 @@ let currentElementEditor = null;
 const ELEMENT_FIELD_COST_HQ = 1057;
 const ELEMENT_FIELD_SRA3 = 1066;
 const MAX_LAYOUT_FILE_MB = 50;
+const MAX_PREVIEW_BYTES = 512000;
 const PREVIEW_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 function assetsCacheKey(dealId, elementId) {
@@ -175,6 +176,77 @@ async function elementAssetsApi(action, body, options = {}) {
     if (!response.ok) throw new Error(`API ${action} failed`);
 
     return response.json();
+}
+
+function canvasToBlob(canvas, mimeType, quality) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+            if (blob) resolve(blob);
+            else reject(new Error("compress failed"));
+        }, mimeType, quality);
+    });
+}
+
+async function loadPreviewImageSource(file) {
+    const url = URL.createObjectURL(file);
+    try {
+        return await new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error("image load failed"));
+            image.src = url;
+        });
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+async function compressPreviewImage(file) {
+    if (file.size <= MAX_PREVIEW_BYTES) return file;
+
+    const image = await loadPreviewImageSource(file);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const outputMime = "image/jpeg";
+    const baseName = String(file.name || "preview").replace(/\.[^.]+$/, "") || "preview";
+    let width = image.naturalWidth || image.width;
+    let height = image.naturalHeight || image.height;
+    let quality = 0.92;
+
+    while (width >= 64 && height >= 64) {
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(image, 0, 0, width, height);
+
+        let blob = await canvasToBlob(canvas, outputMime, quality);
+        while (blob.size > MAX_PREVIEW_BYTES && quality > 0.45) {
+            quality -= 0.08;
+            blob = await canvasToBlob(canvas, outputMime, quality);
+        }
+        if (blob.size <= MAX_PREVIEW_BYTES) {
+            return new File([blob], `${baseName}.jpg`, { type: outputMime });
+        }
+
+        width = Math.round(width * 0.85);
+        height = Math.round(height * 0.85);
+        quality = 0.88;
+    }
+
+    throw new Error("preview too large");
+}
+
+async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null) {
+    const response = await fetchWithTimeout(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+            "Content-Type": mimeType || file.type || "application/octet-stream"
+        }
+    }, UPLOAD_TIMEOUT_MS);
+
+    if (!response.ok) {
+        throw new Error(`Yandex upload failed (${response.status})`);
+    }
 }
 
 function buildElementAssetsPayload(dealId, elementId, dealNum) {
@@ -426,18 +498,6 @@ async function ensureElementFieldsLoaded(dealId, elementId) {
     }
 
     return element;
-}
-
-function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const result = String(reader.result || "");
-            resolve(result.includes(",") ? result.split(",")[1] : result);
-        };
-        reader.onerror = () => reject(reader.error || new Error("read failed"));
-        reader.readAsDataURL(file);
-    });
 }
 
 function formatFileSize(bytes) {
@@ -949,8 +1009,8 @@ async function handlePreviewUpload(event) {
         alert("Превью: только JPG, PNG, WebP или GIF");
         return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-        alert("Превью: файл не больше 8 МБ");
+    if (file.size > 16 * 1024 * 1024) {
+        alert("Превью: исходник не больше 16 МБ");
         return;
     }
 
@@ -958,17 +1018,33 @@ async function handlePreviewUpload(event) {
     if (previewEl) previewEl.innerHTML = `<span class="element-editor-preview-placeholder loading">загрузка…</span>`;
 
     try {
-        const fileData = await readFileAsBase64(file);
+        const uploadFile = await compressPreviewImage(file);
+        if (uploadFile.size > MAX_PREVIEW_BYTES) {
+            throw new Error("preview too large");
+        }
+
+        const payload = buildElementAssetsPayload(
+            currentElementEditor.dealId,
+            currentElementEditor.elementId,
+            currentElementEditor.dealNum
+        );
+
+        const prep = await elementAssetsApi("uploadElementPreview", {
+            ...payload,
+            fileName: uploadFile.name,
+            mimeType: uploadFile.type || "image/jpeg",
+            clientUpload: true
+        }, { timeoutMs: SERVER_TIMEOUT_MS });
+
+        if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
+
+        await uploadFileToYandexUrl(prep.uploadUrl, uploadFile, uploadFile.type);
+
         const data = await elementAssetsApi("uploadElementPreview", {
-            ...buildElementAssetsPayload(
-                currentElementEditor.dealId,
-                currentElementEditor.elementId,
-                currentElementEditor.dealNum
-            ),
-            fileName: file.name,
-            mimeType: file.type,
-            fileData
-        }, { timeoutMs: UPLOAD_TIMEOUT_MS });
+            ...payload,
+            uploadComplete: true,
+            diskFileName: prep.diskFileName || undefined
+        }, { timeoutMs: SERVER_TIMEOUT_MS });
 
         const assets = normalizeAssetsResponse(data);
         const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
@@ -982,7 +1058,10 @@ async function handlePreviewUpload(event) {
         updateElementThumb(currentElementEditor.dealId, currentElementEditor.elementId);
         renderElementEditorAssets();
     } catch (e) {
-        alert("Не удалось загрузить превью");
+        console.warn("uploadElementPreview", e);
+        alert(file.size > MAX_PREVIEW_BYTES
+            ? "Не удалось сжать превью до 500 КБ"
+            : "Не удалось загрузить превью");
         renderElementEditorAssets();
     }
 }
@@ -1039,12 +1118,15 @@ async function handleLayoutLinkAdd() {
         elementAssetsCache.set(key, {
             status: "ready",
             preview: assets.preview ?? prev.preview ?? null,
-            layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || [])
+            layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
+            layoutsLoaded: true,
+            layoutsLoading: false
         });
 
         if (input) input.value = "";
         renderElementEditorAssets();
     } catch (e) {
+        console.warn("addElementLayout link", e);
         alert("Не удалось добавить ссылку");
     }
 }
@@ -1065,18 +1147,30 @@ async function handleLayoutFileUpload(event) {
     if (layoutsEl) layoutsEl.innerHTML = `<div class="element-editor-layout-empty loading">загрузка файла…</div>`;
 
     try {
-        const fileData = await readFileAsBase64(file);
-        const data = await elementAssetsApi("addElementLayout", {
-            ...buildElementAssetsPayload(
-                currentElementEditor.dealId,
-                currentElementEditor.elementId,
-                currentElementEditor.dealNum
-            ),
+        const payload = buildElementAssetsPayload(
+            currentElementEditor.dealId,
+            currentElementEditor.elementId,
+            currentElementEditor.dealNum
+        );
+
+        const prep = await elementAssetsApi("addElementLayout", {
+            ...payload,
             type: "file",
             fileName: file.name,
+            fileSize: file.size,
             mimeType: file.type || "application/octet-stream",
-            fileData
-        }, { timeoutMs: UPLOAD_TIMEOUT_MS });
+            clientUpload: true
+        }, { timeoutMs: SERVER_TIMEOUT_MS });
+
+        if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
+
+        await uploadFileToYandexUrl(prep.uploadUrl, file);
+
+        const data = await elementAssetsApi("addElementLayout", {
+            ...payload,
+            type: "file",
+            uploadComplete: true
+        }, { timeoutMs: SERVER_TIMEOUT_MS });
 
         const assets = normalizeAssetsResponse(data);
         const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
@@ -1084,11 +1178,14 @@ async function handleLayoutFileUpload(event) {
         elementAssetsCache.set(key, {
             status: "ready",
             preview: assets.preview ?? prev.preview ?? null,
-            layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || [])
+            layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
+            layoutsLoaded: true,
+            layoutsLoading: false
         });
 
         renderElementEditorAssets();
     } catch (e) {
+        console.warn("addElementLayout file", e);
         alert("Не удалось загрузить макет");
         renderElementEditorAssets();
     }
@@ -1114,11 +1211,14 @@ async function handleLayoutDelete(layoutId) {
         elementAssetsCache.set(key, {
             status: "ready",
             preview: assets.preview ?? prev.preview ?? null,
-            layouts: assets.layouts ?? []
+            layouts: assets.layouts ?? [],
+            layoutsLoaded: true,
+            layoutsLoading: false
         });
 
         renderElementEditorAssets();
     } catch (e) {
+        console.warn("deleteElementLayout", e);
         alert("Не удалось удалить макет");
     }
 }
