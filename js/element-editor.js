@@ -173,7 +173,21 @@ async function elementAssetsApi(action, body, options = {}) {
         handleUnauthorized({ silent: options.silent401 === true });
         throw new Error("Unauthorized");
     }
-    if (!response.ok) throw new Error(`API ${action} failed`);
+    if (!response.ok) {
+        let detail = "";
+        try {
+            const errBody = await response.json();
+            detail = errBody?.message || errBody?.error || errBody?.description || "";
+            if (!detail && typeof errBody === "string") detail = errBody;
+        } catch {
+            try {
+                detail = (await response.text()).trim();
+            } catch {
+                detail = "";
+            }
+        }
+        throw new Error(detail || `API ${action} failed (${response.status})`);
+    }
 
     return response.json();
 }
@@ -1153,10 +1167,12 @@ async function handleLayoutFileUpload(event) {
             currentElementEditor.dealNum
         );
 
+        const safeFileName = toSafeUploadFileName(file.name, "layout");
+
         const prep = await elementAssetsApi("addElementLayout", {
             ...payload,
             type: "file",
-            fileName: file.name,
+            fileName: safeFileName,
             fileSize: file.size,
             mimeType: file.type || "application/octet-stream",
             clientUpload: true
@@ -1186,7 +1202,7 @@ async function handleLayoutFileUpload(event) {
         renderElementEditorAssets();
     } catch (e) {
         console.warn("addElementLayout file", e);
-        alert("Не удалось загрузить макет");
+        alert(e?.message || "Не удалось загрузить макет");
         renderElementEditorAssets();
     }
 }
