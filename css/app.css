@@ -298,8 +298,8 @@
     }
     .element-editor-preview {
         width: 100%;
-        min-height: 200px;
-        max-height: 320px;
+        min-height: 135px;
+        max-height: 215px;
         border-radius: 8px;
         border: 1px dashed #ccd5e0;
         background: #f8fafc;
@@ -310,7 +310,7 @@
     }
     .element-editor-preview img {
         width: 100%;
-        max-height: 320px;
+        max-height: 215px;
         object-fit: contain;
         display: block;
     }
@@ -766,8 +766,8 @@
         .element-row-text, .element-row-total, .deal-total-only { font-size: 11px !important; line-height: 1.2; }
         .element-preview-thumb { flex: 0 0 20px; width: 20px; height: 20px; }
         .element-editor-modal { max-width: 100%; border-radius: 10px; }
-        .element-editor-preview { min-height: 160px; max-height: 260px; }
-        .element-editor-preview img { max-height: 260px; }
+        .element-editor-preview { min-height: 107px; max-height: 173px; }
+        .element-editor-preview img { max-height: 173px; }
         .element-editor-row4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
         .element-editor-row5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
         .element-editor-row3 { grid-template-columns: 1fr 0.65fr 1fr; gap: 6px; }
