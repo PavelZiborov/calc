@@ -72,14 +72,16 @@ function normalizePreview(raw) {
 }
 
 function inferLayoutType(item) {
-    if (item.type === "link" || item.type === 2 || item.type === "2") return "link";
     if (item.type === "file" || item.type === 1 || item.type === "1") return "file";
+    if (item.type === "link" || item.type === 2 || item.type === "2") return "link";
+    if (item.crm_type === 1 || item.crmType === 1) return "file";
+    if (item.crm_type === 2 || item.crmType === 2) return "link";
 
     const url = String(item.url || item.file_name || item.fileName || "");
     if (/^https?:\/\//i.test(url) && !/downloader\.disk\.yandex/i.test(url)) {
         if (/yadi\.sk/i.test(url)) return "link";
         if (/disk\.yandex\./i.test(url)) return "link";
-        if (!/\.(pdf|jpg|jpeg|png|webp|gif|tif|tiff|ai|eps|psd|zip|rar|7z|doc|docx)$/i.test(url)) {
+        if (!/\.(pdf|jpg|jpeg|png|webp|gif|tif|tiff|ai|eps|psd|zip|rar|7z|doc|docx|cdr|svg)$/i.test(url)) {
             return "link";
         }
     }
@@ -87,9 +89,26 @@ function inferLayoutType(item) {
     return "file";
 }
 
+function layoutDisplayName(fileName, fallbackUrl = "") {
+    const raw = String(fileName || fallbackUrl || "").trim();
+    if (!raw) return "файл";
+    if (!/^https?:\/\//i.test(raw)) return raw;
+
+    try {
+        const base = decodeURIComponent(new URL(raw).pathname.split("/").filter(Boolean).pop() || "");
+        if (base) return base;
+    } catch (e) {
+        // ignore malformed URL
+    }
+
+    return raw.replace(/^https?:\/\//, "").slice(0, 80);
+}
+
 function layoutIsDeletable(item) {
     const id = Number(item.id ?? item.layout_id ?? item.layoutId);
-    return Number.isFinite(id) && id > 0;
+    if (!Number.isFinite(id) || id <= 0) return false;
+    if (item.isCanDelete === false || item.is_can_delete === false) return false;
+    return true;
 }
 
 function resolveLayoutItemUrl(item) {
@@ -112,16 +131,19 @@ function normalizeLayouts(rawLayouts) {
             const url = resolveLayoutItemUrl(item);
             if (!url) return null;
 
-            const name = (item.name || item.file_name || item.fileName || url).trim();
+            const name = layoutDisplayName(item.name || item.file_name || item.fileName, url);
             const id = item.id ?? item.file_id ?? item.layout_id ?? name;
+            const type = item.type === "file" || item.type === "link"
+                ? item.type
+                : inferLayoutType({ ...item, url });
 
             return {
                 id,
-                type: inferLayoutType({ ...item, url }),
+                type,
                 name,
                 url,
                 size: item.size ?? null,
-                isCanDelete: layoutIsDeletable(item)
+                isCanDelete: item.isCanDelete !== false && item.is_can_delete !== false
             };
         })
         .filter(Boolean);
@@ -1025,9 +1047,10 @@ async function loadElementAssetsFull(dealId, elementId, dealNum, options = {}) {
     });
 
     elementAssetsCache.set(key, {
+        ...prev,
         status: "ready",
-        preview: assets.preview || prev.preview || null,
-        layouts: assets.layouts || [],
+        preview: assets.preview ?? prev.preview ?? null,
+        layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
         layoutsLoaded: true,
         layoutsLoading: false
     });
@@ -1380,7 +1403,7 @@ function renderElementEditorAssets() {
     layoutsEl.innerHTML = cached.layouts.map(layout => {
         const size = layout.size ? `<span class="element-layout-size">${escapeHtml(formatFileSize(layout.size))}</span>` : "";
         const icon = layout.type === "link" ? "🔗" : "📄";
-        const deleteBtnHtml = isStaff && layout.type !== "link" && layoutIsDeletable(layout)
+        const deleteBtnHtml = isStaff && layout.type === "file" && layoutIsDeletable(layout)
             ? `<button type="button" class="element-layout-del" data-layout-id="${escapeHtml(layout.id)}" title="Удалить">×</button>`
             : "";
 
@@ -1484,7 +1507,14 @@ async function handlePreviewDelete() {
             previewId: cached.preview.id
         });
 
-        elementAssetsCache.set(key, { ...cached, preview: null, status: "ready" });
+        elementAssetsCache.set(key, {
+            ...cached,
+            preview: null,
+            status: "ready",
+            layouts: cached.layouts || [],
+            layoutsLoaded: cached.layoutsLoaded === true || !!(cached.layouts?.length),
+            layoutsLoading: false
+        });
         updateElementThumb(currentElementEditor.dealId, currentElementEditor.elementId);
         renderElementEditorAssets();
     } catch (e) {
