@@ -713,7 +713,7 @@ function createRowHtml(name, qty, price, statusName, isNew = false, options = {}
         <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}"${rowAttrs}>
             ${statusControl}
             ${thumbHtml}
-            <span class="${textClass}"${textClick}>${escapeHtml(name)}, ${q} шт, ${p} руб.</span>
+            <span class="${textClass}"${textClick}>${escapeHtml(name)}, ${q} ${escapeHtml(getElementUnits(options.element || {}))}, ${p} руб.</span>
             <span class="element-row-total" style="margin-right: ${isNew ? '30px' : '0'};">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} руб.</span>
             ${isNew ? `<button onclick="this.parentElement.remove(); updateDealTotal(this.closest('.elements-list'));" style="position: absolute; right: 0; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">&times;</button>` : ''}
         </div>`;
@@ -808,6 +808,11 @@ function getElementName(element) {
 
 function getElementQuantity(element) {
     return Number(element?.quantity ?? element?.qty) || 0;
+}
+
+function getElementUnits(element) {
+    const units = String(element?.units || "").trim();
+    return units || "шт";
 }
 
 function getElementPrice(element) {

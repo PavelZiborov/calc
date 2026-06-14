@@ -168,6 +168,203 @@ function getElementSra3Sheets(element) {
     return Number.isFinite(n) ? n : null;
 }
 
+function normalizeElementResponsibles(raw) {
+    if (!Array.isArray(raw)) return [];
+
+    return raw.map(item => {
+        if (item == null) return null;
+        const id = Number(item.id ?? item.user_id ?? item.userId);
+        const name = String(item.name || item.fio || "").trim();
+        if (!Number.isFinite(id) || id <= 0) return null;
+        return { id, name: name || `#${id}` };
+    }).filter(Boolean);
+}
+
+function getElementResponsibles(element) {
+    return normalizeElementResponsibles(element?.responsibles);
+}
+
+function buildResponsibleOptionsOrdered(selectedResponsibles = []) {
+    const PRINTER_NAME = "Печатник";
+    const byId = new Map();
+
+    for (const manager of getManagers()) {
+        byId.set(Number(manager.id), { id: Number(manager.id), name: manager.name });
+    }
+    for (const responsible of selectedResponsibles) {
+        if (!byId.has(responsible.id)) {
+            byId.set(responsible.id, responsible);
+        }
+    }
+
+    const all = [...byId.values()];
+    const printer = all.find(item => item.name === PRINTER_NAME) || null;
+    const others = all
+        .filter(item => item.name !== PRINTER_NAME)
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+
+    const ordered = [];
+    if (printer) ordered.push(printer);
+    ordered.push(...others);
+    return ordered;
+}
+
+function toggleElementEditorResponsiblesDropdown() {
+    document.getElementById("elementEditorResponsiblesDropdown")?.classList.toggle("open");
+}
+
+function updateElementEditorResponsiblesLabel() {
+    const btn = document.getElementById("elementEditorResponsiblesBtn");
+    const list = document.getElementById("elementEditorResponsiblesList");
+    if (!btn || !list) return;
+
+    const noneInput = list.querySelector('input[data-none="1"]');
+    if (noneInput?.checked) {
+        btn.innerText = "";
+        return;
+    }
+
+    const selected = [...list.querySelectorAll('input[type="checkbox"]:checked:not([data-none="1"])')];
+    if (selected.length === 0) {
+        btn.innerText = "";
+    } else if (selected.length === 1) {
+        btn.innerText = selected[0].dataset.name || "";
+    } else {
+        btn.innerText = `Выбрано ${selected.length}`;
+    }
+}
+
+function handleElementEditorResponsibleChange(event) {
+    const input = event.target;
+    const list = document.getElementById("elementEditorResponsiblesList");
+    if (!list || !input) return;
+
+    if (input.dataset.none === "1") {
+        if (input.checked) {
+            list.querySelectorAll('input[type="checkbox"]:not([data-none="1"])').forEach(el => {
+                el.checked = false;
+            });
+        }
+    } else if (input.checked) {
+        const noneInput = list.querySelector('input[data-none="1"]');
+        if (noneInput) noneInput.checked = false;
+    }
+
+    const hasSelected = list.querySelector('input[type="checkbox"]:checked:not([data-none="1"])');
+    const noneInput = list.querySelector('input[data-none="1"]');
+    if (!hasSelected && noneInput && !noneInput.checked) {
+        noneInput.checked = true;
+    }
+
+    updateElementEditorResponsiblesLabel();
+}
+
+function getSelectedElementEditorResponsibleIds() {
+    const list = document.getElementById("elementEditorResponsiblesList");
+    if (!list) return [];
+
+    const noneInput = list.querySelector('input[data-none="1"]');
+    if (noneInput?.checked) return [];
+
+    return [...list.querySelectorAll('input[type="checkbox"]:checked:not([data-none="1"])')]
+        .map(input => Number(input.value))
+        .filter(id => Number.isFinite(id) && id > 0);
+}
+
+function renderElementEditorResponsiblesList(element) {
+    const list = document.getElementById("elementEditorResponsiblesList");
+    const readonlyEl = document.getElementById("elementEditorResponsiblesReadonly");
+    if (!list) return;
+
+    const responsibles = getElementResponsibles(element);
+    const selectedIds = new Set(responsibles.map(item => item.id));
+    const noneSelected = responsibles.length === 0;
+    const options = buildResponsibleOptionsOrdered(responsibles);
+
+    const items = [
+        `<label class="status-option element-responsible-option element-responsible-none">
+            <input type="checkbox" value="" data-name="" data-none="1"${noneSelected ? " checked" : ""}>
+            <span class="status-option-name">&nbsp;</span>
+            <span class="status-checkmark">✓</span>
+        </label>`
+    ];
+
+    items.push(...options.map(item => {
+        const checked = selectedIds.has(item.id) ? " checked" : "";
+        return `<label class="status-option element-responsible-option">
+            <input type="checkbox" value="${item.id}" data-name="${escapeHtml(item.name)}"${checked}>
+            <span class="status-option-name">${escapeHtml(item.name)}</span>
+            <span class="status-checkmark">✓</span>
+        </label>`;
+    }));
+
+    list.innerHTML = items.join("");
+    list.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.addEventListener("change", handleElementEditorResponsibleChange);
+    });
+
+    updateElementEditorResponsiblesLabel();
+
+    if (readonlyEl) {
+        readonlyEl.textContent = responsibles.length
+            ? responsibles.map(item => item.name).join(", ")
+            : "—";
+    }
+}
+
+function fillElementEditorResponsibles(element) {
+    renderElementEditorResponsiblesList(element);
+}
+
+function fillElementEditorMeta(element) {
+    const modal = document.getElementById("element-editor-modal");
+    if (!modal) return;
+
+    const unitsInput = modal.querySelector("#elementEditorUnits");
+    if (unitsInput) {
+        unitsInput.value = String(element?.units || "").trim() || getElementUnits(element);
+    }
+
+    fillElementEditorResponsibles(element);
+}
+
+async function fetchElementResponsibles(dealId, elementId) {
+    const data = await elementAssetsApi("getElementResponsibles", { dealId, elementId }, { silent401: true });
+    return normalizeElementResponsibles(data?.responsibles ?? data);
+}
+
+async function ensureElementResponsiblesLoaded(dealId, elementId, elementIndex = null) {
+    const element = findDealElement(dealId, elementId, elementIndex);
+    if (!element) return null;
+
+    if (element._responsiblesLoaded === true) {
+        if (isElementEditorOpen(dealId, elementId)) {
+            fillElementEditorResponsibles(element);
+        }
+        return element;
+    }
+
+    try {
+        element.responsibles = await fetchElementResponsibles(dealId, elementId);
+    } catch (e) {
+        console.warn("getElementResponsibles failed", e);
+        element.responsibles = getElementResponsibles(element);
+    }
+
+    element._responsiblesLoaded = true;
+
+    if (typeof saveOpenDealState === "function") {
+        const deal = dealsCache.get(String(dealId));
+        if (deal) saveOpenDealState(deal);
+    }
+
+    if (isElementEditorOpen(dealId, elementId)) {
+        fillElementEditorResponsibles(element);
+    }
+
+    return element;
+}
+
 function findDealElement(dealId, elementId, elementIndex = null) {
     const deal = dealsCache.get(String(dealId));
     if (!deal || !Array.isArray(deal.elements)) return null;
@@ -809,51 +1006,64 @@ function getElementEditorModal() {
     modal.style.display = "none";
     modal.innerHTML = `
         <div class="element-editor-modal" onclick="event.stopPropagation()">
-            <div class="element-editor-header">
-                <span class="element-editor-title">Позиция</span>
+            <div class="element-editor-header element-editor-header-minimal">
                 <button type="button" class="element-editor-close" onclick="closeElementEditor()" aria-label="Закрыть">&times;</button>
             </div>
             <div class="element-editor-body">
                 <label class="element-editor-label" title="Название задаётся при добавлении позиции в CRM; API не позволяет переименовать">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
-                <div class="element-editor-row3">
+                <div class="element-editor-row5">
                     <div>
-                        <label class="element-editor-label">Цена/шт</label>
-                        <input id="elementEditorPrice" type="number" step="0.01" class="element-editor-input">
+                        <label class="element-editor-label">Ед. изм.</label>
+                        <input id="elementEditorUnits" type="text" maxlength="32" class="element-editor-input" autocomplete="off">
                     </div>
                     <div>
                         <label class="element-editor-label">Кол-во</label>
                         <input id="elementEditorQty" type="number" step="1" min="1" class="element-editor-input">
                     </div>
                     <div>
-                        <label class="element-editor-label">Сумма</label>
-                        <input id="elementEditorTotal" type="number" step="0.01" class="element-editor-input">
+                        <label class="element-editor-label">Цена</label>
+                        <input id="elementEditorPrice" type="number" step="0.01" class="element-editor-input">
                     </div>
-                </div>
-                <div class="element-editor-row3 staff-only-fields">
-                    <div>
-                        <label class="element-editor-label">Себестоимость</label>
+                    <div class="staff-only-fields">
+                        <label class="element-editor-label">Себест.</label>
                         <input id="elementEditorCost" type="number" step="1" class="element-editor-input">
                     </div>
                     <div>
+                        <label class="element-editor-label">Итого</label>
+                        <input id="elementEditorTotal" type="number" step="0.01" class="element-editor-input">
+                    </div>
+                </div>
+                <div class="element-editor-row3 element-editor-secondary-row">
+                    <div class="staff-only-fields">
                         <label class="element-editor-label">Себ. HQ</label>
                         <input id="elementEditorCostHq" type="number" step="1" class="element-editor-input">
                     </div>
-                    <div>
+                    <div class="staff-only-fields">
                         <label class="element-editor-label">Листов SRA3</label>
                         <input id="elementEditorSra3" type="number" step="1" class="element-editor-input">
                     </div>
+                    <div class="element-editor-responsibles-wrap">
+                        <label class="element-editor-label">Ответственные</label>
+                        <div class="status-dropdown element-editor-responsibles-dropdown" id="elementEditorResponsiblesDropdown">
+                            <button type="button" class="status-dropdown-btn element-editor-responsibles-btn" id="elementEditorResponsiblesBtn"></button>
+                            <div class="status-dropdown-list" id="elementEditorResponsiblesList"></div>
+                        </div>
+                        <div id="elementEditorResponsiblesReadonly" class="element-editor-readonly-text"></div>
+                    </div>
                 </div>
                 <div class="element-editor-preview-wrap">
-                    <div id="elementEditorPreview" class="element-editor-preview">
-                        <span class="element-editor-preview-placeholder">нет превью</span>
-                    </div>
-                    <div class="element-editor-preview-actions staff-only-fields">
-                        <label class="element-editor-mini-btn">
-                            📷
-                            <input id="elementEditorPreviewFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
-                        </label>
-                        <button type="button" id="elementEditorPreviewDelete" class="element-editor-mini-btn danger" title="Удалить превью" style="display:none;">×</button>
+                    <div class="element-editor-preview-box">
+                        <div id="elementEditorPreview" class="element-editor-preview">
+                            <span class="element-editor-preview-placeholder">нет превью</span>
+                        </div>
+                        <div class="element-editor-preview-actions staff-only-fields">
+                            <label class="element-editor-mini-btn" title="Загрузить превью">
+                                📷
+                                <input id="elementEditorPreviewFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+                            </label>
+                            <button type="button" id="elementEditorPreviewDelete" class="element-editor-mini-btn danger" title="Удалить превью" style="display:none;">×</button>
+                        </div>
                     </div>
                 </div>
                 <div class="element-editor-section-title">Макеты</div>
@@ -913,6 +1123,16 @@ function bindElementEditorEvents(modal) {
     modal.querySelector("#elementEditorAddLink")?.addEventListener("click", handleLayoutLinkAdd);
     modal.querySelector("#elementEditorLayoutFile")?.addEventListener("change", handleLayoutFileUpload);
     modal.querySelector("#elementEditorSave")?.addEventListener("click", saveElementEditor);
+    modal.querySelector("#elementEditorResponsiblesBtn")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleElementEditorResponsiblesDropdown();
+    });
+    modal.querySelector(".element-editor-modal")?.addEventListener("click", (event) => {
+        const dropdown = modal.querySelector("#elementEditorResponsiblesDropdown");
+        if (dropdown && !dropdown.contains(event.target)) {
+            dropdown.classList.remove("open");
+        }
+    });
 }
 
 function setElementEditorStaffMode(isStaff) {
@@ -923,11 +1143,18 @@ function setElementEditorStaffMode(isStaff) {
         el.style.display = isStaff ? "" : "none";
     });
 
-    modal.querySelectorAll("#elementEditorPrice, #elementEditorTotal, #elementEditorQty, #elementEditorCost, #elementEditorCostHq, #elementEditorSra3")
+    modal.querySelectorAll("#elementEditorPrice, #elementEditorTotal, #elementEditorQty, #elementEditorCost, #elementEditorCostHq, #elementEditorSra3, #elementEditorUnits")
         .forEach(input => {
             if (!input) return;
             input.readOnly = !isStaff;
         });
+
+    const responsiblesDropdown = modal.querySelector("#elementEditorResponsiblesDropdown");
+    const responsiblesReadonly = modal.querySelector("#elementEditorResponsiblesReadonly");
+    if (responsiblesDropdown && responsiblesReadonly) {
+        responsiblesDropdown.style.display = isStaff ? "" : "none";
+        responsiblesReadonly.style.display = isStaff ? "none" : "";
+    }
 
     const nameInput = modal.querySelector("#elementEditorName");
     if (nameInput) nameInput.readOnly = true;
@@ -969,6 +1196,7 @@ function openElementEditor(event, trigger) {
     modal.querySelector("#elementEditorLinkInput").value = "";
 
     fillElementEditorFields(element);
+    fillElementEditorMeta(element);
     if (isStaff && !elementFieldsReady(element)) {
         setElementEditorFieldsLoading();
     }
@@ -985,6 +1213,8 @@ function openElementEditor(event, trigger) {
         { forceLayouts: true }
     );
 
+    ensureElementResponsiblesLoaded(dealId, elementId, elementIndex);
+
     if (isStaff && !elementFieldsReady(element)) {
         ensureElementFieldsLoaded(dealId, elementId).then((loadedElement) => {
             if (!isElementEditorOpen(dealId, elementId) || !loadedElement) return;
@@ -994,6 +1224,7 @@ function openElementEditor(event, trigger) {
 }
 
 function closeElementEditor() {
+    document.getElementById("elementEditorResponsiblesDropdown")?.classList.remove("open");
     const modal = document.getElementById("element-editor-modal");
     if (modal) modal.style.display = "none";
     document.body.style.overflow = "";
@@ -1317,7 +1548,8 @@ function updateElementRowDom(dealId, elementId, element) {
     const name = getElementName(element);
     const qty = getElementQuantity(element);
     const price = getElementPrice(element);
-    row.textContent = `${name}, ${qty} шт, ${price} руб.`;
+    const units = getElementUnits(element);
+    row.textContent = `${name}, ${qty} ${units}, ${price} руб.`;
 
     const totalEl = row.closest(".element-row")?.querySelector(".element-row-total");
     if (totalEl) {
@@ -1337,6 +1569,7 @@ async function saveElementEditor() {
     const costHqRaw = modal.querySelector("#elementEditorCostHq")?.value;
     const costRaw = modal.querySelector("#elementEditorCost")?.value;
     const sra3Raw = modal.querySelector("#elementEditorSra3")?.value;
+    const unitsRaw = modal.querySelector("#elementEditorUnits")?.value;
     const qty = Number(modal.querySelector("#elementEditorQty")?.value) || 0;
 
     if (qty <= 0) {
@@ -1362,6 +1595,11 @@ async function saveElementEditor() {
         const sra3 = Number(sra3Raw);
         if (Number.isFinite(sra3)) fields.sra3_sheets = sra3;
     }
+
+    const units = String(unitsRaw || "").trim();
+    if (units) fields.units = units;
+
+    fields.responsible_ids = getSelectedElementEditorResponsibleIds();
 
     if (saveBtn) {
         saveBtn.disabled = true;
@@ -1392,6 +1630,16 @@ async function saveElementEditor() {
             if (fields.cost != null) element.cost = fields.cost;
             if (fields.cost_hq != null) element.cost_hq = fields.cost_hq;
             if (fields.sra3_sheets != null) element.sra3_sheets = fields.sra3_sheets;
+            if (fields.units) element.units = fields.units;
+            if (Array.isArray(fields.responsible_ids)) {
+                const options = buildResponsibleOptionsOrdered(getElementResponsibles(element));
+                const byId = new Map(options.map(item => [item.id, item.name]));
+                element.responsibles = fields.responsible_ids.map(id => ({
+                    id,
+                    name: byId.get(id) || `#${id}`
+                }));
+                element._responsiblesLoaded = true;
+            }
             element._fieldsLoaded = true;
             updateElementRowDom(currentElementEditor.dealId, currentElementEditor.elementId, element);
             updateDealTotal(document.querySelector(
