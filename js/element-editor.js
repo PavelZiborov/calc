@@ -72,13 +72,36 @@ function normalizePreview(raw) {
 }
 
 function inferLayoutType(item) {
-    if (item.type === "link" || item.type === 2) return "link";
-    if (item.type === "file" || item.type === 1) return "file";
+    if (item.type === "link" || item.type === 2 || item.type === "2") return "link";
+    if (item.type === "file" || item.type === 1 || item.type === "1") return "file";
 
-    const url = String(item.url || "");
+    const url = String(item.url || item.file_name || item.fileName || "");
+    if (/^https?:\/\//i.test(url) && !/downloader\.disk\.yandex/i.test(url)) {
+        if (/yadi\.sk/i.test(url)) return "link";
+        if (/disk\.yandex\./i.test(url)) return "link";
+        if (!/\.(pdf|jpg|jpeg|png|webp|gif|tif|tiff|ai|eps|psd|zip|rar|7z|doc|docx)$/i.test(url)) {
+            return "link";
+        }
+    }
     if (/yadi\.sk/i.test(url)) return "link";
-    if (/disk\.yandex\./i.test(url) && !/downloader\.disk\.yandex/i.test(url)) return "link";
     return "file";
+}
+
+function layoutIsDeletable(item) {
+    const id = Number(item.id ?? item.layout_id ?? item.layoutId);
+    return Number.isFinite(id) && id > 0;
+}
+
+function resolveLayoutItemUrl(item) {
+    if (isUsableAssetUrl(item?.url)) return String(item.url).trim();
+
+    const type = inferLayoutType(item);
+    if (type !== "link") return "";
+
+    for (const candidate of [item?.file_name, item?.fileName, item?.name]) {
+        if (isUsableAssetUrl(candidate)) return String(candidate).trim();
+    }
+    return "";
 }
 
 function normalizeLayouts(rawLayouts) {
@@ -86,19 +109,19 @@ function normalizeLayouts(rawLayouts) {
 
     return rawLayouts
         .map(item => {
-            const url = isUsableAssetUrl(item.url) ? String(item.url).trim() : "";
+            const url = resolveLayoutItemUrl(item);
             if (!url) return null;
 
-            const name = (item.name || item.file_name || url).trim();
+            const name = (item.name || item.file_name || item.fileName || url).trim();
             const id = item.id ?? item.file_id ?? item.layout_id ?? name;
 
             return {
                 id,
-                type: inferLayoutType(item),
+                type: inferLayoutType({ ...item, url }),
                 name,
                 url,
                 size: item.size ?? null,
-                isCanDelete: item.is_can_delete !== false && item.isCanDelete !== false
+                isCanDelete: layoutIsDeletable(item)
             };
         })
         .filter(Boolean);
@@ -161,6 +184,16 @@ function findDealElement(dealId, elementId, elementIndex = null) {
     return null;
 }
 
+async function parseApiResponse(response) {
+    const text = await response.text();
+    if (!text || !text.trim()) return {};
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error(`Invalid JSON response: ${text.slice(0, 200)}`);
+    }
+}
+
 async function elementAssetsApi(action, body, options = {}) {
     if (!ensureActiveSession()) throw new Error("Unauthorized");
 
@@ -181,20 +214,16 @@ async function elementAssetsApi(action, body, options = {}) {
     if (!response.ok) {
         let detail = "";
         try {
-            const errBody = await response.json();
+            const errBody = await parseApiResponse(response);
             detail = errBody?.message || errBody?.error || errBody?.description || "";
             if (!detail && typeof errBody === "string") detail = errBody;
-        } catch {
-            try {
-                detail = (await response.text()).trim();
-            } catch {
-                detail = "";
-            }
+        } catch (e) {
+            detail = String(e?.message || "").trim();
         }
         throw new Error(detail || `API ${action} failed (${response.status})`);
     }
 
-    return response.json();
+    return parseApiResponse(response);
 }
 
 function canvasToBlob(canvas, mimeType, quality) {
@@ -708,12 +737,13 @@ async function prefetchDealLayoutsBatch(dealId, dealNum, elementIds) {
     }
 }
 
-async function loadElementAssetsFull(dealId, elementId, dealNum) {
+async function loadElementAssetsFull(dealId, elementId, dealNum, options = {}) {
     const key = assetsCacheKey(dealId, elementId);
     const prev = elementAssetsCache.get(key) || {};
     const hasPreview = !!(prev.preview?.url || prev.preview?.thumbUrl);
+    const forceLayouts = options.forceLayouts === true;
 
-    if (prev.layoutsLoaded) {
+    if (prev.layoutsLoaded && !forceLayouts) {
         if (isElementEditorOpen(dealId, elementId)) renderElementEditorAssets();
         return;
     }
@@ -948,14 +978,12 @@ function openElementEditor(event, trigger) {
     document.body.style.overflow = "hidden";
 
     const key = assetsCacheKey(dealId, elementId);
-    const cached = elementAssetsCache.get(key);
-    if (!cached?.layoutsLoaded) {
-        loadElementAssetsFull(
-            dealId,
-            elementId,
-            currentElementEditor.dealNum || getDealNum(dealId)
-        );
-    }
+    loadElementAssetsFull(
+        dealId,
+        elementId,
+        currentElementEditor.dealNum || getDealNum(dealId),
+        { forceLayouts: true }
+    );
 
     if (isStaff && !elementFieldsReady(element)) {
         ensureElementFieldsLoaded(dealId, elementId).then((loadedElement) => {
@@ -1019,7 +1047,7 @@ function renderElementEditorAssets() {
     layoutsEl.innerHTML = cached.layouts.map(layout => {
         const size = layout.size ? `<span class="element-layout-size">${escapeHtml(formatFileSize(layout.size))}</span>` : "";
         const icon = layout.type === "link" ? "🔗" : "📄";
-        const deleteBtnHtml = isStaff
+        const deleteBtnHtml = isStaff && layout.type !== "link" && layoutIsDeletable(layout)
             ? `<button type="button" class="element-layout-del" data-layout-id="${escapeHtml(layout.id)}" title="Удалить">×</button>`
             : "";
 
@@ -1235,6 +1263,12 @@ async function handleLayoutDelete(layoutId) {
     if (!canEditElementAssets() || !layoutId) return;
     if (!confirm("Удалить макет?")) return;
 
+    const numericLayoutId = Number(layoutId);
+    if (!Number.isFinite(numericLayoutId) || numericLayoutId <= 0) {
+        alert("Не удалось определить ID макета в CRM");
+        return;
+    }
+
     try {
         const data = await elementAssetsApi("deleteElementLayout", {
             ...buildElementAssetsPayload(
@@ -1242,10 +1276,20 @@ async function handleLayoutDelete(layoutId) {
                 currentElementEditor.elementId,
                 currentElementEditor.dealNum
             ),
-            layoutId
+            layoutId: numericLayoutId
         });
 
-        const assets = normalizeAssetsResponse(data);
+        let assets = normalizeAssetsResponse(data);
+        if (!assets.layouts?.length) {
+            const refreshed = await fetchElementAssets(
+                currentElementEditor.dealId,
+                currentElementEditor.elementId,
+                currentElementEditor.dealNum,
+                { layoutsOnly: true, silent401: true }
+            );
+            if (refreshed?.layouts?.length) assets = refreshed;
+        }
+
         const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
         const prev = elementAssetsCache.get(key) || {};
         elementAssetsCache.set(key, {
@@ -1259,7 +1303,8 @@ async function handleLayoutDelete(layoutId) {
         renderElementEditorAssets();
     } catch (e) {
         console.warn("deleteElementLayout", e);
-        alert("Не удалось удалить макет");
+        const detail = String(e?.message || "").trim();
+        alert(detail || "Не удалось удалить макет");
     }
 }
 
