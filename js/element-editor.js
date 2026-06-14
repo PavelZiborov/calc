@@ -133,6 +133,11 @@ function getElementCostHq(element) {
     return toMoneyNumber(raw, null);
 }
 
+function getElementCost(element) {
+    const raw = element?.cost ?? element?.cost_total ?? element?.costTotal;
+    return toMoneyNumber(raw, null);
+}
+
 function getElementSra3Sheets(element) {
     const raw = element?.sra3_sheets ?? element?.sra3Sheets ?? getElementAdditionalField(element, ELEMENT_FIELD_SRA3);
     if (raw == null || raw === "") return null;
@@ -444,21 +449,30 @@ function fillElementEditorFields(element) {
     const modal = document.getElementById("element-editor-modal");
     if (!modal) return;
 
+    const cost = getElementCost(element);
     const costHq = getElementCostHq(element);
     const sra3 = getElementSra3Sheets(element);
 
+    const costInput = modal.querySelector("#elementEditorCost");
     const costHqInput = modal.querySelector("#elementEditorCostHq");
     const sra3Input = modal.querySelector("#elementEditorSra3");
 
+    const staffEditable = currentUser.role === "staff" && !currentElementEditor?.isLocked;
+
+    if (costInput) {
+        costInput.value = cost != null ? Math.round(cost) : "";
+        costInput.placeholder = "";
+        costInput.readOnly = !staffEditable;
+    }
     if (costHqInput) {
         costHqInput.value = costHq != null ? Math.round(costHq) : "";
         costHqInput.placeholder = "";
-        costHqInput.readOnly = currentUser.role !== "staff" || currentElementEditor?.isLocked;
+        costHqInput.readOnly = !staffEditable;
     }
     if (sra3Input) {
         sra3Input.value = sra3 != null ? sra3 : "";
         sra3Input.placeholder = "";
-        sra3Input.readOnly = currentUser.role !== "staff" || currentElementEditor?.isLocked;
+        sra3Input.readOnly = !staffEditable;
     }
 }
 
@@ -770,8 +784,8 @@ function getElementEditorModal() {
                 <button type="button" class="element-editor-close" onclick="closeElementEditor()" aria-label="Закрыть">&times;</button>
             </div>
             <div class="element-editor-body">
-                <label class="element-editor-label">Наименование</label>
-                <textarea id="elementEditorName" rows="2" class="element-editor-input"></textarea>
+                <label class="element-editor-label" title="Название задаётся при добавлении позиции в CRM; API не позволяет переименовать">Наименование</label>
+                <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
                 <div class="element-editor-row3">
                     <div>
                         <label class="element-editor-label">Цена/шт</label>
@@ -779,14 +793,18 @@ function getElementEditorModal() {
                     </div>
                     <div>
                         <label class="element-editor-label">Кол-во</label>
-                        <input id="elementEditorQty" type="number" step="1" class="element-editor-input" readonly>
+                        <input id="elementEditorQty" type="number" step="1" min="1" class="element-editor-input">
                     </div>
                     <div>
                         <label class="element-editor-label">Сумма</label>
                         <input id="elementEditorTotal" type="number" step="0.01" class="element-editor-input">
                     </div>
                 </div>
-                <div class="element-editor-row2 staff-only-fields">
+                <div class="element-editor-row3 staff-only-fields">
+                    <div>
+                        <label class="element-editor-label">Себестоимость</label>
+                        <input id="elementEditorCost" type="number" step="1" class="element-editor-input">
+                    </div>
                     <div>
                         <label class="element-editor-label">Себ. HQ</label>
                         <input id="elementEditorCostHq" type="number" step="1" class="element-editor-input">
@@ -836,6 +854,14 @@ function bindElementEditorEvents(modal) {
     const totalInput = modal.querySelector("#elementEditorTotal");
     const qtyInput = modal.querySelector("#elementEditorQty");
 
+    qtyInput?.addEventListener("input", () => {
+        const qty = Number(qtyInput.value) || 0;
+        const price = Number(priceInput?.value);
+        if (qty > 0 && Number.isFinite(price)) {
+            totalInput.value = Number((price * qty).toFixed(2));
+        }
+    });
+
     priceInput?.addEventListener("input", () => {
         const qty = Number(qtyInput?.value) || 0;
         const price = Number(priceInput.value);
@@ -867,15 +893,14 @@ function setElementEditorStaffMode(isStaff) {
         el.style.display = isStaff ? "" : "none";
     });
 
-    modal.querySelectorAll("#elementEditorName, #elementEditorPrice, #elementEditorTotal, #elementEditorCostHq, #elementEditorSra3")
+    modal.querySelectorAll("#elementEditorPrice, #elementEditorTotal, #elementEditorQty, #elementEditorCost, #elementEditorCostHq, #elementEditorSra3")
         .forEach(input => {
             if (!input) return;
-            if (input.id === "elementEditorQty") {
-                input.readOnly = true;
-                return;
-            }
             input.readOnly = !isStaff;
         });
+
+    const nameInput = modal.querySelector("#elementEditorName");
+    if (nameInput) nameInput.readOnly = true;
 }
 
 function openElementEditor(event, trigger) {
@@ -913,10 +938,9 @@ function openElementEditor(event, trigger) {
     modal.querySelector("#elementEditorTotal").value = Number.isFinite(total) ? total : "";
     modal.querySelector("#elementEditorLinkInput").value = "";
 
+    fillElementEditorFields(element);
     if (isStaff && !elementFieldsReady(element)) {
         setElementEditorFieldsLoading();
-    } else {
-        fillElementEditorFields(element);
     }
 
     renderElementEditorAssets();
@@ -1263,25 +1287,28 @@ async function saveElementEditor() {
     const saveBtn = modal?.querySelector("#elementEditorSave");
     if (saveBtn?.disabled) return;
 
-    const name = modal.querySelector("#elementEditorName")?.value?.trim() || "";
     const price = Number(modal.querySelector("#elementEditorPrice")?.value);
     const total = Number(modal.querySelector("#elementEditorTotal")?.value);
     const costHqRaw = modal.querySelector("#elementEditorCostHq")?.value;
+    const costRaw = modal.querySelector("#elementEditorCost")?.value;
     const sra3Raw = modal.querySelector("#elementEditorSra3")?.value;
     const qty = Number(modal.querySelector("#elementEditorQty")?.value) || 0;
 
-    if (!name) {
-        alert("Укажите наименование");
+    if (qty <= 0) {
+        alert("Укажите количество больше 0");
         return;
     }
 
     const fields = {
-        name,
         quantity: qty,
         price: Number.isFinite(price) ? price : 0,
         total: Number.isFinite(total) ? total : 0
     };
 
+    if (costRaw !== "") {
+        const cost = Math.round(Number(costRaw));
+        if (Number.isFinite(cost)) fields.cost = cost;
+    }
     if (costHqRaw !== "") {
         const costHq = Math.round(Number(costHqRaw));
         if (Number.isFinite(costHq)) fields.cost_hq = costHq;
@@ -1297,7 +1324,7 @@ async function saveElementEditor() {
     }
 
     try {
-        await elementAssetsApi("updateElement", {
+        const saveResult = await elementAssetsApi("updateElement", {
             ...buildElementAssetsPayload(
                 currentElementEditor.dealId,
                 currentElementEditor.elementId,
@@ -1314,11 +1341,10 @@ async function saveElementEditor() {
         );
 
         if (element) {
-            element.name = name;
-            element.category_and_name = name;
             element.quantity = qty;
             element.price = fields.price;
             element.total = fields.total;
+            if (fields.cost != null) element.cost = fields.cost;
             if (fields.cost_hq != null) element.cost_hq = fields.cost_hq;
             if (fields.sra3_sheets != null) element.sra3_sheets = fields.sra3_sheets;
             element._fieldsLoaded = true;
@@ -1326,6 +1352,10 @@ async function saveElementEditor() {
             updateDealTotal(document.querySelector(
                 `.deal-elements-list[data-deal-id="${currentElementEditor.dealId}"]`
             ));
+        }
+
+        if (saveResult?.nameNote) {
+            console.info(saveResult.nameNote);
         }
 
         closeElementEditor();
