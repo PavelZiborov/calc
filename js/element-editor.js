@@ -316,15 +316,77 @@ function fillElementEditorResponsibles(element) {
     renderElementEditorResponsiblesList(element);
 }
 
+const ELEMENT_UNIT_PRESETS = ["шт", "услуга"];
+
+function normalizeElementUnitsValue(units) {
+    const value = String(units || "").trim();
+    return value || "шт";
+}
+
+function getElementEditorUnitsValue() {
+    const customInput = document.getElementById("elementEditorUnitsCustom");
+    const custom = String(customInput?.value || "").trim();
+    const activePreset = document.querySelector("#elementEditorUnitsList .element-units-preset.is-selected");
+    if (activePreset?.dataset?.units) return activePreset.dataset.units;
+    if (custom) return custom;
+    return "шт";
+}
+
+function updateElementEditorUnitsLabel() {
+    const btn = document.getElementById("elementEditorUnitsBtn");
+    const readonlyEl = document.getElementById("elementEditorUnitsReadonly");
+    const value = getElementEditorUnitsValue();
+    if (btn) btn.textContent = value;
+    if (readonlyEl) readonlyEl.textContent = value || "—";
+}
+
+function setElementEditorUnitsValue(units) {
+    const value = normalizeElementUnitsValue(units);
+    const customInput = document.getElementById("elementEditorUnitsCustom");
+    const presets = document.querySelectorAll("#elementEditorUnitsList .element-units-preset");
+
+    if (ELEMENT_UNIT_PRESETS.includes(value)) {
+        presets.forEach(btn => {
+            btn.classList.toggle("is-selected", btn.dataset.units === value);
+        });
+        if (customInput) customInput.value = "";
+    } else {
+        presets.forEach(btn => btn.classList.remove("is-selected"));
+        if (customInput) customInput.value = value;
+    }
+
+    updateElementEditorUnitsLabel();
+}
+
+function fillElementEditorUnits(element) {
+    setElementEditorUnitsValue(getElementUnits(element));
+}
+
+function toggleElementEditorUnitsDropdown() {
+    document.getElementById("elementEditorUnitsDropdown")?.classList.toggle("open");
+}
+
+function handleElementEditorUnitsPreset(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const units = event.currentTarget?.dataset?.units;
+    if (!units) return;
+    setElementEditorUnitsValue(units);
+    document.getElementById("elementEditorUnitsDropdown")?.classList.remove("open");
+}
+
+function handleElementEditorUnitsCustomInput() {
+    document.querySelectorAll("#elementEditorUnitsList .element-units-preset").forEach(btn => {
+        btn.classList.remove("is-selected");
+    });
+    updateElementEditorUnitsLabel();
+}
+
 function fillElementEditorMeta(element) {
     const modal = document.getElementById("element-editor-modal");
     if (!modal) return;
 
-    const unitsInput = modal.querySelector("#elementEditorUnits");
-    if (unitsInput) {
-        unitsInput.value = String(element?.units || "").trim() || getElementUnits(element);
-    }
-
+    fillElementEditorUnits(element);
     fillElementEditorResponsibles(element);
 }
 
@@ -997,12 +1059,18 @@ function canEditElementAssets() {
 }
 
 function getElementEditorModal() {
+    const MODAL_VERSION = "4";
     let modal = document.getElementById("element-editor-modal");
+    if (modal && modal.dataset.version !== MODAL_VERSION) {
+        modal.remove();
+        modal = null;
+    }
     if (modal) return modal;
 
     modal = document.createElement("div");
     modal.id = "element-editor-modal";
     modal.className = "element-editor-backdrop";
+    modal.dataset.version = "4";
     modal.style.display = "none";
     modal.innerHTML = `
         <div class="element-editor-modal" onclick="event.stopPropagation()">
@@ -1012,36 +1080,46 @@ function getElementEditorModal() {
             <div class="element-editor-body">
                 <label class="element-editor-label" title="Название задаётся при добавлении позиции в CRM; API не позволяет переименовать">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
-                <div class="element-editor-row5">
-                    <div>
-                        <label class="element-editor-label">Ед. изм.</label>
-                        <input id="elementEditorUnits" type="text" maxlength="32" class="element-editor-input" autocomplete="off">
-                    </div>
+                <div class="element-editor-row4">
                     <div>
                         <label class="element-editor-label">Кол-во</label>
-                        <input id="elementEditorQty" type="number" step="1" min="1" class="element-editor-input">
+                        <input id="elementEditorQty" type="text" inputmode="numeric" autocomplete="off" class="element-editor-input element-editor-input-num">
                     </div>
                     <div>
                         <label class="element-editor-label">Цена</label>
-                        <input id="elementEditorPrice" type="number" step="0.01" class="element-editor-input">
+                        <input id="elementEditorPrice" type="text" inputmode="decimal" autocomplete="off" class="element-editor-input element-editor-input-num">
                     </div>
                     <div class="staff-only-fields">
                         <label class="element-editor-label">Себест.</label>
-                        <input id="elementEditorCost" type="number" step="1" class="element-editor-input">
+                        <input id="elementEditorCost" type="text" inputmode="numeric" autocomplete="off" class="element-editor-input element-editor-input-num">
                     </div>
                     <div>
                         <label class="element-editor-label">Итого</label>
-                        <input id="elementEditorTotal" type="number" step="0.01" class="element-editor-input">
+                        <input id="elementEditorTotal" type="text" inputmode="decimal" autocomplete="off" class="element-editor-input element-editor-input-num">
                     </div>
                 </div>
-                <div class="element-editor-row3 element-editor-secondary-row">
+                <div class="element-editor-secondary-row">
                     <div class="staff-only-fields">
                         <label class="element-editor-label">Себ. HQ</label>
-                        <input id="elementEditorCostHq" type="number" step="1" class="element-editor-input">
+                        <input id="elementEditorCostHq" type="text" inputmode="numeric" autocomplete="off" class="element-editor-input element-editor-input-num">
                     </div>
                     <div class="staff-only-fields">
                         <label class="element-editor-label">Листов SRA3</label>
-                        <input id="elementEditorSra3" type="number" step="1" class="element-editor-input">
+                        <input id="elementEditorSra3" type="text" inputmode="numeric" autocomplete="off" class="element-editor-input element-editor-input-num">
+                    </div>
+                    <div class="element-editor-units-wrap">
+                        <label class="element-editor-label">Ед. изм.</label>
+                        <div class="status-dropdown element-editor-units-dropdown" id="elementEditorUnitsDropdown">
+                            <button type="button" class="status-dropdown-btn element-editor-units-btn" id="elementEditorUnitsBtn"></button>
+                            <div class="status-dropdown-list element-editor-units-list" id="elementEditorUnitsList">
+                                <button type="button" class="element-units-preset" data-units="шт">шт</button>
+                                <button type="button" class="element-units-preset" data-units="услуга">услуга</button>
+                                <div class="element-units-custom-row">
+                                    <input id="elementEditorUnitsCustom" type="text" maxlength="32" placeholder="Своё значение" inputmode="text" autocomplete="off" class="element-editor-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="elementEditorUnitsReadonly" class="element-editor-readonly-text"></div>
                     </div>
                     <div class="element-editor-responsibles-wrap">
                         <label class="element-editor-label">Ответственные</label>
@@ -1125,13 +1203,29 @@ function bindElementEditorEvents(modal) {
     modal.querySelector("#elementEditorSave")?.addEventListener("click", saveElementEditor);
     modal.querySelector("#elementEditorResponsiblesBtn")?.addEventListener("click", (event) => {
         event.stopPropagation();
+        document.getElementById("elementEditorUnitsDropdown")?.classList.remove("open");
         toggleElementEditorResponsiblesDropdown();
     });
+    modal.querySelector("#elementEditorUnitsBtn")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        document.getElementById("elementEditorResponsiblesDropdown")?.classList.remove("open");
+        toggleElementEditorUnitsDropdown();
+    });
+    modal.querySelectorAll("#elementEditorUnitsList .element-units-preset").forEach(btn => {
+        btn.addEventListener("click", handleElementEditorUnitsPreset);
+    });
+    modal.querySelector("#elementEditorUnitsCustom")?.addEventListener("input", handleElementEditorUnitsCustomInput);
+    modal.querySelector("#elementEditorUnitsCustom")?.addEventListener("focus", handleElementEditorUnitsCustomInput);
+    modal.querySelector("#elementEditorUnitsCustom")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
     modal.querySelector(".element-editor-modal")?.addEventListener("click", (event) => {
-        const dropdown = modal.querySelector("#elementEditorResponsiblesDropdown");
-        if (dropdown && !dropdown.contains(event.target)) {
-            dropdown.classList.remove("open");
-        }
+        ["#elementEditorResponsiblesDropdown", "#elementEditorUnitsDropdown"].forEach(selector => {
+            const dropdown = modal.querySelector(selector);
+            if (dropdown && !dropdown.contains(event.target)) {
+                dropdown.classList.remove("open");
+            }
+        });
     });
 }
 
@@ -1143,11 +1237,18 @@ function setElementEditorStaffMode(isStaff) {
         el.style.display = isStaff ? "" : "none";
     });
 
-    modal.querySelectorAll("#elementEditorPrice, #elementEditorTotal, #elementEditorQty, #elementEditorCost, #elementEditorCostHq, #elementEditorSra3, #elementEditorUnits")
+    modal.querySelectorAll("#elementEditorPrice, #elementEditorTotal, #elementEditorQty, #elementEditorCost, #elementEditorCostHq, #elementEditorSra3, #elementEditorUnitsCustom")
         .forEach(input => {
             if (!input) return;
             input.readOnly = !isStaff;
         });
+
+    const unitsDropdown = modal.querySelector("#elementEditorUnitsDropdown");
+    const unitsReadonly = modal.querySelector("#elementEditorUnitsReadonly");
+    if (unitsDropdown && unitsReadonly) {
+        unitsDropdown.style.display = isStaff ? "" : "none";
+        unitsReadonly.style.display = isStaff ? "none" : "";
+    }
 
     const responsiblesDropdown = modal.querySelector("#elementEditorResponsiblesDropdown");
     const responsiblesReadonly = modal.querySelector("#elementEditorResponsiblesReadonly");
@@ -1225,6 +1326,7 @@ function openElementEditor(event, trigger) {
 
 function closeElementEditor() {
     document.getElementById("elementEditorResponsiblesDropdown")?.classList.remove("open");
+    document.getElementById("elementEditorUnitsDropdown")?.classList.remove("open");
     const modal = document.getElementById("element-editor-modal");
     if (modal) modal.style.display = "none";
     document.body.style.overflow = "";
@@ -1569,7 +1671,6 @@ async function saveElementEditor() {
     const costHqRaw = modal.querySelector("#elementEditorCostHq")?.value;
     const costRaw = modal.querySelector("#elementEditorCost")?.value;
     const sra3Raw = modal.querySelector("#elementEditorSra3")?.value;
-    const unitsRaw = modal.querySelector("#elementEditorUnits")?.value;
     const qty = Number(modal.querySelector("#elementEditorQty")?.value) || 0;
 
     if (qty <= 0) {
@@ -1596,7 +1697,7 @@ async function saveElementEditor() {
         if (Number.isFinite(sra3)) fields.sra3_sheets = sra3;
     }
 
-    const units = String(unitsRaw || "").trim();
+    const units = getElementEditorUnitsValue();
     if (units) fields.units = units;
 
     fields.responsible_ids = getSelectedElementEditorResponsibleIds();
