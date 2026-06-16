@@ -11,6 +11,9 @@ const ELEMENT_FIELD_SRA3 = 1066;
 const MAX_LAYOUT_FILE_MB = 50;
 const MAX_PREVIEW_BYTES = 512000;
 const PREVIEW_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const PREVIEW_FETCH_MAX_RETRIES = 3;
+const ELEMENT_ASSETS_TIMEOUT_MS = 45000;
+const previewRefreshInFlight = new Map();
 
 function assetsCacheKey(dealId, elementId) {
     return `${dealId}:${elementId}`;
@@ -43,7 +46,41 @@ function bindPreviewImgFallback(img, fallbackUrl) {
     }, { once: true });
 }
 
-function setPreviewImgContent(container, preview, altText = "") {
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function previewNeedsFetch(cached) {
+    if (!cached) return true;
+    if (isUsableAssetUrl(cached.preview?.url) || isUsableAssetUrl(cached.preview?.thumbUrl)) return false;
+    if (cached.status === "loading") return false;
+    if (cached.previewMissing === true) return false;
+    return (cached.previewRetryCount || 0) < PREVIEW_FETCH_MAX_RETRIES;
+}
+
+function bindPreviewImgRefresh(img, dealId, elementId) {
+    if (!img || !dealId || !elementId) return;
+
+    img.addEventListener("error", async () => {
+        if (img.dataset.previewRefreshDone === "1") return;
+        img.dataset.previewRefreshDone = "1";
+
+        const refreshed = await refreshElementPreview(dealId, elementId);
+        if (!refreshed) return;
+
+        const cached = elementAssetsCache.get(assetsCacheKey(dealId, elementId));
+        const { primary, fallback } = getPreviewDisplayUrls(cached?.preview);
+        if (!primary) return;
+
+        img.dataset.previewRefreshDone = "";
+        img.dataset.fallbackApplied = "";
+        img.src = primary;
+        if (fallback) bindPreviewImgFallback(img, fallback);
+        bindPreviewImgRefresh(img, dealId, elementId);
+    }, { once: true });
+}
+
+function setPreviewImgContent(container, preview, altText = "", context = null) {
     const { primary, fallback } = getPreviewDisplayUrls(preview);
     if (!primary) {
         container.innerHTML = "";
@@ -53,6 +90,9 @@ function setPreviewImgContent(container, preview, altText = "") {
     container.innerHTML = `<img src="${escapeHtml(primary)}" alt="${escapeHtml(altText)}" referrerpolicy="no-referrer">`;
     const img = container.querySelector("img");
     if (img && fallback) bindPreviewImgFallback(img, fallback);
+    if (img && context?.dealId && context?.elementId) {
+        bindPreviewImgRefresh(img, context.dealId, context.elementId);
+    }
     return true;
 }
 
@@ -701,6 +741,75 @@ function buildElementAssetsPayload(dealId, elementId, dealNum) {
     return payload;
 }
 
+async function refreshElementPreview(dealId, elementId, dealNum = null) {
+    const key = assetsCacheKey(dealId, elementId);
+    if (previewRefreshInFlight.has(key)) {
+        return previewRefreshInFlight.get(key);
+    }
+
+    const task = (async () => {
+        const prev = elementAssetsCache.get(key) || {};
+        elementAssetsCache.set(key, { ...prev, status: "loading" });
+        updateElementThumb(dealId, elementId);
+        if (isElementEditorOpen(dealId, elementId)) renderElementEditorAssets();
+
+        const assets = await fetchElementAssets(
+            dealId,
+            elementId,
+            dealNum || getDealNum(dealId),
+            { previewOnly: true, silent401: true, timeoutMs: ELEMENT_ASSETS_TIMEOUT_MS }
+        );
+
+        const preview = normalizePreview(assets.preview);
+        const hasPreview = !!(preview?.url || preview?.thumbUrl);
+        const retryCount = hasPreview ? 0 : (prev.previewRetryCount || 0) + 1;
+
+        elementAssetsCache.set(key, {
+            ...prev,
+            status: "ready",
+            preview,
+            previewRetryCount: retryCount,
+            previewMissing: !hasPreview && retryCount >= PREVIEW_FETCH_MAX_RETRIES,
+            previewChecked: hasPreview || retryCount >= PREVIEW_FETCH_MAX_RETRIES,
+            layouts: prev.layouts || [],
+            layoutsLoaded: prev.layoutsLoaded === true,
+            layoutsLoading: prev.layoutsLoading === true
+        });
+
+        updateElementThumb(dealId, elementId);
+        if (isElementEditorOpen(dealId, elementId)) renderElementEditorAssets();
+        return hasPreview;
+    })().finally(() => {
+        previewRefreshInFlight.delete(key);
+    });
+
+    previewRefreshInFlight.set(key, task);
+    return task;
+}
+
+function applyPreviewBatchResult(dealId, elementId, assets, batchFailed) {
+    const key = assetsCacheKey(dealId, elementId);
+    const prev = elementAssetsCache.get(key) || {};
+    const preview = normalizePreview(assets?.preview);
+    const hasPreview = !!(preview?.url || preview?.thumbUrl);
+    const retryCount = batchFailed || !hasPreview ? (prev.previewRetryCount || 0) + 1 : 0;
+
+    elementAssetsCache.set(key, {
+        ...prev,
+        status: batchFailed ? "error" : "ready",
+        preview: hasPreview ? preview : null,
+        previewRetryCount: retryCount,
+        previewMissing: !hasPreview && !batchFailed && retryCount >= PREVIEW_FETCH_MAX_RETRIES,
+        previewChecked: hasPreview || (!batchFailed && retryCount >= PREVIEW_FETCH_MAX_RETRIES),
+        layouts: prev.layouts || [],
+        layoutsLoaded: prev.layoutsLoaded === true,
+        layoutsLoading: prev.layoutsLoading === true
+    });
+
+    updateElementThumb(dealId, elementId);
+    return hasPreview;
+}
+
 async function fetchElementAssets(dealId, elementId, dealNum, options = {}) {
     try {
         const payload = buildElementAssetsPayload(dealId, elementId, dealNum);
@@ -710,7 +819,7 @@ async function fetchElementAssets(dealId, elementId, dealNum, options = {}) {
         const data = await elementAssetsApi(
             "getElementAssets",
             payload,
-            { silent401: options.silent401 === true }
+            { silent401: options.silent401 === true, timeoutMs: options.timeoutMs ?? ELEMENT_ASSETS_TIMEOUT_MS }
         );
         return { ...normalizeAssetsResponse(data), layoutsLoaded: true };
     } catch (e) {
@@ -738,7 +847,7 @@ async function fetchDealElementAssetsBatch(dealId, dealNum, elementIds, options 
         const data = await elementAssetsApi(
             "getElementAssets",
             payload,
-            { silent401: options.silent401 === true }
+            { silent401: options.silent401 === true, timeoutMs: options.timeoutMs ?? ELEMENT_ASSETS_TIMEOUT_MS }
         );
         return normalizeBatchAssetsResponse(data);
     } catch (e) {
@@ -964,8 +1073,21 @@ function openPreviewLightbox(dealId, elementId, event) {
         event.stopPropagation();
     }
 
-    const cached = elementAssetsCache.get(assetsCacheKey(dealId, elementId));
-    const url = cached?.preview?.url || cached?.preview?.thumbUrl;
+    void openPreviewLightboxAsync(dealId, elementId);
+}
+
+async function openPreviewLightboxAsync(dealId, elementId) {
+    let cached = elementAssetsCache.get(assetsCacheKey(dealId, elementId));
+    let url = cached?.preview?.url || cached?.preview?.thumbUrl;
+
+    if (!isUsableAssetUrl(url)) {
+        const refreshed = await refreshElementPreview(dealId, elementId);
+        if (refreshed) {
+            cached = elementAssetsCache.get(assetsCacheKey(dealId, elementId));
+            url = cached?.preview?.url || cached?.preview?.thumbUrl;
+        }
+    }
+
     if (!isUsableAssetUrl(url)) return;
 
     document.querySelectorAll(".preview-lightbox").forEach(el => el.remove());
@@ -991,6 +1113,11 @@ function openPreviewLightbox(dealId, elementId, event) {
         close();
     });
     lightbox.querySelector("img")?.addEventListener("click", (e) => e.stopPropagation());
+
+    const img = lightbox.querySelector("img");
+    if (img) {
+        bindPreviewImgRefresh(img, dealId, elementId);
+    }
 
     document.body.appendChild(lightbox);
     document.body.style.overflow = "hidden";
@@ -1027,7 +1154,7 @@ function updateElementThumb(dealId, elementId) {
             thumb.classList.add("has-preview", "element-preview-thumb-clickable");
             thumb.title = "Открыть превью";
             thumb.innerHTML = "";
-            setPreviewImgContent(thumb, cached.preview);
+            setPreviewImgContent(thumb, cached.preview, "", { dealId, elementId });
             thumb.onclick = (event) => openPreviewLightbox(dealId, elementId, event);
         } else {
             thumb.classList.remove("element-preview-thumb-clickable");
@@ -1067,7 +1194,7 @@ function scheduleElementAssetsLoading(deal) {
             previewIds.push(elementId);
             layoutIds.push(elementId);
         } else {
-            if (!previewReady && prev.status !== "loading") {
+            if (previewNeedsFetch(prev)) {
                 elementAssetsCache.set(key, { ...prev, status: "loading" });
                 previewIds.push(elementId);
             }
@@ -1088,38 +1215,30 @@ function scheduleElementAssetsLoading(deal) {
     prefetchElementFieldsBatch(deal.id, elementIds);
 }
 
-async function loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPrefetch = null) {
+async function loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPrefetch = null, attempt = 1) {
     const batch = await fetchDealElementAssetsBatch(dealId, dealNum, elementIds, {
         previewOnly: true,
         silent401: true
     });
 
+    if (batch == null && attempt < PREVIEW_FETCH_MAX_RETRIES) {
+        await sleep(400 * attempt);
+        return loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPrefetch, attempt + 1);
+    }
+
+    const retryIds = [];
+
     for (const elementId of elementIds) {
-        const key = assetsCacheKey(dealId, elementId);
-        const prev = elementAssetsCache.get(key) || {};
         const assets = batch?.[String(elementId)];
-
-        if (assets) {
-            elementAssetsCache.set(key, {
-                ...prev,
-                status: "ready",
-                preview: normalizePreview(assets.preview),
-                layouts: prev.layouts || [],
-                layoutsLoaded: prev.layoutsLoaded === true,
-                layoutsLoading: prev.layoutsLoading === true
-            });
-        } else {
-            elementAssetsCache.set(key, {
-                ...prev,
-                status: batch == null ? "error" : "ready",
-                preview: null,
-                layouts: prev.layouts || [],
-                layoutsLoaded: prev.layoutsLoaded === true,
-                layoutsLoading: prev.layoutsLoading === true
-            });
+        const hasPreview = applyPreviewBatchResult(dealId, elementId, assets, batch == null);
+        if (!hasPreview && previewNeedsFetch(elementAssetsCache.get(assetsCacheKey(dealId, elementId)))) {
+            retryIds.push(elementId);
         }
+    }
 
-        updateElementThumb(dealId, elementId);
+    if (retryIds.length && attempt < PREVIEW_FETCH_MAX_RETRIES) {
+        await sleep(500 * attempt);
+        await loadDealPreviewsBatch(dealId, dealNum, retryIds, null, attempt + 1);
     }
 
     const layoutTargets = (layoutIdsToPrefetch || elementIds).filter(elementId => {
@@ -1205,7 +1324,7 @@ function ensureElementAssetsForEditor(dealId, elementId, dealNum) {
     }
 
     const previewReady = !!(prev.preview?.url || prev.preview?.thumbUrl);
-    const needsPreview = !previewReady && prev.status === "loading";
+    const needsPreview = !previewReady && previewNeedsFetch(prev);
     const needsLayouts = !prev.layoutsLoaded && !prev.layoutsLoading;
 
     if (!needsPreview && !needsLayouts) return;
@@ -1222,7 +1341,7 @@ async function loadElementAssetsFull(dealId, elementId, dealNum, options = {}) {
     const hasPreview = !!(prev.preview?.url || prev.preview?.thumbUrl);
     const fetchLayouts = options.fetchLayouts !== false && !prev.layoutsLoaded && !prev.layoutsLoading;
     const fetchPreview = options.fetchPreview === true
-        || (!hasPreview && prev.status === "loading" && options.fetchPreview !== false);
+        || (!hasPreview && previewNeedsFetch(prev) && options.fetchPreview !== false);
 
     if (!fetchLayouts && !fetchPreview) {
         if (isElementEditorOpen(dealId, elementId)) renderElementEditorAssets();
@@ -1605,7 +1724,7 @@ function renderElementEditorAssets() {
         if (deleteBtn) deleteBtn.style.display = "none";
     } else if (previewReady) {
         previewEl.innerHTML = "";
-        setPreviewImgContent(previewEl, cached.preview, "Превью");
+        setPreviewImgContent(previewEl, cached.preview, "Превью", { dealId, elementId });
         if (deleteBtn) {
             deleteBtn.style.display = isStaff ? "inline-flex" : "none";
             deleteBtn.disabled = previewBusy;
