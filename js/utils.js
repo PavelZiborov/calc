@@ -6,6 +6,9 @@ function switchTab(id, trigger = null) {
     const currentTab = document.querySelector('.tab-content.active');
     if (currentTab) {
         tabScrollPositions[currentTab.id] = window.scrollY || window.pageYOffset || 0;
+        if (currentTab.id === "search-tab" && typeof saveAdvKanbanScrollState === "function") {
+            saveAdvKanbanScrollState();
+        }
         if (currentTab.id !== "deal-tab") lastNonDealTabId = currentTab.id;
     }
 

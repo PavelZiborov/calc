@@ -1,7 +1,87 @@
 // --- CRM ЛОГИКА ---
+function collectAdvSearchParams() {
+    const input = document.getElementById("advSearchInput");
+    const q = input ? input.value : "";
+
+    const selectedStatusInputs = Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked:not([data-preset])'));
+    const openDealsFilterActive = isAdvOpenDealsFilterActive();
+    let selectedStatuses;
+    let selectedStatusNames;
+    if (openDealsFilterActive) {
+        const openStatuses = getOpenCrmDealStatuses();
+        selectedStatuses = openStatuses.map(status => status.id);
+        selectedStatusNames = openStatuses.map(status => status.name);
+    } else {
+        selectedStatuses = selectedStatusInputs
+            .map(input => Number(input.value))
+            .filter(Number.isInteger);
+        selectedStatusNames = selectedStatusInputs.map(input => input.dataset.name || "");
+    }
+
+    const selectedManagerInputs = Array.from(document.querySelectorAll('#advManagerList input[type="checkbox"]:checked'));
+    const selectedManagers = selectedManagerInputs
+        .map(input => Number(input.value))
+        .filter(Number.isFinite);
+    const selectedManagerNames = selectedManagerInputs.map(input => input.dataset.name || "");
+
+    const filters = {
+        status: selectedStatuses,
+        statusNames: selectedStatusNames,
+        managers: selectedManagers,
+        managerNames: selectedManagerNames,
+        dateFrom: formatDateForWebhook(document.getElementById("advDateFrom")?.value || ""),
+        dateTo: formatDateForWebhook(document.getElementById("advDateTo")?.value || ""),
+        openDealsOnly: openDealsFilterActive
+    };
+
+    return {
+        q,
+        filters,
+        fingerprint: JSON.stringify({ q, filters })
+    };
+}
+
+function saveAdvKanbanScrollState() {
+    const board = document.querySelector("#advCrmResults .crm-kanban-board");
+    if (board) advKanbanBoardScrollLeft = board.scrollLeft;
+}
+
+function restoreAdvKanbanScrollState() {
+    const board = document.querySelector("#advCrmResults .crm-kanban-board");
+    if (!board) return;
+    board.scrollLeft = advKanbanBoardScrollLeft;
+    requestAnimationFrame(() => {
+        board.scrollLeft = advKanbanBoardScrollLeft;
+    });
+}
+
+function syncAdvSearchCacheFromDealsCache() {
+    if (!Array.isArray(crmSearchCache.adv)) return;
+    crmSearchCache.adv = crmSearchCache.adv.map(deal => {
+        const fresh = dealsCache.get(String(deal.id));
+        return fresh ? { ...deal, ...fresh } : deal;
+    });
+}
+
+function restoreAdvSearchFromCache() {
+    syncAdvSearchCacheFromDealsCache();
+    rerenderCrmResultsFromCache("adv", { restoreKanbanScroll: true });
+    applyCrmViewLayoutClass();
+}
+
 function runAdvSearchOnTabOpen() {
     if (currentUser?.role !== "staff") return;
     if (!document.getElementById("search-tab")?.classList.contains("active")) return;
+
+    const { fingerprint } = collectAdvSearchParams();
+    const hasCachedResults = crmSearchCache.adv !== null;
+    const filtersUnchanged = advSearchFiltersFingerprint === fingerprint;
+
+    if (hasCachedResults && filtersUnchanged) {
+        restoreAdvSearchFromCache();
+        return;
+    }
+
     searchCRM("adv");
 }
 
@@ -19,46 +99,17 @@ async function searchCRM(mode, triggerEvent) {
     const originalBtnText = btn ? btn.innerText : "";
 
     let q = "";
-    if (currentUser.role === 'staff' || mode === 'adv') {
-        const input = document.getElementById(mode === 'main' ? 'crmSearchInput' : 'advSearchInput');
+    let advFilters = {};
+    if (mode === "adv") {
+        const advParams = collectAdvSearchParams();
+        q = advParams.q;
+        advFilters = advParams.filters;
+    } else if (currentUser.role === "staff") {
+        const input = document.getElementById("crmSearchInput");
         q = input ? input.value : "";
     }
 
-    const selectedStatusInputs = mode === 'adv'
-        ? Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked:not([data-preset])'))
-        : [];
-    const openDealsFilterActive = mode === 'adv' && isAdvOpenDealsFilterActive();
-    let selectedStatuses;
-    let selectedStatusNames;
-    if (openDealsFilterActive) {
-        const openStatuses = getOpenCrmDealStatuses();
-        selectedStatuses = openStatuses.map(status => status.id);
-        selectedStatusNames = openStatuses.map(status => status.name);
-    } else {
-        selectedStatuses = selectedStatusInputs
-            .map(input => Number(input.value))
-            .filter(Number.isInteger);
-        selectedStatusNames = selectedStatusInputs.map(input => input.dataset.name || "");
-    }
-
-    const selectedManagerInputs = mode === 'adv'
-        ? Array.from(document.querySelectorAll('#advManagerList input[type="checkbox"]:checked'))
-        : [];
-    const selectedManagers = selectedManagerInputs
-        .map(input => Number(input.value))
-        .filter(Number.isFinite);
-    const selectedManagerNames = selectedManagerInputs.map(input => input.dataset.name || "");
-
-    const advFilters = mode === 'adv' ? {
-        status: selectedStatuses,
-        statusNames: selectedStatusNames,
-        managers: selectedManagers,
-        managerNames: selectedManagerNames,
-        dateFrom: formatDateForWebhook(document.getElementById('advDateFrom')?.value || ""),
-        dateTo: formatDateForWebhook(document.getElementById('advDateTo')?.value || "")
-    } : {};
-
-    resDiv.innerHTML = ""; 
+    resDiv.innerHTML = "";
     load.style.display = "block";
     
     if (btn) {
@@ -101,6 +152,11 @@ async function searchCRM(mode, triggerEvent) {
         } else {
             crmSearchCache[mode] = deals;
             renderDealsResults(deals, resDiv);
+        }
+
+        if (mode === "adv") {
+            advSearchFiltersFingerprint = collectAdvSearchParams().fingerprint;
+            advKanbanBoardScrollLeft = 0;
         }
 
     } catch (e) {
@@ -1091,6 +1147,8 @@ function getDealResponsibleName(deal) {
 
 const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
 const crmSearchCache = { main: null, adv: null };
+let advSearchFiltersFingerprint = null;
+let advKanbanBoardScrollLeft = 0;
 let kanbanColumnOrderCache = null;
 let kanbanColumnOrderSaveTimer = null;
 const kanbanDragState = {
@@ -1664,11 +1722,11 @@ function applyCrmViewLayoutClass() {
     }
 }
 
-function rerenderCrmResultsFromCache(mode) {
+function rerenderCrmResultsFromCache(mode, options = {}) {
     if (mode !== "adv") return;
     const deals = crmSearchCache.adv;
     const resDiv = document.getElementById("advCrmResults");
-    if (!resDiv || !deals) return;
+    if (!resDiv || deals === null) return;
 
     if (!deals.length) {
         resDiv.classList.remove("crm-kanban-results-host");
@@ -1677,6 +1735,9 @@ function rerenderCrmResultsFromCache(mode) {
     }
 
     renderDealsResults(deals, resDiv);
+    if (options.restoreKanbanScroll) {
+        restoreAdvKanbanScrollState();
+    }
 }
 
 function toggleCrmView(mode) {
