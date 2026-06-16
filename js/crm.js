@@ -1,4 +1,10 @@
 // --- CRM ЛОГИКА ---
+function runAdvSearchOnTabOpen() {
+    if (currentUser?.role !== "staff") return;
+    if (!document.getElementById("search-tab")?.classList.contains("active")) return;
+    searchCRM("adv");
+}
+
 async function searchCRM(mode, triggerEvent) {
     if (!ensureActiveSession()) return;
 
