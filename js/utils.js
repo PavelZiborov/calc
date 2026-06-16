@@ -20,6 +20,7 @@ function switchTab(id, trigger = null) {
 
     requestAnimationFrame(() => {
         window.scrollTo(0, tabScrollPositions[id] || 0);
+        if (typeof applyCrmViewLayoutClass === "function") applyCrmViewLayoutClass();
     });
 }
 function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }

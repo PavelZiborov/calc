@@ -81,7 +81,14 @@ function applyPermissions() {
             document.getElementById('adv-tab-btn').style.display = 'block';
             fillStatusFilter();
             fillManagerFilter();
+        } else {
+            localStorage.setItem(CRM_VIEW_STORAGE_KEY, "list");
         }
+
+        document.querySelectorAll('#adv-search-container .crm-view-toggle').forEach(el => {
+            el.style.display = currentUser.role === 'staff' ? '' : 'none';
+        });
+        if (typeof applyCrmViewLayoutClass === 'function') applyCrmViewLayoutClass();
     }
 }
 

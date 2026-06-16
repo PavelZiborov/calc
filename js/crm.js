@@ -850,8 +850,119 @@ function getDealResponsibleName(deal) {
 const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
 const crmSearchCache = { main: null, adv: null };
 
+function isKanbanAvailable() {
+    return currentUser?.role === "staff";
+}
+
 function getCrmViewMode() {
+    if (!isKanbanAvailable()) return "list";
     return localStorage.getItem(CRM_VIEW_STORAGE_KEY) === "kanban" ? "kanban" : "list";
+}
+
+function isKanbanFullscreenActive() {
+    return isKanbanAvailable()
+        && getCrmViewMode() === "kanban"
+        && document.getElementById("search-tab")?.classList.contains("active");
+}
+
+function getKanbanColumnOrderStorageKey() {
+    const userId = currentUser?.crmId || currentUser?.login || currentUser?.id || "guest";
+    return `calc_kanban_col_order_${userId}`;
+}
+
+function loadKanbanColumnOrder() {
+    try {
+        const raw = localStorage.getItem(getKanbanColumnOrderStorageKey());
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveKanbanColumnOrder(keys) {
+    localStorage.setItem(getKanbanColumnOrderStorageKey(), JSON.stringify(keys.map(String)));
+}
+
+function sortKanbanColumnsBySavedOrder(columns) {
+    const saved = loadKanbanColumnOrder();
+    if (!saved.length) return columns;
+
+    const orderMap = new Map(saved.map((key, index) => [key, index]));
+    return [...columns].sort((a, b) => {
+        const ai = orderMap.has(a.key) ? orderMap.get(a.key) : 10000 + columns.indexOf(a);
+        const bi = orderMap.has(b.key) ? orderMap.get(b.key) : 10000 + columns.indexOf(b);
+        return ai - bi;
+    });
+}
+
+function saveKanbanColumnOrderFromBoard(board) {
+    const keys = [...board.querySelectorAll(".crm-kanban-column")].map(col => col.dataset.statusKey);
+    saveKanbanColumnOrder(keys);
+}
+
+function reorderKanbanColumns(board, sourceKey, targetKey) {
+    const columns = [...board.querySelectorAll(".crm-kanban-column")];
+    const source = columns.find(col => col.dataset.statusKey === sourceKey);
+    const target = columns.find(col => col.dataset.statusKey === targetKey);
+    if (!source || !target || source === target) return;
+
+    const sourceIdx = columns.indexOf(source);
+    const targetIdx = columns.indexOf(target);
+    if (sourceIdx < targetIdx) {
+        target.after(source);
+    } else {
+        target.before(source);
+    }
+}
+
+function bindKanbanColumnDrag(board) {
+    if (!board || !isKanbanAvailable()) return;
+
+    let dragKey = null;
+
+    board.querySelectorAll(".crm-kanban-column").forEach(col => {
+        const header = col.querySelector(".crm-kanban-column-header");
+        if (!header) return;
+
+        header.draggable = true;
+        header.title = "Перетащите для изменения порядка колонок";
+
+        header.addEventListener("dragstart", (event) => {
+            dragKey = col.dataset.statusKey;
+            col.classList.add("is-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", dragKey || "");
+        });
+
+        header.addEventListener("dragend", () => {
+            col.classList.remove("is-dragging");
+            board.querySelectorAll(".crm-kanban-column").forEach(item => item.classList.remove("drop-target"));
+            dragKey = null;
+        });
+
+        col.addEventListener("dragover", (event) => {
+            if (!dragKey || col.dataset.statusKey === dragKey) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            col.classList.add("drop-target");
+        });
+
+        col.addEventListener("dragleave", (event) => {
+            if (!col.contains(event.relatedTarget)) {
+                col.classList.remove("drop-target");
+            }
+        });
+
+        col.addEventListener("drop", (event) => {
+            event.preventDefault();
+            col.classList.remove("drop-target");
+            const targetKey = col.dataset.statusKey;
+            if (!dragKey || !targetKey || dragKey === targetKey) return;
+            reorderKanbanColumns(board, dragKey, targetKey);
+            saveKanbanColumnOrderFromBoard(board);
+        });
+    });
 }
 
 function syncCrmViewToggleButtons() {
@@ -862,8 +973,12 @@ function syncCrmViewToggleButtons() {
 }
 
 function applyCrmViewLayoutClass() {
-    const isKanban = getCrmViewMode() === "kanban";
+    const isKanban = isKanbanAvailable() && getCrmViewMode() === "kanban";
     document.getElementById("adv-search-container")?.classList.toggle("crm-kanban-layout", isKanban);
+    document.body.classList.toggle("crm-kanban-active", isKanbanFullscreenActive());
+    if (isKanbanFullscreenActive()) {
+        window.scrollTo(0, 0);
+    }
     if (!isKanban) {
         closeAdvSearchPopover();
     }
@@ -876,6 +991,7 @@ function rerenderCrmResultsFromCache(mode) {
     if (!resDiv || !deals) return;
 
     if (!deals.length) {
+        resDiv.classList.remove("crm-kanban-results-host");
         resDiv.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>Список заказов пуст</p>";
         return;
     }
@@ -884,6 +1000,8 @@ function rerenderCrmResultsFromCache(mode) {
 }
 
 function toggleCrmView(mode) {
+    if (!isKanbanAvailable()) return;
+
     const nextMode = mode === "kanban" ? "kanban" : "list";
     if (getCrmViewMode() === nextMode) return;
 
@@ -1033,7 +1151,7 @@ function renderDealsKanban(deals, targetDiv) {
     const validDeals = deals.filter(isValidDeal).map(deal => normalizeDealForView(deal));
     validDeals.forEach(deal => dealsCache.set(String(deal.id), deal));
 
-    const columns = buildKanbanColumns(validDeals);
+    const columns = sortKanbanColumnsBySavedOrder(buildKanbanColumns(validDeals));
     const board = document.createElement("div");
     board.className = "crm-kanban-board";
 
@@ -1049,6 +1167,7 @@ function renderDealsKanban(deals, targetDiv) {
 
         columnEl.innerHTML = `
             <header class="crm-kanban-column-header" style="--col-bg:${col.bk_color}; --col-text:${col.text_color}">
+                <span class="crm-kanban-column-grip" aria-hidden="true">⠿</span>
                 <span class="crm-kanban-column-title">${escapeHtml(col.name)}</span>
                 <span class="crm-kanban-column-count">${col.deals.length}</span>
             </header>
@@ -1060,8 +1179,10 @@ function renderDealsKanban(deals, targetDiv) {
     });
 
     targetDiv.innerHTML = "";
+    targetDiv.classList.add("crm-kanban-results-host");
     targetDiv.appendChild(board);
     bindKanbanBoardEvents(board);
+    bindKanbanColumnDrag(board);
     requestAnimationFrame(() => board.classList.add("is-ready"));
 }
 
@@ -1072,7 +1193,9 @@ function renderDealsResults(deals, targetDiv, options = {}) {
     }
 
     const isAdvResults = targetDiv?.id === "advCrmResults";
-    if (isAdvResults && getCrmViewMode() === "kanban") {
+    const useKanban = isAdvResults && getCrmViewMode() === "kanban";
+    targetDiv?.classList.toggle("crm-kanban-results-host", useKanban);
+    if (useKanban) {
         renderDealsKanban(deals, targetDiv);
     } else {
         renderDealsList(deals, targetDiv, options);

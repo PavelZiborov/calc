@@ -1123,7 +1123,108 @@
         margin-left: 0;
     }
     #adv-search-container.crm-kanban-layout .crm-kanban-column {
-        max-height: calc(100vh - 170px);
+        max-height: 100%;
+    }
+
+    /* Полноэкранный канбан: без шапки пользователя, без скролла страницы */
+    body.crm-kanban-active {
+        height: 100dvh;
+        overflow: hidden;
+        padding: 6px 10px 8px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+    }
+    body.crm-kanban-active #user-bar {
+        display: none !important;
+    }
+    body.crm-kanban-active .tabs-nav {
+        flex: 0 0 auto;
+        max-width: none;
+        width: 100%;
+        margin: 0 0 4px;
+        padding-bottom: 0;
+        border-bottom-width: 1px;
+        gap: 3px;
+    }
+    body.crm-kanban-active .tab-btn {
+        margin-top: 0;
+        padding: 5px 14px;
+        font-size: 13px;
+        line-height: 1.2;
+        border-radius: 6px 6px 0 0;
+    }
+    body.crm-kanban-active .tab-close-btn {
+        width: 14px;
+        height: 14px;
+        font-size: 12px;
+    }
+    body.crm-kanban-active .tab-content {
+        display: none !important;
+    }
+    body.crm-kanban-active #search-tab.active {
+        display: flex !important;
+        flex: 1 1 auto;
+        min-height: 0;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    body.crm-kanban-active #adv-search-container {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        margin: 0;
+        padding: 8px 12px 6px;
+        max-width: none;
+        width: 100%;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.06);
+    }
+    body.crm-kanban-active .adv-search-header {
+        margin-bottom: 6px;
+        flex: 0 0 auto;
+    }
+    body.crm-kanban-active #advCrmLoader {
+        flex: 0 0 auto;
+    }
+    body.crm-kanban-active #advCrmResults.crm-kanban-results-host {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    body.crm-kanban-active .crm-kanban-board {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        max-height: 100%;
+        padding-bottom: 2px;
+        align-items: stretch;
+    }
+    body.crm-kanban-active .crm-kanban-column {
+        max-height: 100%;
+        min-height: 0;
+    }
+    body.crm-kanban-active #adv-search-container.crm-kanban-layout .adv-filter-slot .status-dropdown-btn,
+    body.crm-kanban-active #adv-search-container.crm-kanban-layout .adv-filter-slot .date-range-btn {
+        height: 32px;
+        min-height: 32px;
+        padding: 6px 22px 6px 8px;
+        font-size: 11px;
+    }
+    body.crm-kanban-active #adv-search-container.crm-kanban-layout .clear-filters-btn,
+    body.crm-kanban-active #adv-search-container.crm-kanban-layout .adv-search-trigger {
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+    body.crm-kanban-active .crm-view-btn {
+        min-width: 32px;
+        padding: 5px 10px;
+        font-size: 14px;
     }
 
     .crm-kanban-board {
@@ -1157,23 +1258,41 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
-        padding: 10px 12px 8px;
+        gap: 6px;
+        padding: 8px 10px 6px;
         position: sticky;
         top: 0;
         z-index: 1;
         background: linear-gradient(180deg, #ebecf0 70%, rgba(235, 236, 240, 0));
+        cursor: grab;
+        user-select: none;
+    }
+    .crm-kanban-column-header:active {
+        cursor: grabbing;
+    }
+    .crm-kanban-column-grip {
+        flex: 0 0 auto;
+        opacity: 0.42;
+        font-size: 11px;
+        line-height: 1;
+        color: #64748b;
+    }
+    .crm-kanban-column.is-dragging {
+        opacity: 0.72;
+    }
+    .crm-kanban-column.drop-target {
+        box-shadow: inset 0 0 0 2px #2f7df6;
     }
     .crm-kanban-column-title {
+        flex: 1 1 auto;
+        min-width: 0;
         font-size: 13px;
         font-weight: 700;
         line-height: 1.25;
-        color: #334155;
         padding: 4px 8px;
         border-radius: 6px;
         background: var(--col-bg, #dfe3ea);
         color: var(--col-text, #334155);
-        max-width: calc(100% - 36px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
