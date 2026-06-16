@@ -37,6 +37,55 @@
     .checkbox-group { margin-top: 15px; background: #fcfcfc; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
 
     .crm-item { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-top: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+    .crm-search-pagination {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin: 18px 0 8px;
+        padding: 12px 8px 4px;
+        border-top: 1px solid #e8edf2;
+    }
+    .crm-search-page-btn {
+        min-width: 34px;
+        height: 34px;
+        padding: 0 10px;
+        border: 1px solid #d5dde6;
+        border-radius: 8px;
+        background: #fff;
+        color: #334155;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .crm-search-page-btn:hover:not(:disabled) {
+        border-color: #2f7df6;
+        color: #2f7df6;
+        background: #f5f9ff;
+    }
+    .crm-search-page-btn.active {
+        border-color: #2f7df6;
+        background: #2f7df6;
+        color: #fff;
+        cursor: default;
+    }
+    .crm-search-page-btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+    }
+    .crm-search-page-dots {
+        color: #94a3b8;
+        font-size: 14px;
+        padding: 0 2px;
+        user-select: none;
+    }
+    .crm-search-page-info {
+        flex: 0 0 100%;
+        text-align: center;
+        color: #64748b;
+        font-size: 12px;
+        margin-top: 2px;
+    }
     .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
     .editable-status { margin:0; width:auto; padding:3px 8px; border-radius:4px; border:none; font-size:11px; line-height:1.2; font-weight:bold; text-transform:uppercase; cursor:pointer; }
     .editable-status:hover { filter: brightness(0.96); box-shadow: 0 0 0 2px rgba(47,125,246,0.12); }

@@ -57,13 +57,25 @@ function restoreAdvKanbanScrollState() {
 
 function syncAdvSearchCacheFromDealsCache() {
     if (!Array.isArray(crmSearchCache.adv)) return;
-    crmSearchCache.adv = crmSearchCache.adv.map(deal => {
+    const refreshed = crmSearchCache.adv.map(deal => {
         const fresh = dealsCache.get(String(deal.id));
         return fresh ? { ...deal, ...fresh } : deal;
     });
+    crmSearchCache.adv = refreshed;
+    const viewMode = getCrmViewMode();
+    if (viewMode === "kanban") {
+        advSearchKanbanCache = refreshed;
+    } else {
+        advSearchListCache = refreshed;
+    }
 }
 
 function restoreAdvSearchFromCache() {
+    const viewMode = getCrmViewMode();
+    const cached = getAdvSearchViewCache(viewMode);
+    if (cached !== null) {
+        crmSearchCache.adv = cached;
+    }
     syncAdvSearchCacheFromDealsCache();
     rerenderCrmResultsFromCache("adv", { restoreKanbanScroll: true });
     applyCrmViewLayoutClass();
@@ -74,18 +86,70 @@ function runAdvSearchOnTabOpen() {
     if (!document.getElementById("search-tab")?.classList.contains("active")) return;
 
     const { fingerprint } = collectAdvSearchParams();
-    const hasCachedResults = crmSearchCache.adv !== null;
-    const filtersUnchanged = advSearchFiltersFingerprint === fingerprint;
+    const viewMode = getCrmViewMode();
+    const cachedDeals = getAdvSearchViewCache(viewMode);
+    const cacheFingerprint = viewMode === "kanban" ? advKanbanCacheFingerprint : advListCacheFingerprint;
+    const hasCachedResults = cachedDeals !== null;
+    const filtersUnchanged = advSearchFiltersFingerprint === fingerprint && cacheFingerprint === fingerprint;
 
     if (hasCachedResults && filtersUnchanged) {
         restoreAdvSearchFromCache();
         return;
     }
 
-    searchCRM("adv");
+    searchCRM("adv", null, {
+        kanbanMode: viewMode === "kanban",
+        page: viewMode === "kanban" ? 1 : advSearchListPage
+    });
 }
 
-async function searchCRM(mode, triggerEvent) {
+function parseSearchResponse(data) {
+    let payload = data;
+
+    if (Array.isArray(payload)) {
+        if (payload[0]?.json && payload[0].json.items) {
+            payload = payload[0].json;
+        } else if (payload.length === 1 && payload[0]?.items) {
+            payload = payload[0];
+        } else if (payload[0]?.json) {
+            const deals = payload.map(item => item.json).filter(Boolean);
+            return { deals, page: 1, pagesCount: 1 };
+        }
+    }
+
+    if (payload && Array.isArray(payload.items)) {
+        return {
+            deals: payload.items,
+            page: Number(payload.page) || 1,
+            pagesCount: Math.max(1, Number(payload.pages_count ?? payload.pagesCount) || 1)
+        };
+    }
+
+    let deals = Array.isArray(payload) ? payload : (payload?.items || (payload ? [payload] : []));
+    if (deals[0]?.json) deals = deals.map(item => item.json);
+    return { deals, page: 1, pagesCount: 1 };
+}
+
+function getCompletedCrmDealStatusIds() {
+    return getCrmStatuses().filter(isCompletedCrmDealStatus).map(status => status.id);
+}
+
+function getAdvSearchViewCache(mode) {
+    return mode === "kanban" ? advSearchKanbanCache : advSearchListCache;
+}
+
+function setAdvSearchViewCache(mode, deals, fingerprint) {
+    if (mode === "kanban") {
+        advSearchKanbanCache = deals;
+        advKanbanCacheFingerprint = fingerprint;
+    } else {
+        advSearchListCache = deals;
+        advListCacheFingerprint = fingerprint;
+    }
+    crmSearchCache.adv = deals;
+}
+
+async function searchCRM(mode, triggerEvent, options = {}) {
     if (!ensureActiveSession()) return;
 
     const resId = mode === 'main' ? 'crmResults' : 'advCrmResults';
@@ -100,13 +164,25 @@ async function searchCRM(mode, triggerEvent) {
 
     let q = "";
     let advFilters = {};
+    let advFingerprint = "";
     if (mode === "adv") {
         const advParams = collectAdvSearchParams();
         q = advParams.q;
         advFilters = advParams.filters;
+        advFingerprint = advParams.fingerprint;
     } else if (currentUser.role === "staff") {
         const input = document.getElementById("crmSearchInput");
         q = input ? input.value : "";
+    }
+
+    const advKanbanMode = mode === "adv" && (options.kanbanMode === true || (options.kanbanMode == null && getCrmViewMode() === "kanban"));
+    const isExplicitPage = options.page != null;
+    if (mode === "adv" && !advKanbanMode && !isExplicitPage) {
+        advSearchListPage = 1;
+    }
+    const requestedPage = Math.max(1, Number(options.page) || advSearchListPage || 1);
+    if (mode === "adv" && !advKanbanMode) {
+        advSearchListPage = requestedPage;
     }
 
     resDiv.innerHTML = "";
@@ -127,6 +203,13 @@ async function searchCRM(mode, triggerEvent) {
 
         if (mode === 'adv') {
             searchPayload.filters = advFilters;
+            if (advKanbanMode) {
+                searchPayload.kanbanMode = true;
+                searchPayload.completedStatusIds = getCompletedCrmDealStatusIds();
+                searchPayload.openStatusIds = getOpenCrmDealStatuses().map(status => status.id);
+            } else {
+                searchPayload.page = requestedPage;
+            }
         }
 
         const res = await fetch(N8N_URL, {
@@ -143,20 +226,38 @@ async function searchCRM(mode, triggerEvent) {
         const data = await res.json();
         load.style.display = "none";
 
-        let deals = Array.isArray(data) ? (data[0]?.json ? data.map(i => i.json) : data) : (data.items || [data]);
-        deals = deals.filter(isValidDeal);
+        const parsed = parseSearchResponse(data);
+        let deals = parsed.deals.filter(isValidDeal);
 
-        if (!deals || deals.length === 0 || !deals[0]) {
-            crmSearchCache[mode] = [];
+        if (mode === "adv" && !advKanbanMode) {
+            advSearchPagesCount = parsed.pagesCount;
+            advSearchListPage = parsed.page || requestedPage;
+        }
+
+        if (!deals || deals.length === 0) {
+            if (mode === "adv") {
+                setAdvSearchViewCache(advKanbanMode ? "kanban" : "list", [], advFingerprint);
+            } else {
+                crmSearchCache[mode] = [];
+            }
             resDiv.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>Список заказов пуст</p>";
+            if (mode === "adv" && !advKanbanMode) {
+                renderAdvSearchPagination(resDiv);
+            }
         } else {
-            crmSearchCache[mode] = deals;
+            if (mode === "adv") {
+                setAdvSearchViewCache(advKanbanMode ? "kanban" : "list", deals, advFingerprint);
+            } else {
+                crmSearchCache[mode] = deals;
+            }
             renderDealsResults(deals, resDiv);
         }
 
         if (mode === "adv") {
-            advSearchFiltersFingerprint = collectAdvSearchParams().fingerprint;
-            advKanbanBoardScrollLeft = 0;
+            advSearchFiltersFingerprint = advFingerprint;
+            if (!options.keepKanbanScroll) {
+                advKanbanBoardScrollLeft = 0;
+            }
         }
 
     } catch (e) {
@@ -171,6 +272,16 @@ async function searchCRM(mode, triggerEvent) {
             }, 2000);
         }
     }
+}
+
+function goToAdvSearchPage(page) {
+    const nextPage = Math.max(1, Number(page) || 1);
+    if (nextPage === advSearchListPage && advSearchListCache) {
+        crmSearchCache.adv = advSearchListCache;
+        rerenderCrmResultsFromCache("adv");
+        return;
+    }
+    searchCRM("adv", null, { page: nextPage, kanbanMode: false });
 }
 
 function isValidDeal(deal, allowIdOnly = false) {
@@ -709,7 +820,8 @@ function applyAdvFilters(e) {
     e?.stopPropagation();
     closeAdvFilterDropdowns();
     closeAdvFiltersPopover();
-    searchCRM("adv", e);
+    advSearchListPage = 1;
+    searchCRM("adv", e, { page: 1, kanbanMode: getCrmViewMode() === "kanban" });
 }
 
 function fillManagerFilter() {
@@ -1148,6 +1260,12 @@ function getDealResponsibleName(deal) {
 const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
 const crmSearchCache = { main: null, adv: null };
 let advSearchFiltersFingerprint = null;
+let advSearchListPage = 1;
+let advSearchPagesCount = 1;
+let advSearchListCache = null;
+let advSearchKanbanCache = null;
+let advListCacheFingerprint = null;
+let advKanbanCacheFingerprint = null;
 let advKanbanBoardScrollLeft = 0;
 let kanbanColumnOrderCache = null;
 let kanbanColumnOrderSaveTimer = null;
@@ -1749,7 +1867,22 @@ function toggleCrmView(mode) {
     localStorage.setItem(CRM_VIEW_STORAGE_KEY, nextMode);
     syncCrmViewToggleButtons();
     applyCrmViewLayoutClass();
-    rerenderCrmResultsFromCache("adv");
+
+    const { fingerprint } = collectAdvSearchParams();
+    const cached = getAdvSearchViewCache(nextMode);
+    const cacheFingerprint = nextMode === "kanban" ? advKanbanCacheFingerprint : advListCacheFingerprint;
+
+    if (cached !== null && cacheFingerprint === fingerprint) {
+        crmSearchCache.adv = cached;
+        rerenderCrmResultsFromCache("adv", { restoreKanbanScroll: nextMode === "kanban" });
+        return;
+    }
+
+    searchCRM("adv", null, {
+        kanbanMode: nextMode === "kanban",
+        page: nextMode === "kanban" ? 1 : advSearchListPage,
+        keepKanbanScroll: nextMode === "kanban"
+    });
 }
 
 function initCrmViewToggle() {
@@ -2401,6 +2534,74 @@ function showCreateDealConfirm(sourceDealId, btn) {
     };
 }
 
+function renderAdvSearchPagination(targetDiv) {
+    if (!targetDiv || targetDiv.id !== "advCrmResults") return;
+    if (getCrmViewMode() === "kanban") return;
+    if (advSearchPagesCount <= 1) return;
+
+    targetDiv.querySelector(".crm-search-pagination")?.remove();
+
+    const nav = document.createElement("nav");
+    nav.className = "crm-search-pagination";
+    nav.setAttribute("aria-label", "Страницы результатов поиска");
+
+    const currentPage = advSearchListPage;
+    const totalPages = advSearchPagesCount;
+
+    const addBtn = (label, page, { active = false, disabled = false } = {}) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "crm-search-page-btn";
+        btn.textContent = label;
+        btn.disabled = disabled;
+        if (active) btn.classList.add("active");
+        if (!disabled && !active) {
+            btn.addEventListener("click", () => goToAdvSearchPage(page));
+        }
+        nav.appendChild(btn);
+    };
+
+    addBtn("«", currentPage - 1, { disabled: currentPage <= 1 });
+
+    const windowSize = 5;
+    let start = Math.max(1, currentPage - Math.floor(windowSize / 2));
+    let end = Math.min(totalPages, start + windowSize - 1);
+    start = Math.max(1, end - windowSize + 1);
+
+    if (start > 1) {
+        addBtn("1", 1);
+        if (start > 2) {
+            const dots = document.createElement("span");
+            dots.className = "crm-search-page-dots";
+            dots.textContent = "…";
+            nav.appendChild(dots);
+        }
+    }
+
+    for (let page = start; page <= end; page += 1) {
+        addBtn(String(page), page, { active: page === currentPage });
+    }
+
+    if (end < totalPages) {
+        if (end < totalPages - 1) {
+            const dots = document.createElement("span");
+            dots.className = "crm-search-page-dots";
+            dots.textContent = "…";
+            nav.appendChild(dots);
+        }
+        addBtn(String(totalPages), totalPages);
+    }
+
+    addBtn("»", currentPage + 1, { disabled: currentPage >= totalPages });
+
+    const info = document.createElement("span");
+    info.className = "crm-search-page-info";
+    info.textContent = `Страница ${currentPage} из ${totalPages}`;
+    nav.appendChild(info);
+
+    targetDiv.appendChild(nav);
+}
+
 function renderDealsList(deals, targetDiv, options = {}) {
     if (!targetDiv) return;
     targetDiv.innerHTML = ""; 
@@ -2499,6 +2700,8 @@ function renderDealsList(deals, targetDiv, options = {}) {
             scheduleElementAssetsLoading(deal);
         }
     });
+
+    renderAdvSearchPagination(targetDiv);
 }
 
 function createDealCardById(id) {
