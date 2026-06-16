@@ -855,11 +855,13 @@
         .row { gap: 12px; }
         .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
         #search-tab .row { flex-direction: column; align-items: stretch !important; }
-        #search-tab .advanced-toolbar { gap: 6px; align-items: flex-end; flex-wrap: nowrap; }
-        #search-tab .advanced-toolbar .col { flex: 1 1 0; min-width: 0; }
-        #search-tab .advanced-toolbar label { font-size: 12px; white-space: nowrap; }
-        #search-tab .advanced-toolbar .clear-filters-btn { width: 40px; min-width: 40px; height: 42px; font-size: 20px; }
-        .advanced-search-row button { width: 52px; min-width: 52px; }
+        #search-tab .adv-filters-row { gap: 6px; align-items: flex-end; flex-wrap: nowrap; }
+        #search-tab .adv-filter-group { gap: 6px; }
+        #search-tab .adv-filter-slot { flex: 1 1 0; min-width: 0; }
+        #search-tab .adv-filter-label,
+        #search-tab .adv-search-label { font-size: 12px; white-space: nowrap; }
+        #adv-search-container .clear-filters-btn { width: 40px; min-width: 40px; height: 42px; font-size: 20px; }
+        .adv-search-submit { width: 52px; min-width: 52px; }
         #main-tab .row { flex-direction: row; gap: 10px; }
         #main-tab .col { min-width: 0; }
         #main-tab #crm-search-container .row { flex-direction: column; align-items: stretch !important; }
@@ -903,17 +905,119 @@
         .add-btn { font-size: 11px; padding: 5px 9px; }
     }
 
-    /* CRM view toggle + Kanban board */
-    .crm-results-toolbar {
+    /* CRM view toggle + Kanban board (вкладка «Поиск») */
+    .adv-search-header {
+        margin-bottom: 12px;
+    }
+    .adv-search-header,
+    .adv-toolbar-line,
+    .adv-filter-slot .status-dropdown-btn,
+    .adv-filter-slot .date-range-btn,
+    .adv-search-popover {
+        transition: all 0.22s ease;
+    }
+    .adv-toolbar-line {
         display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        margin: 12px 0 4px;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .adv-filters-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+    }
+    .adv-filter-group {
+        display: flex;
+        flex: 1 1 auto;
+        align-items: flex-end;
+        gap: 10px;
+        min-width: 0;
+    }
+    .adv-filter-slot {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .adv-filter-label,
+    .adv-search-label {
+        display: block;
+        margin-top: 0;
+        margin-bottom: 0;
+        font-size: inherit;
+        font-weight: bold;
+    }
+    .adv-filter-slot .status-dropdown-btn,
+    .adv-filter-slot .date-range-btn {
+        margin-top: 5px;
+    }
+    #adv-search-container .clear-filters-btn {
+        flex: 0 0 auto;
+        align-self: flex-end;
+        width: 44px;
+        min-width: 44px;
+        height: 40px;
+        margin-top: 0;
+        margin-left: 0;
+        padding: 0;
+        border-radius: 8px;
+        background: #2f7df6;
+        font-size: 22px;
+        line-height: 1;
+    }
+    .adv-search-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+    }
+    .adv-search-field-wrap {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .adv-search-trigger {
+        display: none;
+        margin: 0;
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 8px;
+        background: #eef1f5;
+        color: #475569;
+        font-size: 18px;
+        line-height: 1;
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+    .adv-search-trigger:hover {
+        background: #e2e8f0;
+        color: #334155;
+    }
+    .adv-search-popover {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        margin-top: 5px;
+    }
+    .adv-search-popover input {
+        flex: 1;
+        margin-top: 0;
+        border-radius: 6px 0 0 6px;
+    }
+    .adv-search-submit {
+        width: 54px;
+        min-width: 54px;
+        margin: 0;
+        padding: 0;
+        border-radius: 0 6px 6px 0;
+        background: #27ae60;
+        font-size: 22px;
+        line-height: 1;
     }
     .crm-view-toggle {
         display: inline-flex;
+        flex: 0 0 auto;
         gap: 2px;
         padding: 3px;
+        margin-left: auto;
         background: #eef1f5;
         border-radius: 8px;
         box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -940,11 +1044,88 @@
         color: #2f7df6;
         box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
     }
-    .crm-kanban-layout.container,
-    #crm-search-container.crm-kanban-layout {
+
+    /* Канбан: одна компактная строка */
+    #adv-search-container.crm-kanban-layout {
         max-width: min(1600px, calc(100vw - 40px));
         width: 100%;
     }
+    #adv-search-container.crm-kanban-layout .adv-toolbar-line {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        padding-bottom: 2px;
+    }
+    #adv-search-container.crm-kanban-layout .adv-filters-row,
+    #adv-search-container.crm-kanban-layout .adv-search-row {
+        display: contents;
+    }
+    #adv-search-container.crm-kanban-layout .adv-filter-group {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    #adv-search-container.crm-kanban-layout .adv-filter-slot {
+        flex: 1 1 0;
+        min-width: 72px;
+        max-width: 180px;
+    }
+    #adv-search-container.crm-kanban-layout .adv-filter-label,
+    #adv-search-container.crm-kanban-layout .adv-search-label {
+        display: none;
+    }
+    #adv-search-container.crm-kanban-layout .adv-filter-slot .status-dropdown-btn,
+    #adv-search-container.crm-kanban-layout .adv-filter-slot .date-range-btn {
+        margin-top: 0;
+        height: 36px;
+        min-height: 36px;
+        padding: 8px 24px 8px 10px;
+        font-size: 12px;
+    }
+    #adv-search-container.crm-kanban-layout .clear-filters-btn {
+        align-self: center;
+        width: 36px;
+        min-width: 36px;
+        height: 36px;
+        margin-left: 0;
+        font-size: 18px;
+    }
+    #adv-search-container.crm-kanban-layout .adv-search-field-wrap {
+        flex: 0 0 auto;
+        width: auto;
+    }
+    #adv-search-container.crm-kanban-layout .adv-search-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #adv-search-container.crm-kanban-layout .adv-search-popover {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        z-index: 1200;
+        width: min(320px, calc(100vw - 32px));
+        margin-top: 0;
+        padding: 10px;
+        background: #fff;
+        border: 1px solid #d9dde3;
+        border-radius: 10px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+    }
+    #adv-search-container.crm-kanban-layout .adv-search-popover.open {
+        display: flex;
+    }
+    #adv-search-container.crm-kanban-layout .adv-search-popover input {
+        border-radius: 6px 0 0 6px;
+    }
+    #adv-search-container.crm-kanban-layout .crm-view-toggle {
+        margin-left: 0;
+    }
+    #adv-search-container.crm-kanban-layout .crm-kanban-column {
+        max-height: calc(100vh - 170px);
+    }
+
     .crm-kanban-board {
         display: flex;
         gap: 12px;
@@ -1100,9 +1281,20 @@
     .kanban-card-amount.payment-ok { color: #27ae60; }
     .kanban-card-amount.payment-alert { color: #e74c3c; }
     @media (max-width: 875px) {
-        .crm-kanban-layout.container,
-        #crm-search-container.crm-kanban-layout {
+        #adv-search-container.crm-kanban-layout {
             max-width: calc(100vw - 24px);
+        }
+        #adv-search-container.crm-kanban-layout .adv-toolbar-line {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        #adv-search-container.crm-kanban-layout .adv-toolbar-line::-webkit-scrollbar {
+            display: none;
+        }
+        #adv-search-container.crm-kanban-layout .adv-filter-slot {
+            flex: 0 0 120px;
+            max-width: 140px;
         }
         .crm-kanban-column {
             flex-basis: 248px;

@@ -856,21 +856,23 @@ function getCrmViewMode() {
 
 function syncCrmViewToggleButtons() {
     const mode = getCrmViewMode();
-    document.querySelectorAll(".crm-view-btn").forEach(btn => {
+    document.querySelectorAll("#adv-search-container .crm-view-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.view === mode);
     });
 }
 
 function applyCrmViewLayoutClass() {
     const isKanban = getCrmViewMode() === "kanban";
-    document.getElementById("crm-search-container")?.classList.toggle("crm-kanban-layout", isKanban);
-    document.getElementById("search-tab")?.querySelector(".container")?.classList.toggle("crm-kanban-layout", isKanban);
+    document.getElementById("adv-search-container")?.classList.toggle("crm-kanban-layout", isKanban);
+    if (!isKanban) {
+        closeAdvSearchPopover();
+    }
 }
 
 function rerenderCrmResultsFromCache(mode) {
-    const deals = crmSearchCache[mode];
-    const resId = mode === "main" ? "crmResults" : "advCrmResults";
-    const resDiv = document.getElementById(resId);
+    if (mode !== "adv") return;
+    const deals = crmSearchCache.adv;
+    const resDiv = document.getElementById("advCrmResults");
     if (!resDiv || !deals) return;
 
     if (!deals.length) {
@@ -888,13 +890,49 @@ function toggleCrmView(mode) {
     localStorage.setItem(CRM_VIEW_STORAGE_KEY, nextMode);
     syncCrmViewToggleButtons();
     applyCrmViewLayoutClass();
-    rerenderCrmResultsFromCache("main");
     rerenderCrmResultsFromCache("adv");
 }
 
 function initCrmViewToggle() {
     syncCrmViewToggleButtons();
     applyCrmViewLayoutClass();
+    document.addEventListener("click", (event) => {
+        const popover = document.getElementById("advSearchPopover");
+        const trigger = document.getElementById("advSearchPopoverBtn");
+        if (!popover?.classList.contains("open")) return;
+        if (popover.contains(event.target) || trigger?.contains(event.target)) return;
+        closeAdvSearchPopover();
+    });
+}
+
+function toggleAdvSearchPopover(event) {
+    event?.stopPropagation();
+    const popover = document.getElementById("advSearchPopover");
+    const trigger = document.getElementById("advSearchPopoverBtn");
+    if (!popover || !trigger) return;
+
+    const willOpen = !popover.classList.contains("open");
+    document.querySelectorAll(".adv-search-popover.open").forEach(el => el.classList.remove("open"));
+
+    if (willOpen) {
+        popover.classList.add("open");
+        trigger.setAttribute("aria-expanded", "true");
+        document.getElementById("advSearchInput")?.focus();
+    } else {
+        closeAdvSearchPopover();
+    }
+}
+
+function closeAdvSearchPopover() {
+    const popover = document.getElementById("advSearchPopover");
+    const trigger = document.getElementById("advSearchPopoverBtn");
+    popover?.classList.remove("open");
+    trigger?.setAttribute("aria-expanded", "false");
+}
+
+function submitAdvSearchFromPopover() {
+    closeAdvSearchPopover();
+    searchCRM("adv");
 }
 
 function resolveDealStatusColumnMeta(deal) {
@@ -1033,7 +1071,8 @@ function renderDealsResults(deals, targetDiv, options = {}) {
         return;
     }
 
-    if (getCrmViewMode() === "kanban") {
+    const isAdvResults = targetDiv?.id === "advCrmResults";
+    if (isAdvResults && getCrmViewMode() === "kanban") {
         renderDealsKanban(deals, targetDiv);
     } else {
         renderDealsList(deals, targetDiv, options);
