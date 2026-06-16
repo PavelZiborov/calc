@@ -656,6 +656,12 @@
         line-height: 1;
     }
     .status-option input:checked ~ .status-checkmark { visibility: visible; }
+    .status-option-preset .status-option-name { font-weight: 600; }
+    .status-filter-divider {
+        height: 1px;
+        margin: 4px 8px 6px;
+        background: #e2e8f0;
+    }
     .advanced-toolbar {
         display: flex;
         align-items: flex-end;
@@ -971,6 +977,7 @@
         gap: 5px;
         flex: 0 0 auto;
         flex-shrink: 0;
+        margin-left: auto;
     }
     .adv-toolbar-icon-btn {
         margin: 0;
@@ -1038,17 +1045,68 @@
         display: block;
     }
     .adv-filters-popover-section {
+        display: flex;
+        align-items: center;
+        gap: 10px;
         margin-bottom: 10px;
     }
-    .adv-filters-popover-section:last-child {
+    .adv-filters-popover-section:last-of-type {
         margin-bottom: 0;
     }
     .adv-filter-label {
-        display: block;
-        margin: 0 0 4px;
+        flex: 0 0 72px;
+        margin: 0;
         font-size: 12px;
         font-weight: bold;
         color: #64748b;
+        cursor: pointer;
+        user-select: none;
+    }
+    .adv-filters-popover-section .status-dropdown,
+    .adv-filters-popover-section .date-range-dropdown {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .adv-filters-popover-footer {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #e2e8f0;
+    }
+    .adv-filters-reset-btn,
+    .adv-filters-apply-btn {
+        flex: 1 1 0;
+        width: auto;
+        margin: 0;
+        padding: 9px 12px;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.2;
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease;
+    }
+    .adv-filters-reset-btn {
+        background: #eef1f5;
+        color: #475569;
+    }
+    .adv-filters-reset-btn:hover {
+        background: #e2e8f0;
+        color: #334155;
+    }
+    .adv-filters-apply-btn {
+        background: #2f7df6;
+        color: #fff;
+    }
+    .adv-filters-apply-btn:hover {
+        background: #1e5fcb;
+        color: #fff;
+    }
+    .adv-filters-apply-btn:disabled {
+        opacity: 0.65;
+        cursor: wait;
     }
     .adv-filters-popover .status-dropdown-btn,
     .adv-filters-popover .date-range-btn {

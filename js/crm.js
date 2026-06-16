@@ -1,5 +1,5 @@
 // --- CRM ЛОГИКА ---
-async function searchCRM(mode) {
+async function searchCRM(mode, triggerEvent) {
     if (!ensureActiveSession()) return;
 
     const resId = mode === 'main' ? 'crmResults' : 'advCrmResults';
@@ -7,8 +7,8 @@ async function searchCRM(mode) {
     const resDiv = document.getElementById(resId);
     const load = document.getElementById(loadId);
     
-    // Находим кнопку, которая вызвала поиск
-    const btn = event?.target?.tagName === 'BUTTON' ? event.target : document.querySelector(`button[onclick="searchCRM('${mode}')"]`);
+    const evt = triggerEvent ?? (typeof event !== "undefined" ? event : null);
+    const btn = evt?.target?.tagName === 'BUTTON' ? evt.target : document.querySelector(`button[onclick="searchCRM('${mode}')"]`);
     if (btn && btn.disabled) return;
     const originalBtnText = btn ? btn.innerText : "";
 
@@ -19,12 +19,21 @@ async function searchCRM(mode) {
     }
 
     const selectedStatusInputs = mode === 'adv'
-        ? Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked'))
+        ? Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked:not([data-preset])'))
         : [];
-    const selectedStatuses = selectedStatusInputs
-        .map(input => Number(input.value))
-        .filter(Number.isInteger);
-    const selectedStatusNames = selectedStatusInputs.map(input => input.dataset.name || "");
+    const openDealsFilterActive = mode === 'adv' && isAdvOpenDealsFilterActive();
+    let selectedStatuses;
+    let selectedStatusNames;
+    if (openDealsFilterActive) {
+        const openStatuses = getOpenCrmDealStatuses();
+        selectedStatuses = openStatuses.map(status => status.id);
+        selectedStatusNames = openStatuses.map(status => status.name);
+    } else {
+        selectedStatuses = selectedStatusInputs
+            .map(input => Number(input.value))
+            .filter(Number.isInteger);
+        selectedStatusNames = selectedStatusInputs.map(input => input.dataset.name || "");
+    }
 
     const selectedManagerInputs = mode === 'adv'
         ? Array.from(document.querySelectorAll('#advManagerList input[type="checkbox"]:checked'))
@@ -476,13 +485,52 @@ async function updateCrmStatus(trigger, status, menu) {
     }
 }
 
+function isCompletedCrmDealStatus(status) {
+    return String(status?.name || "").trim().toLowerCase() === "завершено";
+}
+
+function getOpenCrmDealStatuses() {
+    return getCrmStatuses().filter(status => !isCompletedCrmDealStatus(status));
+}
+
+function isAdvOpenDealsFilterActive() {
+    return Boolean(document.querySelector('#advStatusList input[data-preset="open-deals"]:checked'));
+}
+
+function onAdvStatusFilterChange(event) {
+    const target = event?.target;
+    if (target?.type === "checkbox") {
+        if (target.dataset.preset === "open-deals") {
+            if (target.checked) {
+                document.querySelectorAll('#advStatusList input[type="checkbox"]:not([data-preset])').forEach(input => {
+                    input.checked = false;
+                });
+            }
+        } else if (target.checked) {
+            const openFilter = document.querySelector('#advStatusList input[data-preset="open-deals"]');
+            if (openFilter) openFilter.checked = false;
+        }
+    }
+    updateAdvFilterUi();
+}
+
 function fillStatusFilter() {
     const list = document.getElementById('advStatusList');
     if (!list) return;
 
-    list.innerHTML = getCrmStatuses().map(s => `
+    const presetOption = `
+        <label class="status-option status-option-preset">
+            <input type="checkbox" data-preset="open-deals" data-name="Все открытые сделки" onchange="onAdvStatusFilterChange(event)">
+            <span class="status-color-marker" style="background:#2f7df6;"></span>
+            <span class="status-option-name">Все открытые сделки</span>
+            <span class="status-checkmark">✓</span>
+        </label>
+        <div class="status-filter-divider" aria-hidden="true"></div>
+    `;
+
+    list.innerHTML = presetOption + getCrmStatuses().map(s => `
         <label class="status-option">
-            <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="updateAdvFilterUi()">
+            <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="onAdvStatusFilterChange(event)">
             <span class="status-color-marker" style="background:${s.bk_color};"></span>
             <span class="status-option-name">${escapeHtml(s.name)}</span>
             <span class="status-checkmark">✓</span>
@@ -513,6 +561,24 @@ function updateAdvFilterUi() {
     syncAdvFiltersButtonState();
 }
 
+function closeAdvFilterDropdowns() {
+    document.getElementById("advStatusDropdown")?.classList.remove("open");
+    document.getElementById("advManagerDropdown")?.classList.remove("open");
+    document.getElementById("advDateDropdown")?.classList.remove("open");
+}
+
+function onAdvFiltersPopoverClick(event) {
+    event.stopPropagation();
+    if (event.target.closest(".adv-filters-reset-btn, .adv-filters-apply-btn, .status-dropdown-btn, .date-range-btn")) return;
+
+    document.querySelectorAll("#advFiltersPopover .status-dropdown.open, #advFiltersPopover .date-range-dropdown.open").forEach(dropdown => {
+        const panel = dropdown.querySelector(".status-dropdown-list, .date-range-panel");
+        if (panel && !panel.contains(event.target)) {
+            dropdown.classList.remove("open");
+        }
+    });
+}
+
 function toggleAdvFiltersPopover(event) {
     event?.stopPropagation();
     const wrap = document.getElementById("advFiltersPopoverWrap");
@@ -525,18 +591,21 @@ function toggleAdvFiltersPopover(event) {
     btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
 
     if (!willOpen) {
-        document.getElementById("advStatusDropdown")?.classList.remove("open");
-        document.getElementById("advManagerDropdown")?.classList.remove("open");
-        document.getElementById("advDateDropdown")?.classList.remove("open");
+        closeAdvFilterDropdowns();
     }
 }
 
 function closeAdvFiltersPopover() {
     document.getElementById("advFiltersPopoverWrap")?.classList.remove("open");
     document.getElementById("advFiltersBtn")?.setAttribute("aria-expanded", "false");
-    document.getElementById("advStatusDropdown")?.classList.remove("open");
-    document.getElementById("advManagerDropdown")?.classList.remove("open");
-    document.getElementById("advDateDropdown")?.classList.remove("open");
+    closeAdvFilterDropdowns();
+}
+
+function applyAdvFilters(e) {
+    e?.stopPropagation();
+    closeAdvFilterDropdowns();
+    closeAdvFiltersPopover();
+    searchCRM("adv", e);
 }
 
 function fillManagerFilter() {
@@ -711,10 +780,12 @@ document.addEventListener('click', (event) => {
 
 function updateStatusDropdownLabel() {
     const btn = document.querySelector('#advStatusDropdown .status-dropdown-btn');
-    const selected = Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked'));
+    const selected = Array.from(document.querySelectorAll('#advStatusList input[type="checkbox"]:checked:not([data-preset])'));
     if (!btn) return;
 
-    if (selected.length === 0) {
+    if (isAdvOpenDealsFilterActive()) {
+        btn.innerText = "Все открытые сделки";
+    } else if (selected.length === 0) {
         btn.innerText = "Все статусы";
     } else if (selected.length === 1) {
         btn.innerText = selected[0].dataset.name || "1 статус";
