@@ -30,4 +30,13 @@ window.onload = () => {
     document.getElementById('advSearchInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') searchCRM('adv');
     });
+
+    window.addEventListener('resize', () => {
+        if (typeof positionAdvFiltersPopover === 'function') positionAdvFiltersPopover();
+    });
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            if (typeof positionAdvFiltersPopover === 'function') positionAdvFiltersPopover();
+        }, 120);
+    });
 };

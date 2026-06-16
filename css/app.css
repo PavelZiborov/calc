@@ -883,16 +883,6 @@
         .adv-search-header {
             position: relative;
         }
-        .adv-filters-popover-wrap {
-            position: static;
-        }
-        .adv-filters-popover {
-            left: 0;
-            right: 0;
-            width: auto;
-            max-width: none;
-            top: calc(100% + 6px);
-        }
         .adv-filters-popover .status-dropdown-btn,
         .adv-filters-popover .date-range-btn,
         .adv-filters-popover .status-option,
@@ -1077,6 +1067,20 @@
     }
     .adv-filters-popover-wrap.open .adv-filters-popover {
         display: block;
+    }
+    @media (max-width: 600px) {
+        #advFiltersPopover.adv-filters-popover {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            width: auto;
+            max-width: none;
+            margin: 0;
+            box-sizing: border-box;
+            z-index: 1500;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     }
     .adv-filters-popover-section {
         display: flex;

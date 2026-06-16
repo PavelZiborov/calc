@@ -579,6 +579,44 @@ function onAdvFiltersPopoverClick(event) {
     });
 }
 
+function resetAdvFiltersPopoverPosition() {
+    const popover = document.getElementById("advFiltersPopover");
+    if (!popover) return;
+    popover.style.position = "";
+    popover.style.left = "";
+    popover.style.right = "";
+    popover.style.top = "";
+    popover.style.bottom = "";
+    popover.style.width = "";
+    popover.style.maxHeight = "";
+    popover.style.overflowY = "";
+}
+
+function positionAdvFiltersPopover() {
+    const popover = document.getElementById("advFiltersPopover");
+    const header = document.querySelector(".adv-search-header");
+    const wrap = document.getElementById("advFiltersPopoverWrap");
+    if (!popover || !header || !wrap?.classList.contains("open")) return;
+
+    if (!window.matchMedia("(max-width: 600px)").matches) {
+        resetAdvFiltersPopoverPosition();
+        return;
+    }
+
+    const pad = 12;
+    const gap = 6;
+    const top = Math.round(header.getBoundingClientRect().bottom + gap);
+
+    popover.style.position = "fixed";
+    popover.style.left = `${pad}px`;
+    popover.style.right = `${pad}px`;
+    popover.style.width = "auto";
+    popover.style.top = `${top}px`;
+    popover.style.bottom = "auto";
+    popover.style.maxHeight = `calc(100dvh - ${top + pad}px)`;
+    popover.style.overflowY = "auto";
+}
+
 function toggleAdvFiltersPopover(event) {
     event?.stopPropagation();
     const wrap = document.getElementById("advFiltersPopoverWrap");
@@ -590,8 +628,11 @@ function toggleAdvFiltersPopover(event) {
     wrap.classList.toggle("open", willOpen);
     btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
 
-    if (!willOpen) {
+    if (willOpen) {
+        requestAnimationFrame(() => positionAdvFiltersPopover());
+    } else {
         closeAdvFilterDropdowns();
+        resetAdvFiltersPopoverPosition();
     }
 }
 
@@ -599,6 +640,7 @@ function closeAdvFiltersPopover() {
     document.getElementById("advFiltersPopoverWrap")?.classList.remove("open");
     document.getElementById("advFiltersBtn")?.setAttribute("aria-expanded", "false");
     closeAdvFilterDropdowns();
+    resetAdvFiltersPopoverPosition();
 }
 
 function applyAdvFilters(e) {
