@@ -20,6 +20,7 @@ window.onload = () => {
     renderCalendar();
     validateStoredSessionOnLoad();
     applyPermissions();
+    if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
     if (typeof initCrmViewToggle === "function") initCrmViewToggle();
     if (currentUser.role === "staff" || currentUser.role === "client") {
         // Восстановление вкладки заказа — без принудительного logout при 401

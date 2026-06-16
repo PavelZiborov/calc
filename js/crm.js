@@ -1085,6 +1085,8 @@ function getDealResponsibleName(deal) {
 
 const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
 const crmSearchCache = { main: null, adv: null };
+let kanbanColumnOrderCache = null;
+let kanbanColumnOrderSaveTimer = null;
 const kanbanDragState = {
     type: null,
     columnKey: null,
@@ -1118,23 +1120,224 @@ function isKanbanFullscreenActive() {
         && document.getElementById("search-tab")?.classList.contains("active");
 }
 
+function getStaffPrefsUserKey() {
+    if (currentUser?.role !== "staff") return null;
+    const id = currentUser?.crmId ?? currentUser?.login ?? currentUser?.id;
+    return id ? String(id) : null;
+}
+
+function unwrapUserPrefsPayload(data) {
+    let payload = data;
+    if (Array.isArray(payload)) payload = payload[0]?.json ?? payload[0];
+    if (payload?.json && typeof payload.json === "object") payload = payload.json;
+    if (payload?.body && typeof payload.body === "object") payload = payload.body;
+    if (payload?.userPrefs && typeof payload.userPrefs === "object") payload = payload.userPrefs;
+    if (payload?.prefs && typeof payload.prefs === "object") payload = payload.prefs;
+    return payload && typeof payload === "object" ? payload : {};
+}
+
+function normalizeKanbanColumnOrderKeys(keys) {
+    if (!Array.isArray(keys)) return [];
+    return keys.map(String).filter(Boolean);
+}
+
 function getKanbanColumnOrderStorageKey() {
-    const userId = currentUser?.crmId || currentUser?.login || currentUser?.id || "guest";
-    return `calc_kanban_col_order_${userId}`;
+    const userKey = getStaffPrefsUserKey() || "guest";
+    return `calc_kanban_col_order_${userKey}`;
+}
+
+function applyKanbanColumnOrderCache(keys) {
+    kanbanColumnOrderCache = normalizeKanbanColumnOrderKeys(keys);
+    if (!kanbanColumnOrderCache.length) return;
+    localStorage.setItem(getKanbanColumnOrderStorageKey(), JSON.stringify(kanbanColumnOrderCache));
 }
 
 function loadKanbanColumnOrder() {
+    if (kanbanColumnOrderCache?.length) return kanbanColumnOrderCache;
     try {
         const raw = localStorage.getItem(getKanbanColumnOrderStorageKey());
         const parsed = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed.map(String) : [];
+        kanbanColumnOrderCache = normalizeKanbanColumnOrderKeys(parsed);
     } catch {
-        return [];
+        kanbanColumnOrderCache = [];
     }
+    return kanbanColumnOrderCache;
 }
 
 function saveKanbanColumnOrder(keys) {
-    localStorage.setItem(getKanbanColumnOrderStorageKey(), JSON.stringify(keys.map(String)));
+    applyKanbanColumnOrderCache(keys);
+    scheduleKanbanColumnOrderServerSave(kanbanColumnOrderCache);
+}
+
+function scheduleKanbanColumnOrderServerSave(keys) {
+    if (!isKanbanAvailable()) return;
+    clearTimeout(kanbanColumnOrderSaveTimer);
+    kanbanColumnOrderSaveTimer = setTimeout(() => {
+        syncKanbanColumnOrderToServer(keys);
+    }, 450);
+}
+
+async function syncKanbanColumnOrderToServer(keys) {
+    if (!isKanbanAvailable() || !ensureActiveSession({ silent: true })) return;
+    const order = normalizeKanbanColumnOrderKeys(keys);
+    if (!order.length) return;
+
+    try {
+        const response = await fetch(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "saveUserPrefs",
+                kanbanColumnOrder: order
+            })
+        });
+        if (response.status === 401) return;
+    } catch (e) {
+        console.warn("saveUserPrefs failed", e);
+    }
+}
+
+async function fetchKanbanColumnOrderFromServer() {
+    if (!isKanbanAvailable() || !ensureActiveSession({ silent: true })) return loadKanbanColumnOrder();
+
+    try {
+        const response = await fetch(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ action: "getUserPrefs" })
+        });
+        if (response.status === 401) return loadKanbanColumnOrder();
+        if (!response.ok) return loadKanbanColumnOrder();
+
+        const prefs = unwrapUserPrefsPayload(await response.json());
+        const order = normalizeKanbanColumnOrderKeys(prefs.kanbanColumnOrder);
+        if (order.length) {
+            applyKanbanColumnOrderCache(order);
+            return order;
+        }
+    } catch (e) {
+        console.warn("getUserPrefs failed", e);
+    }
+
+    return loadKanbanColumnOrder();
+}
+
+async function initStaffUserPrefs() {
+    if (!isKanbanAvailable()) return;
+    migrateLegacyKanbanColumnOrderStorage();
+    await fetchKanbanColumnOrderFromServer();
+}
+
+function migrateLegacyKanbanColumnOrderStorage() {
+    if (loadKanbanColumnOrder().length) return;
+    const legacyKeys = [
+        currentUser?.crmId != null ? `calc_kanban_col_order_${currentUser.crmId}` : "",
+        currentUser?.login ? `calc_kanban_col_order_${currentUser.login}` : "",
+        currentUser?.id != null ? `calc_kanban_col_order_${currentUser.id}` : ""
+    ].filter(Boolean);
+
+    for (const key of legacyKeys) {
+        if (key === getKanbanColumnOrderStorageKey()) continue;
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+            const parsed = JSON.parse(raw);
+            const order = normalizeKanbanColumnOrderKeys(parsed);
+            if (order.length) {
+                applyKanbanColumnOrderCache(order);
+                scheduleKanbanColumnOrderServerSave(order);
+                return;
+            }
+        } catch {
+            // ignore broken legacy cache
+        }
+    }
+}
+
+function applyUserPrefsFromAuth(session) {
+    const prefs = unwrapUserPrefsPayload(session?.userPrefs ? { userPrefs: session.userPrefs } : session);
+    const order = normalizeKanbanColumnOrderKeys(prefs.kanbanColumnOrder);
+    if (order.length) applyKanbanColumnOrderCache(order);
+}
+
+function isKanbanPanTarget(target) {
+    return !target?.closest(
+        ".kanban-card, .crm-kanban-column-header, button, a, input, select, textarea, label.status-option, .kanban-drop-indicator"
+    );
+}
+
+function bindKanbanBoardPan(board) {
+    if (!board || board.dataset.panBound === "1") return;
+    board.dataset.panBound = "1";
+
+    const panState = {
+        active: false,
+        moved: false,
+        startX: 0,
+        scrollLeft: 0
+    };
+
+    const finishPan = () => {
+        if (!panState.active) return;
+        panState.active = false;
+        board.classList.remove("is-panning");
+    };
+
+    board.addEventListener("mousedown", (event) => {
+        if (event.button !== 0 || !isKanbanPanTarget(event.target)) return;
+        panState.active = true;
+        panState.moved = false;
+        panState.startX = event.pageX;
+        panState.scrollLeft = board.scrollLeft;
+        board.classList.add("is-panning");
+    });
+
+    window.addEventListener("mousemove", (event) => {
+        if (!panState.active) return;
+        const delta = event.pageX - panState.startX;
+        if (Math.abs(delta) > 2) panState.moved = true;
+        board.scrollLeft = panState.scrollLeft - delta;
+    });
+
+    window.addEventListener("mouseup", finishPan);
+
+    board.addEventListener("click", (event) => {
+        if (!panState.moved) return;
+        event.preventDefault();
+        event.stopPropagation();
+        panState.moved = false;
+    }, true);
+
+    board.addEventListener("touchstart", (event) => {
+        if (event.touches.length !== 1 || !isKanbanPanTarget(event.target)) return;
+        panState.active = true;
+        panState.moved = false;
+        panState.startX = event.touches[0].pageX;
+        panState.scrollLeft = board.scrollLeft;
+        board.classList.add("is-panning");
+    }, { passive: true });
+
+    board.addEventListener("touchmove", (event) => {
+        if (!panState.active || event.touches.length !== 1) return;
+        const delta = event.touches[0].pageX - panState.startX;
+        if (Math.abs(delta) > 2) panState.moved = true;
+        board.scrollLeft = panState.scrollLeft - delta;
+    }, { passive: true });
+
+    board.addEventListener("touchend", finishPan);
+    board.addEventListener("touchcancel", finishPan);
+
+    board.addEventListener("wheel", (event) => {
+        let delta = 0;
+        if (event.shiftKey && event.deltaY) {
+            delta = event.deltaY;
+        } else if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+            delta = event.deltaX;
+        }
+        if (!delta) return;
+        event.preventDefault();
+        board.scrollLeft += delta;
+    }, { passive: false });
 }
 
 function sortKanbanColumnsBySavedOrder(columns) {
@@ -1580,6 +1783,7 @@ function renderKanbanCard(deal, index) {
 
 function bindKanbanBoardEvents(board) {
     bindKanbanCardDrag(board);
+    bindKanbanBoardPan(board);
 }
 
 function renderDealsKanban(deals, targetDiv) {

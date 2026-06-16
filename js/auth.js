@@ -28,12 +28,14 @@ async function attemptLogin(event) {
 
         if (response.ok && session?.role && token) {
             currentUser = buildUserSession({ ...session, token }, clientId);
+            if (typeof applyUserPrefsFromAuth === "function") applyUserPrefsFromAuth(session);
             if (!persistSession(currentUser)) {
                 errorDiv.innerText = "Не удалось сохранить сессию. Проверьте, что браузер не блокирует localStorage (режим инкognito, настройки приватности).";
                 return;
             }
             toggleAuthModal();
             applyPermissions();
+            if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
         } else {
             errorDiv.innerText = "За получением логина и пароля обратитесь к вашему менеджеру";
         }

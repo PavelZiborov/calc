@@ -1329,6 +1329,18 @@
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
         scrollbar-color: #c5ceda transparent;
+        cursor: grab;
+    }
+    .crm-kanban-board.is-panning {
+        cursor: grabbing;
+        user-select: none;
+        scroll-behavior: auto;
+    }
+    .crm-kanban-board .kanban-card {
+        cursor: pointer;
+    }
+    .crm-kanban-board .crm-kanban-column-header {
+        cursor: grab;
     }
     .crm-kanban-board::-webkit-scrollbar {
         height: 8px;
