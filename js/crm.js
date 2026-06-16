@@ -482,14 +482,61 @@ function fillStatusFilter() {
 
     list.innerHTML = getCrmStatuses().map(s => `
         <label class="status-option">
-            <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="updateStatusDropdownLabel()">
+            <input type="checkbox" value="${s.id}" data-name="${s.name}" onchange="updateAdvFilterUi()">
             <span class="status-color-marker" style="background:${s.bk_color};"></span>
             <span class="status-option-name">${escapeHtml(s.name)}</span>
             <span class="status-checkmark">✓</span>
         </label>
     `).join('');
 
+    updateAdvFilterUi();
+}
+
+function hasActiveAdvFilters() {
+    const statusChecked = document.querySelectorAll("#advStatusList input[type=\"checkbox\"]:checked").length;
+    const managerChecked = document.querySelectorAll("#advManagerList input[type=\"checkbox\"]:checked").length;
+    const dateFrom = document.getElementById("advDateFrom")?.value || "";
+    const dateTo = document.getElementById("advDateTo")?.value || "";
+    return statusChecked > 0 || managerChecked > 0 || !!dateFrom || !!dateTo;
+}
+
+function syncAdvFiltersButtonState() {
+    const btn = document.getElementById("advFiltersBtn");
+    if (!btn) return;
+    btn.classList.toggle("has-filters", hasActiveAdvFilters());
+}
+
+function updateAdvFilterUi() {
     updateStatusDropdownLabel();
+    updateManagerDropdownLabel();
+    updateDateDropdownLabel();
+    syncAdvFiltersButtonState();
+}
+
+function toggleAdvFiltersPopover(event) {
+    event?.stopPropagation();
+    const wrap = document.getElementById("advFiltersPopoverWrap");
+    const popover = document.getElementById("advFiltersPopover");
+    const btn = document.getElementById("advFiltersBtn");
+    if (!wrap || !popover || !btn) return;
+
+    const willOpen = !wrap.classList.contains("open");
+    wrap.classList.toggle("open", willOpen);
+    btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+
+    if (!willOpen) {
+        document.getElementById("advStatusDropdown")?.classList.remove("open");
+        document.getElementById("advManagerDropdown")?.classList.remove("open");
+        document.getElementById("advDateDropdown")?.classList.remove("open");
+    }
+}
+
+function closeAdvFiltersPopover() {
+    document.getElementById("advFiltersPopoverWrap")?.classList.remove("open");
+    document.getElementById("advFiltersBtn")?.setAttribute("aria-expanded", "false");
+    document.getElementById("advStatusDropdown")?.classList.remove("open");
+    document.getElementById("advManagerDropdown")?.classList.remove("open");
+    document.getElementById("advDateDropdown")?.classList.remove("open");
 }
 
 function fillManagerFilter() {
@@ -500,14 +547,14 @@ function fillManagerFilter() {
     list.innerHTML = managers.length
         ? managers.map(manager => `
             <label class="status-option manager-option">
-                <input type="checkbox" value="${manager.id}" data-name="${manager.name}" onchange="updateManagerDropdownLabel()">
+                <input type="checkbox" value="${manager.id}" data-name="${manager.name}" onchange="updateAdvFilterUi()">
                 <span class="status-option-name">${escapeHtml(manager.name)}</span>
                 <span class="status-checkmark">✓</span>
             </label>
         `).join('')
         : `<div style="padding:10px; color:#888; font-size:13px;">Список менеджеров не загружен</div>`;
 
-    updateManagerDropdownLabel();
+    updateAdvFilterUi();
 }
 
 function formatDateForWebhook(dateValue) {
@@ -605,7 +652,7 @@ function selectCalendarDate(value) {
 
     document.getElementById('advDateFrom').value = calendarRangeStart;
     document.getElementById('advDateTo').value = calendarRangeEnd;
-    updateDateDropdownLabel();
+    updateAdvFilterUi();
     renderCalendar();
 }
 
@@ -647,11 +694,13 @@ document.addEventListener('click', (event) => {
     const statusDropdown = document.getElementById('advStatusDropdown');
     const managerDropdown = document.getElementById('advManagerDropdown');
     const dateDropdown = document.getElementById('advDateDropdown');
+    const filtersWrap = document.getElementById('advFiltersPopoverWrap');
     const confirmPopover = document.querySelector('.deal-confirm-popover');
     const statusMenu = document.querySelector('.status-menu');
     if (statusDropdown && !statusDropdown.contains(event.target)) statusDropdown.classList.remove('open');
     if (managerDropdown && !managerDropdown.contains(event.target)) managerDropdown.classList.remove('open');
     if (dateDropdown && !dateDropdown.contains(event.target)) dateDropdown.classList.remove('open');
+    if (filtersWrap && !filtersWrap.contains(event.target)) closeAdvFiltersPopover();
     if (confirmPopover && !confirmPopover.contains(event.target) && !event.target.closest('.deal-create-btn')) {
         confirmPopover.remove();
     }
@@ -666,7 +715,7 @@ function updateStatusDropdownLabel() {
     if (!btn) return;
 
     if (selected.length === 0) {
-        btn.innerText = "";
+        btn.innerText = "Все статусы";
     } else if (selected.length === 1) {
         btn.innerText = selected[0].dataset.name || "1 статус";
     } else {
@@ -680,7 +729,7 @@ function updateManagerDropdownLabel() {
     if (!btn) return;
 
     if (selected.length === 0) {
-        btn.innerText = "";
+        btn.innerText = "Все менеджеры";
     } else if (selected.length === 1) {
         btn.innerText = selected[0].dataset.name || "1 менеджер";
     } else {
@@ -701,7 +750,7 @@ function updateDateDropdownLabel() {
     } else if (dateTo) {
         btn.innerText = `до ${formatDateForWebhook(dateTo)}`;
     } else {
-        btn.innerText = "";
+        btn.innerText = "Любой период";
     }
 }
 
@@ -712,15 +761,13 @@ function clearAdvFilters() {
 
     document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => input.checked = false);
     document.querySelectorAll('#advManagerList input[type="checkbox"]').forEach(input => input.checked = false);
-    updateStatusDropdownLabel();
-    updateManagerDropdownLabel();
     if (searchInput) searchInput.value = "";
     if (dateFrom) dateFrom.value = "";
     if (dateTo) dateTo.value = "";
     calendarRangeStart = "";
     calendarRangeEnd = "";
     calendarMonth = new Date();
-    updateDateDropdownLabel();
+    updateAdvFilterUi();
     renderCalendar();
 }
 
@@ -930,7 +977,8 @@ const kanbanDragState = {
     columnKey: null,
     card: null,
     dealId: null,
-    sourceColumnKey: null
+    sourceColumnKey: null,
+    insertBefore: null
 };
 
 function resetKanbanDragState() {
@@ -939,6 +987,7 @@ function resetKanbanDragState() {
     kanbanDragState.card = null;
     kanbanDragState.dealId = null;
     kanbanDragState.sourceColumnKey = null;
+    kanbanDragState.insertBefore = null;
 }
 
 function isKanbanAvailable() {
@@ -1096,13 +1145,57 @@ function syncKanbanColumnEmptyState(columnEl) {
     }
 }
 
-function moveKanbanCardToColumn(card, targetColumn) {
+function clearKanbanDropIndicators(board) {
+    board?.querySelectorAll(".kanban-drop-indicator").forEach(el => el.remove());
+}
+
+function getKanbanInsertPosition(body, clientY, draggingCard = null) {
+    const cards = [...body.querySelectorAll(".kanban-card")].filter(card => card !== draggingCard);
+    if (!cards.length) {
+        return { insertBefore: null };
+    }
+
+    for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (clientY < mid) {
+            return { insertBefore: card };
+        }
+    }
+
+    return { insertBefore: null };
+}
+
+function showKanbanDropIndicator(body, insertBefore, draggingCard = null) {
+    clearKanbanDropIndicators(body.closest(".crm-kanban-board"));
+    const indicator = document.createElement("div");
+    indicator.className = "kanban-drop-indicator";
+    if (insertBefore && insertBefore !== draggingCard) {
+        body.insertBefore(indicator, insertBefore);
+    } else {
+        body.appendChild(indicator);
+    }
+}
+
+function moveKanbanCardToPosition(card, targetBody, insertBefore = null) {
+    if (!targetBody || !card) return;
+
+    targetBody.querySelector(".crm-kanban-empty")?.remove();
+    clearKanbanDropIndicators(targetBody.closest(".crm-kanban-board"));
+
+    if (insertBefore && insertBefore.parentElement === targetBody) {
+        targetBody.insertBefore(card, insertBefore);
+    } else {
+        targetBody.appendChild(card);
+    }
+}
+
+function moveKanbanCardToColumn(card, targetColumn, insertBefore = null) {
     const sourceColumn = card.closest(".crm-kanban-column");
     const targetBody = targetColumn.querySelector(".crm-kanban-column-body");
     if (!targetBody) return;
 
-    targetBody.querySelector(".crm-kanban-empty")?.remove();
-    targetBody.appendChild(card);
+    moveKanbanCardToPosition(card, targetBody, insertBefore);
 
     if (sourceColumn && sourceColumn !== targetColumn) {
         syncKanbanColumnEmptyState(sourceColumn);
@@ -1137,6 +1230,7 @@ function bindKanbanCardDrag(board) {
         card.addEventListener("dragend", () => {
             card.classList.remove("is-dragging");
             board.querySelectorAll(".crm-kanban-column").forEach(col => col.classList.remove("card-drop-target"));
+            clearKanbanDropIndicators(board);
             resetKanbanDragState();
         });
 
@@ -1166,6 +1260,10 @@ function bindKanbanCardDrag(board) {
             if (kanbanDragState.type !== "card" || !kanbanDragState.card) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
+
+            const { insertBefore } = getKanbanInsertPosition(body, event.clientY, kanbanDragState.card);
+            kanbanDragState.insertBefore = insertBefore;
+            showKanbanDropIndicator(body, insertBefore, kanbanDragState.card);
             body.closest(".crm-kanban-column")?.classList.add("card-drop-target");
         });
 
@@ -1173,6 +1271,9 @@ function bindKanbanCardDrag(board) {
             const column = body.closest(".crm-kanban-column");
             if (column && !column.contains(event.relatedTarget)) {
                 column.classList.remove("card-drop-target");
+            }
+            if (!body.contains(event.relatedTarget)) {
+                clearKanbanDropIndicators(board);
             }
         });
 
@@ -1183,14 +1284,35 @@ function bindKanbanCardDrag(board) {
 
             const targetColumn = body.closest(".crm-kanban-column");
             targetColumn?.classList.remove("card-drop-target");
+            clearKanbanDropIndicators(board);
 
             const card = kanbanDragState.card;
             const dealId = kanbanDragState.dealId;
             const sourceColumnKey = kanbanDragState.sourceColumnKey;
+            const insertBefore = kanbanDragState.insertBefore;
             if (!card || !dealId || !targetColumn) return;
 
             const targetColumnKey = targetColumn.dataset.statusKey;
-            if (!targetColumnKey || targetColumnKey === sourceColumnKey) return;
+            if (!targetColumnKey) return;
+
+            const sourceColumn = card.closest(".crm-kanban-column");
+            const sameColumn = targetColumnKey === sourceColumnKey;
+
+            if (sameColumn) {
+                const nextCard = card.nextElementSibling;
+                const alreadyLast = !nextCard || nextCard.classList.contains("kanban-drop-indicator");
+                if ((insertBefore === card)
+                    || (insertBefore === nextCard && !nextCard?.classList?.contains("kanban-drop-indicator"))
+                    || (!insertBefore && alreadyLast)) {
+                    clearKanbanDropIndicators(board);
+                    resetKanbanDragState();
+                    return;
+                }
+                moveKanbanCardToPosition(card, body, insertBefore);
+                syncKanbanColumnEmptyState(targetColumn);
+                resetKanbanDragState();
+                return;
+            }
 
             const status = resolveKanbanColumnStatus(targetColumn);
             if (!status?.id) {
@@ -1198,16 +1320,17 @@ function bindKanbanCardDrag(board) {
                 return;
             }
 
-            const sourceColumn = card.closest(".crm-kanban-column");
-            moveKanbanCardToColumn(card, targetColumn);
+            moveKanbanCardToColumn(card, targetColumn, insertBefore);
             card.classList.add("is-updating");
 
             const ok = await updateDealStatusById(dealId, status);
             card.classList.remove("is-updating");
 
             if (!ok && sourceColumn) {
-                moveKanbanCardToColumn(card, sourceColumn);
+                moveKanbanCardToColumn(card, sourceColumn, null);
             }
+
+            resetKanbanDragState();
         });
     });
 }
@@ -1227,7 +1350,7 @@ function applyCrmViewLayoutClass() {
         window.scrollTo(0, 0);
     }
     if (!isKanban) {
-        closeAdvSearchPopover();
+        closeAdvFiltersPopover();
     }
 }
 
@@ -1261,46 +1384,8 @@ function toggleCrmView(mode) {
 function initCrmViewToggle() {
     syncCrmViewToggleButtons();
     applyCrmViewLayoutClass();
-    document.addEventListener("click", (event) => {
-        const popover = document.getElementById("advSearchPopover");
-        const trigger = document.getElementById("advSearchPopoverBtn");
-        if (!popover?.classList.contains("open")) return;
-        if (popover.contains(event.target) || trigger?.contains(event.target)) return;
-        closeAdvSearchPopover();
-    });
+    updateAdvFilterUi();
 }
-
-function toggleAdvSearchPopover(event) {
-    event?.stopPropagation();
-    const popover = document.getElementById("advSearchPopover");
-    const trigger = document.getElementById("advSearchPopoverBtn");
-    if (!popover || !trigger) return;
-
-    const willOpen = !popover.classList.contains("open");
-    document.querySelectorAll(".adv-search-popover.open").forEach(el => el.classList.remove("open"));
-
-    if (willOpen) {
-        popover.classList.add("open");
-        trigger.setAttribute("aria-expanded", "true");
-        document.getElementById("advSearchInput")?.focus();
-    } else {
-        closeAdvSearchPopover();
-    }
-}
-
-function closeAdvSearchPopover() {
-    const popover = document.getElementById("advSearchPopover");
-    const trigger = document.getElementById("advSearchPopoverBtn");
-    popover?.classList.remove("open");
-    trigger?.setAttribute("aria-expanded", "false");
-}
-
-function submitAdvSearchFromPopover() {
-    closeAdvSearchPopover();
-    searchCRM("adv");
-}
-
-function resolveDealStatusColumnMeta(deal) {
     const statusObj = (deal.status && typeof deal.status === "object") ? deal.status : {};
     const statusName = statusObj.name
         || (typeof deal.status === "string" ? deal.status : "")

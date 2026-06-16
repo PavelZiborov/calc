@@ -28,9 +28,6 @@ window.onload = () => {
     
     document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
     document.getElementById('advSearchInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            if (typeof closeAdvSearchPopover === 'function') closeAdvSearchPopover();
-            searchCRM('adv');
-        }
+        if (e.key === 'Enter') searchCRM('adv');
     });
 };

@@ -157,59 +157,58 @@
     <div class="container" id="adv-search-container">
         <div class="adv-search-header">
             <div class="adv-toolbar-line">
-                <div class="adv-filters-row">
-                    <div class="adv-filter-group">
-                        <div class="adv-filter-slot">
-                            <label class="adv-filter-label">Статус</label>
-                            <div class="status-dropdown" id="advStatusDropdown">
-                                <button type="button" class="status-dropdown-btn" onclick="toggleStatusDropdown()"></button>
-                                <div class="status-dropdown-list" id="advStatusList"></div>
+                <div class="adv-toolbar-left">
+                    <div class="adv-filters-popover-wrap" id="advFiltersPopoverWrap">
+                        <button type="button" class="adv-toolbar-icon-btn adv-filters-btn" id="advFiltersBtn" onclick="toggleAdvFiltersPopover(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false">⚙</button>
+                        <div class="adv-filters-popover" id="advFiltersPopover" onclick="event.stopPropagation()">
+                            <div class="adv-filters-popover-section">
+                                <label class="adv-filter-label">Статус</label>
+                                <div class="status-dropdown" id="advStatusDropdown">
+                                    <button type="button" class="status-dropdown-btn" onclick="toggleStatusDropdown()"></button>
+                                    <div class="status-dropdown-list" id="advStatusList"></div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="adv-filter-slot">
-                            <label class="adv-filter-label">Период</label>
-                            <div class="date-range-dropdown" id="advDateDropdown">
-                                <button type="button" class="date-range-btn" onclick="toggleDateDropdown()"></button>
-                                <div class="date-range-panel" onclick="event.stopPropagation()">
-                                    <input type="hidden" id="advDateFrom">
-                                    <input type="hidden" id="advDateTo">
-                                    <div class="calendar-header">
-                                        <button type="button" class="calendar-nav" onclick="changeCalendarMonth(-1)">‹</button>
-                                        <div class="calendar-title-wrap">
-                                            <select class="calendar-month-select" id="calendarMonthSelect" onchange="changeCalendarMonthSelect(this.value)"></select>
-                                            <select class="calendar-year-select" id="calendarYearSelect" onchange="changeCalendarYear(this.value)"></select>
+                            <div class="adv-filters-popover-section">
+                                <label class="adv-filter-label">Период</label>
+                                <div class="date-range-dropdown" id="advDateDropdown">
+                                    <button type="button" class="date-range-btn" onclick="toggleDateDropdown()"></button>
+                                    <div class="date-range-panel" onclick="event.stopPropagation()">
+                                        <input type="hidden" id="advDateFrom">
+                                        <input type="hidden" id="advDateTo">
+                                        <div class="calendar-header">
+                                            <button type="button" class="calendar-nav" onclick="changeCalendarMonth(-1)">‹</button>
+                                            <div class="calendar-title-wrap">
+                                                <select class="calendar-month-select" id="calendarMonthSelect" onchange="changeCalendarMonthSelect(this.value)"></select>
+                                                <select class="calendar-year-select" id="calendarYearSelect" onchange="changeCalendarYear(this.value)"></select>
+                                            </div>
+                                            <button type="button" class="calendar-nav" onclick="changeCalendarMonth(1)">›</button>
                                         </div>
-                                        <button type="button" class="calendar-nav" onclick="changeCalendarMonth(1)">›</button>
+                                        <div class="calendar-weekdays">
+                                            <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+                                        </div>
+                                        <div class="calendar-grid" id="calendarGrid"></div>
                                     </div>
-                                    <div class="calendar-weekdays">
-                                        <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
-                                    </div>
-                                    <div class="calendar-grid" id="calendarGrid"></div>
+                                </div>
+                            </div>
+                            <div class="adv-filters-popover-section">
+                                <label class="adv-filter-label">Менеджер</label>
+                                <div class="status-dropdown" id="advManagerDropdown">
+                                    <button type="button" class="status-dropdown-btn" onclick="toggleManagerDropdown()"></button>
+                                    <div class="status-dropdown-list" id="advManagerList"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="adv-filter-slot">
-                            <label class="adv-filter-label">Менеджер</label>
-                            <div class="status-dropdown" id="advManagerDropdown">
-                                <button type="button" class="status-dropdown-btn" onclick="toggleManagerDropdown()"></button>
-                                <div class="status-dropdown-list" id="advManagerList"></div>
-                            </div>
-                        </div>
                     </div>
-                    <button type="button" class="clear-filters-btn" onclick="clearAdvFilters()" title="Сбросить фильтры" aria-label="Сбросить фильтры">🔄</button>
-                </div>
-                <div class="adv-search-row">
-                    <div class="adv-search-field-wrap">
-                        <label class="adv-search-label">Поиск заказов</label>
-                        <button type="button" class="adv-search-trigger" id="advSearchPopoverBtn" onclick="toggleAdvSearchPopover(event)" title="Поиск" aria-label="Поиск">🔍</button>
-                        <div class="adv-search-popover" id="advSearchPopover" onclick="event.stopPropagation()">
-                            <input type="text" id="advSearchInput" placeholder="Номер, клиент…">
-                            <button type="button" class="adv-search-submit" onclick="submitAdvSearchFromPopover()" title="Найти" aria-label="Найти">🔍</button>
-                        </div>
-                    </div>
+                    <button type="button" class="adv-toolbar-icon-btn clear-filters-btn" onclick="clearAdvFilters()" title="Сбросить фильтры" aria-label="Сбросить фильтры">🔄</button>
                     <div class="crm-view-toggle" role="group" aria-label="Вид списка заказов">
                         <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список">☰</button>
                         <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска">▦</button>
+                    </div>
+                </div>
+                <div class="adv-toolbar-right">
+                    <div class="adv-search-inline">
+                        <input type="text" id="advSearchInput" placeholder="Поиск…">
+                        <button type="button" class="adv-search-submit" onclick="searchCRM('adv')" title="Найти" aria-label="Найти">🔍</button>
                     </div>
                 </div>
             </div>

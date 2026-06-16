@@ -855,13 +855,32 @@
         .row { gap: 12px; }
         .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
         #search-tab .row { flex-direction: column; align-items: stretch !important; }
-        #search-tab .adv-filters-row { gap: 6px; align-items: flex-end; flex-wrap: nowrap; }
-        #search-tab .adv-filter-group { gap: 6px; }
-        #search-tab .adv-filter-slot { flex: 1 1 0; min-width: 0; }
-        #search-tab .adv-filter-label,
-        #search-tab .adv-search-label { font-size: 12px; white-space: nowrap; }
-        #adv-search-container .clear-filters-btn { width: 40px; min-width: 40px; height: 42px; font-size: 20px; }
-        .adv-search-submit { width: 52px; min-width: 52px; }
+        #search-tab .adv-toolbar-line { gap: 5px; }
+        #search-tab .adv-toolbar-left { gap: 4px; }
+        #search-tab .adv-toolbar-icon-btn,
+        #adv-search-container .clear-filters-btn {
+            width: 32px;
+            min-width: 32px;
+            height: 32px;
+            font-size: 15px;
+        }
+        .adv-search-inline input {
+            height: 32px;
+            font-size: 13px;
+            padding: 5px 8px;
+        }
+        .adv-search-submit {
+            width: 34px;
+            min-width: 34px;
+            height: 32px;
+            font-size: 15px;
+        }
+        .crm-view-btn {
+            min-width: 28px;
+            height: 28px;
+            padding: 0 6px;
+            font-size: 13px;
+        }
         #main-tab .row { flex-direction: row; gap: 10px; }
         #main-tab .col { min-width: 0; }
         #main-tab #crm-search-container .row { flex-direction: column; align-items: stretch !important; }
@@ -905,119 +924,155 @@
         .add-btn { font-size: 11px; padding: 5px 9px; }
     }
 
-    /* CRM view toggle + Kanban board (вкладка «Поиск») */
+    /* CRM toolbar + Kanban (вкладка «Поиск») */
     .adv-search-header {
-        margin-bottom: 12px;
-    }
-    .adv-search-header,
-    .adv-toolbar-line,
-    .adv-filter-slot .status-dropdown-btn,
-    .adv-filter-slot .date-range-btn,
-    .adv-search-popover {
-        transition: all 0.22s ease;
+        margin-bottom: 10px;
+        flex: 0 0 auto;
     }
     .adv-toolbar-line {
         display: flex;
-        flex-direction: column;
-        gap: 10px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: nowrap;
     }
-    .adv-filters-row {
+    .adv-toolbar-left {
         display: flex;
-        align-items: flex-end;
-        gap: 10px;
-    }
-    .adv-filter-group {
-        display: flex;
-        flex: 1 1 auto;
-        align-items: flex-end;
-        gap: 10px;
-        min-width: 0;
-    }
-    .adv-filter-slot {
-        flex: 1 1 0;
-        min-width: 0;
-    }
-    .adv-filter-label,
-    .adv-search-label {
-        display: block;
-        margin-top: 0;
-        margin-bottom: 0;
-        font-size: inherit;
-        font-weight: bold;
-    }
-    .adv-filter-slot .status-dropdown-btn,
-    .adv-filter-slot .date-range-btn {
-        margin-top: 5px;
-    }
-    #adv-search-container .clear-filters-btn {
+        align-items: center;
+        gap: 6px;
         flex: 0 0 auto;
-        align-self: flex-end;
-        width: 44px;
-        min-width: 44px;
-        height: 40px;
-        margin-top: 0;
-        margin-left: 0;
-        padding: 0;
-        border-radius: 8px;
-        background: #2f7df6;
-        font-size: 22px;
-        line-height: 1;
     }
-    .adv-search-row {
+    .adv-toolbar-right {
         display: flex;
-        align-items: flex-end;
-        gap: 10px;
-    }
-    .adv-search-field-wrap {
-        position: relative;
+        align-items: center;
+        justify-content: flex-end;
         flex: 1 1 auto;
         min-width: 0;
     }
-    .adv-search-trigger {
-        display: none;
+    .adv-toolbar-icon-btn {
         margin: 0;
-        width: 40px;
-        min-width: 40px;
-        height: 40px;
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
         padding: 0;
         border-radius: 8px;
         background: #eef1f5;
         color: #475569;
-        font-size: 18px;
+        font-size: 16px;
         line-height: 1;
         box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+        transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
     }
-    .adv-search-trigger:hover {
+    .adv-toolbar-icon-btn:hover {
         background: #e2e8f0;
         color: #334155;
     }
-    .adv-search-popover {
+    .adv-filters-popover-wrap {
+        position: relative;
+        flex: 0 0 auto;
+    }
+    .adv-filters-btn {
+        position: relative;
+    }
+    .adv-filters-btn.has-filters {
+        background: #fff4e6;
+        color: #e67e22;
+        box-shadow: inset 0 0 0 1.5px rgba(230, 126, 34, 0.45);
+        animation: advFiltersPulse 2.2s ease-in-out infinite;
+    }
+    .adv-filters-btn.has-filters::after {
+        content: "";
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #e67e22;
+        box-shadow: 0 0 0 2px #fff4e6;
+    }
+    @keyframes advFiltersPulse {
+        0%, 100% { box-shadow: inset 0 0 0 1.5px rgba(230, 126, 34, 0.45), 0 0 0 0 rgba(230, 126, 34, 0.15); }
+        50% { box-shadow: inset 0 0 0 1.5px rgba(230, 126, 34, 0.65), 0 0 0 4px rgba(230, 126, 34, 0.12); }
+    }
+    .adv-filters-popover {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 1300;
+        width: min(320px, calc(100vw - 24px));
+        padding: 12px;
+        background: #fff;
+        border: 1px solid #d9dde3;
+        border-radius: 12px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+    }
+    .adv-filters-popover-wrap.open .adv-filters-popover {
+        display: block;
+    }
+    .adv-filters-popover-section {
+        margin-bottom: 10px;
+    }
+    .adv-filters-popover-section:last-child {
+        margin-bottom: 0;
+    }
+    .adv-filter-label {
+        display: block;
+        margin: 0 0 4px;
+        font-size: 12px;
+        font-weight: bold;
+        color: #64748b;
+    }
+    .adv-filters-popover .status-dropdown-btn,
+    .adv-filters-popover .date-range-btn {
+        margin-top: 0;
+        height: 38px;
+        min-height: 38px;
+    }
+    #adv-search-container .clear-filters-btn {
+        background: #2f7df6;
+        color: #fff;
+        font-size: 17px;
+    }
+    #adv-search-container .clear-filters-btn:hover {
+        background: #1e5fcb;
+        color: #fff;
+    }
+    .adv-search-inline {
         display: flex;
         align-items: stretch;
-        gap: 0;
-        margin-top: 5px;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 100%;
     }
-    .adv-search-popover input {
-        flex: 1;
+    .adv-search-inline input {
+        flex: 1 1 auto;
+        min-width: 0;
         margin-top: 0;
-        border-radius: 6px 0 0 6px;
+        height: 34px;
+        padding: 6px 10px;
+        font-size: 14px;
+        border-radius: 8px 0 0 8px;
+        border-right: none;
     }
     .adv-search-submit {
-        width: 54px;
-        min-width: 54px;
+        width: 38px;
+        min-width: 38px;
+        height: 34px;
         margin: 0;
         padding: 0;
-        border-radius: 0 6px 6px 0;
+        border-radius: 0 8px 8px 0;
         background: #27ae60;
-        font-size: 22px;
+        font-size: 17px;
         line-height: 1;
     }
     .crm-view-toggle {
         display: inline-flex;
         flex: 0 0 auto;
         gap: 2px;
-        padding: 3px;
-        margin-left: auto;
+        padding: 2px;
         background: #eef1f5;
         border-radius: 8px;
         box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -1025,15 +1080,16 @@
     .crm-view-btn {
         margin: 0;
         width: auto;
-        min-width: 36px;
-        padding: 7px 12px;
-        font-size: 15px;
+        min-width: 32px;
+        height: 30px;
+        padding: 0 8px;
+        font-size: 14px;
         line-height: 1;
         border-radius: 6px;
         background: transparent;
         color: #64748b;
         box-shadow: none;
-        transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+        transition: background 0.2s ease, color 0.2s ease;
     }
     .crm-view-btn:hover {
         background: rgba(255, 255, 255, 0.65);
@@ -1045,85 +1101,9 @@
         box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
     }
 
-    /* Канбан: одна компактная строка */
     #adv-search-container.crm-kanban-layout {
         max-width: min(1600px, calc(100vw - 40px));
         width: 100%;
-    }
-    #adv-search-container.crm-kanban-layout .adv-toolbar-line {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        align-items: center;
-        gap: 8px;
-        padding-bottom: 2px;
-    }
-    #adv-search-container.crm-kanban-layout .adv-filters-row,
-    #adv-search-container.crm-kanban-layout .adv-search-row {
-        display: contents;
-    }
-    #adv-search-container.crm-kanban-layout .adv-filter-group {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-    #adv-search-container.crm-kanban-layout .adv-filter-slot {
-        flex: 1 1 0;
-        min-width: 72px;
-        max-width: 180px;
-    }
-    #adv-search-container.crm-kanban-layout .adv-filter-label,
-    #adv-search-container.crm-kanban-layout .adv-search-label {
-        display: none;
-    }
-    #adv-search-container.crm-kanban-layout .adv-filter-slot .status-dropdown-btn,
-    #adv-search-container.crm-kanban-layout .adv-filter-slot .date-range-btn {
-        margin-top: 0;
-        height: 36px;
-        min-height: 36px;
-        padding: 8px 24px 8px 10px;
-        font-size: 12px;
-    }
-    #adv-search-container.crm-kanban-layout .clear-filters-btn {
-        align-self: center;
-        width: 36px;
-        min-width: 36px;
-        height: 36px;
-        margin-left: 0;
-        font-size: 18px;
-    }
-    #adv-search-container.crm-kanban-layout .adv-search-field-wrap {
-        flex: 0 0 auto;
-        width: auto;
-    }
-    #adv-search-container.crm-kanban-layout .adv-search-trigger {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-    #adv-search-container.crm-kanban-layout .adv-search-popover {
-        display: none;
-        position: absolute;
-        top: calc(100% + 6px);
-        right: 0;
-        z-index: 1200;
-        width: min(320px, calc(100vw - 32px));
-        margin-top: 0;
-        padding: 10px;
-        background: #fff;
-        border: 1px solid #d9dde3;
-        border-radius: 10px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
-    }
-    #adv-search-container.crm-kanban-layout .adv-search-popover.open {
-        display: flex;
-    }
-    #adv-search-container.crm-kanban-layout .adv-search-popover input {
-        border-radius: 6px 0 0 6px;
-    }
-    #adv-search-container.crm-kanban-layout .crm-view-toggle {
-        margin-left: 0;
-    }
-    #adv-search-container.crm-kanban-layout .crm-kanban-column {
-        max-height: 100%;
     }
 
     /* Полноэкранный канбан: без шапки пользователя, без скролла страницы */
@@ -1207,24 +1187,26 @@
         max-height: 100%;
         min-height: 0;
     }
-    body.crm-kanban-active #adv-search-container.crm-kanban-layout .adv-filter-slot .status-dropdown-btn,
-    body.crm-kanban-active #adv-search-container.crm-kanban-layout .adv-filter-slot .date-range-btn {
-        height: 32px;
-        min-height: 32px;
-        padding: 6px 22px 6px 8px;
-        font-size: 11px;
-    }
-    body.crm-kanban-active #adv-search-container.crm-kanban-layout .clear-filters-btn,
-    body.crm-kanban-active #adv-search-container.crm-kanban-layout .adv-search-trigger {
+    body.crm-kanban-active .adv-toolbar-icon-btn,
+    body.crm-kanban-active #adv-search-container .clear-filters-btn {
         width: 32px;
         min-width: 32px;
         height: 32px;
-        font-size: 16px;
+        font-size: 15px;
+    }
+    body.crm-kanban-active .adv-search-inline input,
+    body.crm-kanban-active .adv-search-submit {
+        height: 32px;
+    }
+    body.crm-kanban-active .adv-search-submit {
+        width: 34px;
+        min-width: 34px;
     }
     body.crm-kanban-active .crm-view-btn {
-        min-width: 32px;
-        padding: 5px 10px;
-        font-size: 14px;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 6px;
+        font-size: 13px;
     }
 
     .crm-kanban-board {
@@ -1328,6 +1310,14 @@
         text-align: center;
         background: rgba(255, 255, 255, 0.35);
     }
+    .kanban-drop-indicator {
+        height: 3px;
+        margin: 4px 4px;
+        border-radius: 999px;
+        background: #2f7df6;
+        box-shadow: 0 0 0 1px rgba(47, 125, 246, 0.25);
+        pointer-events: none;
+    }
     @keyframes kanbanCardIn {
         from {
             opacity: 0;
@@ -1423,19 +1413,7 @@
     .kanban-card-amount.payment-alert { color: #e74c3c; }
     @media (max-width: 875px) {
         #adv-search-container.crm-kanban-layout {
-            max-width: calc(100vw - 24px);
-        }
-        #adv-search-container.crm-kanban-layout .adv-toolbar-line {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-        #adv-search-container.crm-kanban-layout .adv-toolbar-line::-webkit-scrollbar {
-            display: none;
-        }
-        #adv-search-container.crm-kanban-layout .adv-filter-slot {
-            flex: 0 0 120px;
-            max-width: 140px;
+            max-width: calc(100vw - 16px);
         }
         .crm-kanban-column {
             flex-basis: 248px;
