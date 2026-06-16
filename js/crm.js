@@ -1326,18 +1326,6 @@ function bindKanbanBoardPan(board) {
 
     board.addEventListener("touchend", finishPan);
     board.addEventListener("touchcancel", finishPan);
-
-    board.addEventListener("wheel", (event) => {
-        let delta = 0;
-        if (event.shiftKey && event.deltaY) {
-            delta = event.deltaY;
-        } else if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-            delta = event.deltaX;
-        }
-        if (!delta) return;
-        event.preventDefault();
-        board.scrollLeft += delta;
-    }, { passive: false });
 }
 
 function sortKanbanColumnsBySavedOrder(columns) {

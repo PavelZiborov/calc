@@ -1325,7 +1325,7 @@
         gap: 12px;
         overflow-x: auto;
         padding: 4px 2px 18px;
-        scroll-behavior: smooth;
+        scroll-behavior: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
         scrollbar-color: #c5ceda transparent;
@@ -1334,7 +1334,6 @@
     .crm-kanban-board.is-panning {
         cursor: grabbing;
         user-select: none;
-        scroll-behavior: auto;
     }
     .crm-kanban-board .kanban-card {
         cursor: pointer;
