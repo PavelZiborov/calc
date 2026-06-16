@@ -321,6 +321,39 @@
         padding: 12px;
     }
     .element-editor-preview-placeholder.loading { color: #2f7df6; }
+    .element-editor-progress {
+        width: 100%;
+        padding: 10px 8px;
+        box-sizing: border-box;
+    }
+    .element-editor-progress-label {
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #64748b;
+        text-align: center;
+    }
+    .element-editor-progress-track {
+        height: 5px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+    .element-editor-progress-bar {
+        height: 100%;
+        width: 38%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2f7df6, #5b9dff);
+        animation: elementEditorProgressSlide 1.15s ease-in-out infinite;
+    }
+    .element-editor-progress-bar.determinate {
+        width: 0;
+        animation: none;
+        transition: width 0.15s ease;
+    }
+    @keyframes elementEditorProgressSlide {
+        0% { transform: translateX(-120%); }
+        100% { transform: translateX(320%); }
+    }
     .element-editor-preview-actions {
         position: absolute;
         top: 8px;

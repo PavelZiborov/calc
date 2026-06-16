@@ -564,18 +564,71 @@ async function compressPreviewImage(file) {
     throw new Error("preview too large");
 }
 
-async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null) {
-    const response = await fetchWithTimeout(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-            "Content-Type": mimeType || file.type || "application/octet-stream"
-        }
-    }, UPLOAD_TIMEOUT_MS);
+async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgress = null) {
+    if (typeof onProgress !== "function") {
+        const response = await fetchWithTimeout(uploadUrl, {
+            method: "PUT",
+            body: file,
+            headers: {
+                "Content-Type": mimeType || file.type || "application/octet-stream"
+            }
+        }, UPLOAD_TIMEOUT_MS);
 
-    if (!response.ok) {
-        throw new Error(`Yandex upload failed (${response.status})`);
+        if (!response.ok) {
+            throw new Error(`Yandex upload failed (${response.status})`);
+        }
+        return;
     }
+
+    await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl);
+        xhr.timeout = UPLOAD_TIMEOUT_MS;
+        xhr.setRequestHeader("Content-Type", mimeType || file.type || "application/octet-stream");
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable && event.total > 0) {
+                onProgress(event.loaded / event.total);
+            }
+        };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+                return;
+            }
+            reject(new Error(`Yandex upload failed (${xhr.status})`));
+        };
+        xhr.onerror = () => reject(new Error("Yandex upload failed"));
+        xhr.ontimeout = () => reject(new Error("Yandex upload timeout"));
+        xhr.send(file);
+    });
+}
+
+function renderEditorProgressBlock(label, progress = null) {
+    const pct = progress != null && Number.isFinite(progress)
+        ? Math.max(0, Math.min(100, Math.round(progress * 100)))
+        : null;
+    const barClass = pct != null
+        ? "element-editor-progress-bar determinate"
+        : "element-editor-progress-bar";
+    const barStyle = pct != null ? ` style="width:${pct}%"` : "";
+    const labelText = pct != null ? `${label} ${pct}%` : label;
+
+    return `<div class="element-editor-progress">
+        <div class="element-editor-progress-label">${escapeHtml(labelText)}</div>
+        <div class="element-editor-progress-track"><div class="${barClass}"${barStyle}></div></div>
+    </div>`;
+}
+
+function setPreviewEditorProgress(label, progress = null) {
+    const previewEl = document.getElementById("elementEditorPreview");
+    if (!previewEl) return;
+    previewEl.innerHTML = renderEditorProgressBlock(label, progress);
+}
+
+function setLayoutsEditorProgress(label, progress = null) {
+    const layoutsEl = document.getElementById("elementEditorLayouts");
+    if (!layoutsEl) return;
+    layoutsEl.innerHTML = renderEditorProgressBlock(label, progress);
 }
 
 function buildElementAssetsPayload(dealId, elementId, dealNum) {
@@ -594,6 +647,7 @@ async function fetchElementAssets(dealId, elementId, dealNum, options = {}) {
     try {
         const payload = buildElementAssetsPayload(dealId, elementId, dealNum);
         if (options.layoutsOnly) payload.layoutsOnly = true;
+        if (options.previewOnly) payload.previewOnly = true;
 
         const data = await elementAssetsApi(
             "getElementAssets",
@@ -929,29 +983,54 @@ function updateElementThumb(dealId, elementId) {
 function scheduleElementAssetsLoading(deal) {
     if (!deal?.id || !Array.isArray(deal.elements)) return;
 
-    clearDealAssetsCache(deal.id);
-
+    const dealId = String(deal.id);
     const dealNum = getDealNum(deal);
     const elementIds = deal.elements
         .map(element => getElementId(element))
         .filter(Boolean);
 
+    const previewIds = [];
+    const layoutIds = [];
+
     elementIds.forEach(elementId => {
-        const key = assetsCacheKey(deal.id, elementId);
-        elementAssetsCache.set(key, {
-            status: "loading",
-            preview: null,
-            layouts: [],
-            layoutsLoaded: false
-        });
-        updateElementThumb(deal.id, elementId);
+        const key = assetsCacheKey(dealId, elementId);
+        let prev = elementAssetsCache.get(key);
+        const previewReady = !!(prev?.preview?.url || prev?.preview?.thumbUrl);
+
+        if (!prev) {
+            prev = {
+                status: "loading",
+                preview: null,
+                layouts: [],
+                layoutsLoaded: false,
+                layoutsLoading: false
+            };
+            elementAssetsCache.set(key, prev);
+            previewIds.push(elementId);
+            layoutIds.push(elementId);
+        } else {
+            if (!previewReady && prev.status !== "loading") {
+                elementAssetsCache.set(key, { ...prev, status: "loading" });
+                previewIds.push(elementId);
+            }
+            if (!prev.layoutsLoaded) {
+                layoutIds.push(elementId);
+            }
+        }
+
+        updateElementThumb(dealId, elementId);
     });
 
-    loadDealPreviewsBatch(deal.id, dealNum, elementIds);
+    if (previewIds.length) {
+        loadDealPreviewsBatch(dealId, dealNum, previewIds, layoutIds);
+    } else if (layoutIds.length) {
+        prefetchDealLayoutsBatch(dealId, dealNum, layoutIds);
+    }
+
     prefetchElementFieldsBatch(deal.id, elementIds);
 }
 
-async function loadDealPreviewsBatch(dealId, dealNum, elementIds) {
+async function loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPrefetch = null) {
     const batch = await fetchDealElementAssetsBatch(dealId, dealNum, elementIds, {
         previewOnly: true,
         silent401: true
@@ -959,28 +1038,40 @@ async function loadDealPreviewsBatch(dealId, dealNum, elementIds) {
 
     for (const elementId of elementIds) {
         const key = assetsCacheKey(dealId, elementId);
+        const prev = elementAssetsCache.get(key) || {};
         const assets = batch?.[String(elementId)];
 
         if (assets) {
             elementAssetsCache.set(key, {
+                ...prev,
                 status: "ready",
                 preview: assets.preview,
-                layouts: [],
-                layoutsLoaded: false
+                layouts: prev.layouts || [],
+                layoutsLoaded: prev.layoutsLoaded === true,
+                layoutsLoading: prev.layoutsLoading === true
             });
         } else {
             elementAssetsCache.set(key, {
+                ...prev,
                 status: batch == null ? "error" : "ready",
                 preview: null,
-                layouts: [],
-                layoutsLoaded: false
+                layouts: prev.layouts || [],
+                layoutsLoaded: prev.layoutsLoaded === true,
+                layoutsLoading: prev.layoutsLoading === true
             });
         }
 
         updateElementThumb(dealId, elementId);
     }
 
-    prefetchDealLayoutsBatch(dealId, dealNum, elementIds);
+    const layoutTargets = (layoutIdsToPrefetch || elementIds).filter(elementId => {
+        const prev = elementAssetsCache.get(assetsCacheKey(dealId, elementId));
+        return prev && !prev.layoutsLoaded;
+    });
+
+    if (layoutTargets.length) {
+        prefetchDealLayoutsBatch(dealId, dealNum, layoutTargets);
+    }
 }
 
 async function prefetchDealLayoutsBatch(dealId, dealNum, elementIds) {
@@ -988,6 +1079,21 @@ async function prefetchDealLayoutsBatch(dealId, dealNum, elementIds) {
 
     const token = (dealLayoutsPrefetchToken.get(String(dealId)) || 0) + 1;
     dealLayoutsPrefetchToken.set(String(dealId), token);
+
+    for (const elementId of elementIds) {
+        const key = assetsCacheKey(dealId, elementId);
+        const prev = elementAssetsCache.get(key);
+        if (!prev || prev.layoutsLoaded) continue;
+
+        elementAssetsCache.set(key, {
+            ...prev,
+            layoutsLoading: true
+        });
+
+        if (isElementEditorOpen(dealId, elementId)) {
+            renderElementEditorAssets();
+        }
+    }
 
     const batch = await fetchDealElementAssetsBatch(dealId, dealNum, elementIds, {
         layoutsOnly: true,
@@ -1002,7 +1108,13 @@ async function prefetchDealLayoutsBatch(dealId, dealNum, elementIds) {
         if (!prev) continue;
 
         const assets = batch?.[String(elementId)];
-        if (!assets) continue;
+        if (!assets) {
+            elementAssetsCache.set(key, {
+                ...prev,
+                layoutsLoading: false
+            });
+            continue;
+        }
 
         elementAssetsCache.set(key, {
             ...prev,
@@ -1018,22 +1130,52 @@ async function prefetchDealLayoutsBatch(dealId, dealNum, elementIds) {
     }
 }
 
+function ensureElementAssetsForEditor(dealId, elementId, dealNum) {
+    const key = assetsCacheKey(dealId, elementId);
+    let prev = elementAssetsCache.get(key);
+
+    if (!prev) {
+        elementAssetsCache.set(key, {
+            status: "loading",
+            preview: null,
+            layouts: [],
+            layoutsLoaded: false,
+            layoutsLoading: false
+        });
+        loadElementAssetsFull(dealId, elementId, dealNum);
+        return;
+    }
+
+    const previewReady = !!(prev.preview?.url || prev.preview?.thumbUrl);
+    const needsPreview = !previewReady && prev.status === "loading";
+    const needsLayouts = !prev.layoutsLoaded && !prev.layoutsLoading;
+
+    if (!needsPreview && !needsLayouts) return;
+
+    loadElementAssetsFull(dealId, elementId, dealNum, {
+        fetchPreview: needsPreview,
+        fetchLayouts: needsLayouts
+    });
+}
+
 async function loadElementAssetsFull(dealId, elementId, dealNum, options = {}) {
     const key = assetsCacheKey(dealId, elementId);
     const prev = elementAssetsCache.get(key) || {};
     const hasPreview = !!(prev.preview?.url || prev.preview?.thumbUrl);
-    const forceLayouts = options.forceLayouts === true;
+    const fetchLayouts = options.fetchLayouts !== false && !prev.layoutsLoaded && !prev.layoutsLoading;
+    const fetchPreview = options.fetchPreview === true
+        || (!hasPreview && prev.status === "loading" && options.fetchPreview !== false);
 
-    if (prev.layoutsLoaded && !forceLayouts) {
+    if (!fetchLayouts && !fetchPreview) {
         if (isElementEditorOpen(dealId, elementId)) renderElementEditorAssets();
         return;
     }
 
     elementAssetsCache.set(key, {
         ...prev,
-        status: hasPreview ? "ready" : "loading",
-        layoutsLoading: true,
-        layoutsLoaded: false,
+        status: hasPreview || !fetchPreview ? "ready" : "loading",
+        layoutsLoading: fetchLayouts ? true : prev.layoutsLoading === true,
+        layoutsLoaded: fetchLayouts ? false : prev.layoutsLoaded === true,
         layouts: prev.layouts || []
     });
 
@@ -1041,17 +1183,21 @@ async function loadElementAssetsFull(dealId, elementId, dealNum, options = {}) {
         renderElementEditorAssets();
     }
 
-    const assets = await fetchElementAssets(dealId, elementId, dealNum, {
-        silent401: true,
-        layoutsOnly: hasPreview
-    });
+    const fetchOptions = { silent401: true };
+    if (fetchLayouts && (hasPreview || !fetchPreview)) {
+        fetchOptions.layoutsOnly = true;
+    } else if (fetchPreview && !fetchLayouts && prev.layoutsLoaded) {
+        fetchOptions.previewOnly = true;
+    }
+
+    const assets = await fetchElementAssets(dealId, elementId, dealNum, fetchOptions);
 
     elementAssetsCache.set(key, {
         ...prev,
         status: "ready",
         preview: assets.preview ?? prev.preview ?? null,
         layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
-        layoutsLoaded: true,
+        layoutsLoaded: fetchLayouts ? true : prev.layoutsLoaded === true,
         layoutsLoading: false
     });
 
@@ -1330,11 +1476,10 @@ function openElementEditor(event, trigger) {
     document.body.style.overflow = "hidden";
 
     const key = assetsCacheKey(dealId, elementId);
-    loadElementAssetsFull(
+    ensureElementAssetsForEditor(
         dealId,
         elementId,
-        currentElementEditor.dealNum || getDealNum(dealId),
-        { forceLayouts: true }
+        currentElementEditor.dealNum || getDealNum(dealId)
     );
 
     ensureElementResponsiblesLoaded(dealId, elementId, elementIndex);
@@ -1374,7 +1519,7 @@ function renderElementEditorAssets() {
     const showPreviewLoading = cached.status === "loading" && !previewReady;
 
     if (showPreviewLoading) {
-        previewEl.innerHTML = `<span class="element-editor-preview-placeholder loading">загрузка…</span>`;
+        previewEl.innerHTML = renderEditorProgressBlock("Загрузка превью…");
         if (deleteBtn) deleteBtn.style.display = "none";
     } else if (previewReady) {
         previewEl.innerHTML = "";
@@ -1386,12 +1531,12 @@ function renderElementEditorAssets() {
     }
 
     if (layoutsLoading) {
-        layoutsEl.innerHTML = `<div class="element-editor-layout-empty">загрузка макетов…</div>`;
+        layoutsEl.innerHTML = renderEditorProgressBlock("Загрузка макетов…");
         return;
     }
 
     if (showPreviewLoading && !layoutsLoading) {
-        layoutsEl.innerHTML = `<div class="element-editor-layout-empty">загрузка макетов…</div>`;
+        layoutsEl.innerHTML = renderEditorProgressBlock("Загрузка макетов…");
         return;
     }
 
@@ -1437,9 +1582,10 @@ async function handlePreviewUpload(event) {
     }
 
     const previewEl = document.getElementById("elementEditorPreview");
-    if (previewEl) previewEl.innerHTML = `<span class="element-editor-preview-placeholder loading">загрузка…</span>`;
+    setPreviewEditorProgress("Подготовка изображения…");
 
     try {
+        setPreviewEditorProgress("Сжатие изображения…", 0.08);
         const uploadFile = await compressPreviewImage(file);
         if (uploadFile.size > MAX_PREVIEW_BYTES) {
             throw new Error("preview too large");
@@ -1451,6 +1597,7 @@ async function handlePreviewUpload(event) {
             currentElementEditor.dealNum
         );
 
+        setPreviewEditorProgress("Регистрация превью…", 0.18);
         const prep = await elementAssetsApi("uploadElementPreview", {
             ...payload,
             fileName: uploadFile.name,
@@ -1460,8 +1607,11 @@ async function handlePreviewUpload(event) {
 
         if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
 
-        await uploadFileToYandexUrl(prep.uploadUrl, uploadFile, uploadFile.type);
+        await uploadFileToYandexUrl(prep.uploadUrl, uploadFile, uploadFile.type, (ratio) => {
+            setPreviewEditorProgress("Загрузка превью…", 0.2 + ratio * 0.65);
+        });
 
+        setPreviewEditorProgress("Сохранение превью…", 0.92);
         const data = await elementAssetsApi("uploadElementPreview", {
             ...payload,
             uploadComplete: true,
@@ -1529,6 +1679,8 @@ async function handleLayoutLinkAdd() {
     const url = (input?.value || "").trim();
     if (!url) return;
 
+    setLayoutsEditorProgress("Добавление ссылки…");
+
     try {
         const data = await elementAssetsApi("addElementLayout", {
             ...buildElementAssetsPayload(
@@ -1572,8 +1724,7 @@ async function handleLayoutFileUpload(event) {
         return;
     }
 
-    const layoutsEl = document.getElementById("elementEditorLayouts");
-    if (layoutsEl) layoutsEl.innerHTML = `<div class="element-editor-layout-empty loading">загрузка файла…</div>`;
+    setLayoutsEditorProgress("Подготовка файла…", 0.05);
 
     try {
         const payload = buildElementAssetsPayload(
@@ -1584,6 +1735,7 @@ async function handleLayoutFileUpload(event) {
 
         const safeFileName = toSafeUploadFileName(file.name, "layout");
 
+        setLayoutsEditorProgress("Регистрация макета…", 0.15);
         const prep = await elementAssetsApi("addElementLayout", {
             ...payload,
             type: "file",
@@ -1595,8 +1747,11 @@ async function handleLayoutFileUpload(event) {
 
         if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
 
-        await uploadFileToYandexUrl(prep.uploadUrl, file);
+        await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream", (ratio) => {
+            setLayoutsEditorProgress("Загрузка файла…", 0.2 + ratio * 0.65);
+        });
 
+        setLayoutsEditorProgress("Сохранение макета…", 0.92);
         const data = await elementAssetsApi("addElementLayout", {
             ...payload,
             type: "file",
