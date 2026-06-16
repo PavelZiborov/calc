@@ -294,6 +294,85 @@ function showStatusMenu(event, trigger) {
     menu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - menu.offsetHeight - 12)}px`;
 }
 
+function applyDealStatusToCache(dealId, status) {
+    const deal = dealsCache.get(String(dealId));
+    if (!deal) return;
+
+    const nextStatus = {
+        id: status.id,
+        name: status.name,
+        bk_color: status.bk_color,
+        text_color: status.text_color
+    };
+
+    deal.status = nextStatus;
+    deal.status_id = status.id;
+    deal.status_name = status.name;
+    deal.status_text = status.name;
+    dealsCache.set(String(dealId), deal);
+
+    if (Array.isArray(crmSearchCache.adv)) {
+        const idx = crmSearchCache.adv.findIndex(item => String(item.id) === String(dealId));
+        if (idx >= 0) {
+            crmSearchCache.adv[idx] = { ...crmSearchCache.adv[idx], ...deal };
+        }
+    }
+
+    if (document.getElementById("deal-tab")?.classList.contains("active")) {
+        const openDealId = document.querySelector("#deal-detail .crm-item")?.id?.replace("deal-", "");
+        if (openDealId && String(openDealId) === String(dealId)) {
+            saveOpenDealState(deal);
+        }
+    }
+}
+
+function refreshDealStatusControls(dealId, status) {
+    document.querySelectorAll(`.editable-status[data-status-scope="deal"][data-deal-id="${dealId}"]`).forEach(control => {
+        control.innerText = status.name;
+        control.style.background = status.bk_color;
+        control.style.color = status.text_color;
+    });
+    document.querySelectorAll(`.status-badge`).forEach(badge => {
+        const card = badge.closest(`.crm-item#deal-${dealId}`);
+        if (!card) return;
+        badge.innerText = status.name;
+        badge.style.background = status.bk_color;
+        badge.style.color = status.text_color;
+    });
+}
+
+async function updateDealStatusById(dealId, status) {
+    if (!ensureActiveSession() || !dealId || status?.id == null) return false;
+
+    try {
+        const response = await fetch(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "updateStatus",
+                entity: "deal",
+                dealId: Number(dealId),
+                statusId: status.id,
+                statusName: status.name
+            })
+        });
+
+        if (response.status === 401) {
+            handleUnauthorized();
+            return false;
+        }
+        if (!response.ok) throw new Error("Ошибка обновления статуса");
+
+        applyDealStatusToCache(dealId, status);
+        refreshDealStatusControls(dealId, status);
+        return true;
+    } catch (e) {
+        console.error(e);
+        alert("Не удалось обновить статус");
+        return false;
+    }
+}
+
 function updateCachedStatus(trigger, status) {
     const scope = trigger.dataset.statusScope;
     const dealId = String(trigger.dataset.dealId || "");
@@ -308,11 +387,11 @@ function updateCachedStatus(trigger, status) {
     };
 
     if (scope === "deal") {
-        deal.status = nextStatus;
-        deal.status_id = status.id;
-        deal.status_name = status.name;
-        deal.status_text = status.name;
-    } else if (scope === "element" && Array.isArray(deal.elements)) {
+        applyDealStatusToCache(dealId, status);
+        return;
+    }
+
+    if (scope === "element" && Array.isArray(deal.elements)) {
         const elementId = trigger.dataset.elementId || "";
         const elementIndex = Number(trigger.dataset.elementIndex);
         const element = (elementId ? deal.elements.find(e => String(getElementId(e)) === String(elementId)) : null)
@@ -326,9 +405,6 @@ function updateCachedStatus(trigger, status) {
     }
 
     dealsCache.set(dealId, deal);
-    if (document.getElementById('deal-tab') && String(dealId) === String(document.querySelector('#deal-detail .crm-item')?.id?.replace('deal-', ''))) {
-        saveOpenDealState(deal);
-    }
 }
 
 function refreshStatusControls(trigger, status) {
@@ -849,6 +925,21 @@ function getDealResponsibleName(deal) {
 
 const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
 const crmSearchCache = { main: null, adv: null };
+const kanbanDragState = {
+    type: null,
+    columnKey: null,
+    card: null,
+    dealId: null,
+    sourceColumnKey: null
+};
+
+function resetKanbanDragState() {
+    kanbanDragState.type = null;
+    kanbanDragState.columnKey = null;
+    kanbanDragState.card = null;
+    kanbanDragState.dealId = null;
+    kanbanDragState.sourceColumnKey = null;
+}
 
 function isKanbanAvailable() {
     return currentUser?.role === "staff";
@@ -919,8 +1010,6 @@ function reorderKanbanColumns(board, sourceKey, targetKey) {
 function bindKanbanColumnDrag(board) {
     if (!board || !isKanbanAvailable()) return;
 
-    let dragKey = null;
-
     board.querySelectorAll(".crm-kanban-column").forEach(col => {
         const header = col.querySelector(".crm-kanban-column-header");
         if (!header) return;
@@ -929,20 +1018,26 @@ function bindKanbanColumnDrag(board) {
         header.title = "Перетащите для изменения порядка колонок";
 
         header.addEventListener("dragstart", (event) => {
-            dragKey = col.dataset.statusKey;
+            resetKanbanDragState();
+            kanbanDragState.type = "column";
+            kanbanDragState.columnKey = col.dataset.statusKey;
             col.classList.add("is-dragging");
             event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", dragKey || "");
+            event.dataTransfer.setData("text/plain", kanbanDragState.columnKey || "");
         });
 
         header.addEventListener("dragend", () => {
             col.classList.remove("is-dragging");
-            board.querySelectorAll(".crm-kanban-column").forEach(item => item.classList.remove("drop-target"));
-            dragKey = null;
+            board.querySelectorAll(".crm-kanban-column").forEach(item => {
+                item.classList.remove("drop-target");
+                item.classList.remove("card-drop-target");
+            });
+            resetKanbanDragState();
         });
 
         col.addEventListener("dragover", (event) => {
-            if (!dragKey || col.dataset.statusKey === dragKey) return;
+            if (kanbanDragState.type !== "column" || !kanbanDragState.columnKey) return;
+            if (col.dataset.statusKey === kanbanDragState.columnKey) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
             col.classList.add("drop-target");
@@ -955,12 +1050,164 @@ function bindKanbanColumnDrag(board) {
         });
 
         col.addEventListener("drop", (event) => {
+            if (kanbanDragState.type !== "column") return;
             event.preventDefault();
+            event.stopPropagation();
             col.classList.remove("drop-target");
             const targetKey = col.dataset.statusKey;
+            const dragKey = kanbanDragState.columnKey;
             if (!dragKey || !targetKey || dragKey === targetKey) return;
             reorderKanbanColumns(board, dragKey, targetKey);
             saveKanbanColumnOrderFromBoard(board);
+        });
+    });
+}
+
+function resolveKanbanColumnStatus(columnEl) {
+    if (!columnEl) return null;
+
+    const statusId = Number(columnEl.dataset.statusId);
+    if (Number.isFinite(statusId) && statusId > 0) {
+        return getCrmStatuses().find(status => status.id === statusId) || null;
+    }
+
+    const statusKey = String(columnEl.dataset.statusKey || "");
+    if (statusKey.startsWith("_name:")) {
+        const name = statusKey.slice(6);
+        return getCrmStatuses().find(status => status.name.toLowerCase() === name) || null;
+    }
+
+    return getCrmStatuses().find(status => String(status.id) === statusKey) || null;
+}
+
+function syncKanbanColumnEmptyState(columnEl) {
+    const body = columnEl?.querySelector(".crm-kanban-column-body");
+    if (!body) return;
+
+    const count = body.querySelectorAll(".kanban-card").length;
+    const countEl = columnEl.querySelector(".crm-kanban-column-count");
+    if (countEl) countEl.textContent = String(count);
+
+    const emptyEl = body.querySelector(".crm-kanban-empty");
+    if (count === 0 && !emptyEl) {
+        body.insertAdjacentHTML("beforeend", `<div class="crm-kanban-empty">Нет заказов</div>`);
+    } else if (count > 0 && emptyEl) {
+        emptyEl.remove();
+    }
+}
+
+function moveKanbanCardToColumn(card, targetColumn) {
+    const sourceColumn = card.closest(".crm-kanban-column");
+    const targetBody = targetColumn.querySelector(".crm-kanban-column-body");
+    if (!targetBody) return;
+
+    targetBody.querySelector(".crm-kanban-empty")?.remove();
+    targetBody.appendChild(card);
+
+    if (sourceColumn && sourceColumn !== targetColumn) {
+        syncKanbanColumnEmptyState(sourceColumn);
+    }
+    syncKanbanColumnEmptyState(targetColumn);
+}
+
+function bindKanbanCardDrag(board) {
+    if (!board || !isKanbanAvailable()) return;
+
+    board.querySelectorAll(".kanban-card").forEach(card => {
+        let dragMoved = false;
+
+        card.draggable = true;
+        card.addEventListener("dragstart", (event) => {
+            resetKanbanDragState();
+            kanbanDragState.type = "card";
+            kanbanDragState.card = card;
+            kanbanDragState.dealId = card.dataset.dealId;
+            kanbanDragState.sourceColumnKey = card.closest(".crm-kanban-column")?.dataset.statusKey || null;
+            dragMoved = false;
+
+            card.classList.add("is-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("application/x-kanban-card", kanbanDragState.dealId || "");
+        });
+
+        card.addEventListener("drag", () => {
+            dragMoved = true;
+        });
+
+        card.addEventListener("dragend", () => {
+            card.classList.remove("is-dragging");
+            board.querySelectorAll(".crm-kanban-column").forEach(col => col.classList.remove("card-drop-target"));
+            resetKanbanDragState();
+        });
+
+        card.addEventListener("click", (event) => {
+            if (dragMoved) {
+                event.preventDefault();
+                event.stopPropagation();
+                dragMoved = false;
+                return;
+            }
+
+            const dealId = Number(card.dataset.dealId);
+            if (Number.isFinite(dealId)) openDealInTab(dealId);
+        });
+
+        card.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                const dealId = Number(card.dataset.dealId);
+                if (Number.isFinite(dealId)) openDealInTab(dealId);
+            }
+        });
+    });
+
+    board.querySelectorAll(".crm-kanban-column-body").forEach(body => {
+        body.addEventListener("dragover", (event) => {
+            if (kanbanDragState.type !== "card" || !kanbanDragState.card) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            body.closest(".crm-kanban-column")?.classList.add("card-drop-target");
+        });
+
+        body.addEventListener("dragleave", (event) => {
+            const column = body.closest(".crm-kanban-column");
+            if (column && !column.contains(event.relatedTarget)) {
+                column.classList.remove("card-drop-target");
+            }
+        });
+
+        body.addEventListener("drop", async (event) => {
+            if (kanbanDragState.type !== "card") return;
+            event.preventDefault();
+            event.stopPropagation();
+
+            const targetColumn = body.closest(".crm-kanban-column");
+            targetColumn?.classList.remove("card-drop-target");
+
+            const card = kanbanDragState.card;
+            const dealId = kanbanDragState.dealId;
+            const sourceColumnKey = kanbanDragState.sourceColumnKey;
+            if (!card || !dealId || !targetColumn) return;
+
+            const targetColumnKey = targetColumn.dataset.statusKey;
+            if (!targetColumnKey || targetColumnKey === sourceColumnKey) return;
+
+            const status = resolveKanbanColumnStatus(targetColumn);
+            if (!status?.id) {
+                alert("Не удалось определить статус для этой колонки");
+                return;
+            }
+
+            const sourceColumn = card.closest(".crm-kanban-column");
+            moveKanbanCardToColumn(card, targetColumn);
+            card.classList.add("is-updating");
+
+            const ok = await updateDealStatusById(dealId, status);
+            card.classList.remove("is-updating");
+
+            if (!ok && sourceColumn) {
+                moveKanbanCardToColumn(card, sourceColumn);
+            }
         });
     });
 }
@@ -1132,19 +1379,7 @@ function renderKanbanCard(deal, index) {
 }
 
 function bindKanbanBoardEvents(board) {
-    board.querySelectorAll(".kanban-card").forEach(card => {
-        const dealId = Number(card.dataset.dealId);
-        if (!Number.isFinite(dealId)) return;
-
-        const open = () => openDealInTab(dealId);
-        card.addEventListener("click", open);
-        card.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                open();
-            }
-        });
-    });
+    bindKanbanCardDrag(board);
 }
 
 function renderDealsKanban(deals, targetDiv) {
@@ -1159,6 +1394,7 @@ function renderDealsKanban(deals, targetDiv) {
         const columnEl = document.createElement("section");
         columnEl.className = "crm-kanban-column";
         columnEl.dataset.statusKey = col.key;
+        if (col.id != null) columnEl.dataset.statusId = String(col.id);
 
         const cardsHtml = col.deals.map((deal, idx) => renderKanbanCard(deal, idx)).join("");
         const emptyHtml = col.deals.length
