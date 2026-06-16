@@ -607,6 +607,113 @@
     .deal-contact-popover a:hover { text-decoration:underline; }
     .deal-confirm-popover button { margin:0; width:auto; padding:6px 12px; font-size:12px; border-radius:6px; }
     .crm-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid #f0f0f0; }
+    .add-btn-container { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; text-align: left; }
+    .crm-list-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .crm-list-header-main { flex: 1 1 auto; min-width: 0; }
+    .crm-list-header-meta { display: none; }
+    .crm-list-header-status { flex: 0 0 auto; }
+    .client-name--mobile { display: block; }
+    .deal-footer-meta--mobile { display: block; }
+
+    @media (min-width: 601px) {
+        .crm-item--list {
+            padding: 8px 12px;
+            margin-top: 8px;
+        }
+        .crm-item--list .crm-list-header {
+            align-items: center;
+            margin-bottom: 4px;
+            gap: 10px;
+        }
+        .crm-item--list .crm-list-header-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            flex-wrap: nowrap;
+        }
+        .crm-item--list .deal-num {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            font-weight: bold;
+            font-size: 14px;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        .crm-item--list .deal-num-btn {
+            font-size: 14px;
+        }
+        .crm-item--list .crm-list-header-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1 1 auto;
+            font-size: 12px;
+            line-height: 1.2;
+            color: #666;
+            overflow: hidden;
+        }
+        .crm-item--list .crm-list-client {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #444;
+        }
+        .crm-item--list .crm-list-date,
+        .crm-item--list .crm-list-manager {
+            flex: 0 0 auto;
+            white-space: nowrap;
+            color: #777;
+        }
+        .crm-item--list .client-name--mobile,
+        .crm-item--list .deal-footer-meta--mobile {
+            display: none;
+        }
+        .crm-item--list .elements-list {
+            padding: 4px 8px;
+            margin-top: 2px;
+        }
+        .crm-item--list .element-row {
+            padding: 3px 0;
+            gap: 5px;
+            border-bottom: none;
+        }
+        .crm-item--list .element-row + .element-row {
+            border-top: 1px solid #eee;
+        }
+        .crm-item--list .element-row-text,
+        .crm-item--list .element-row-total {
+            font-size: 11px !important;
+            line-height: 1.15;
+        }
+        .crm-item--list .item-status-control {
+            max-width: 120px;
+            padding: 2px 6px;
+            font-size: 11px;
+        }
+        .crm-item--list .add-btn-container {
+            margin-top: 4px;
+            padding-top: 0;
+            border-top: none;
+        }
+        .crm-item--list .add-btn {
+            padding: 2px 8px;
+            font-size: 11px;
+        }
+        .crm-item--list .crm-list-footer {
+            margin-top: 4px;
+            padding-top: 0;
+            border-top: none;
+        }
+        .crm-item--list .deal-total-only {
+            font-size: 11px;
+        }
+    }
     .payment-actions { display:flex; gap:5px; justify-content:center; }
     .payment-action-btn { margin:0; width:21px; height:21px; min-width:21px; padding:0; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; border:0; box-shadow:0 2px 6px rgba(0,0,0,0.12); }
     .payment-action-icon { width:12px; height:12px; border-radius:3px; display:inline-flex; align-items:center; justify-content:center; font-size:16px; line-height:10px; font-weight:bold; }

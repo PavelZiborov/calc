@@ -2057,6 +2057,45 @@ function renderDealFooterMeta(deal) {
         </div>`;
 }
 
+function renderDealListSearchHeader(deal, dealLink, dealActionButtons, statusControl) {
+    const client = escapeHtml(deal.client?.name || deal.client_name || "Клиент не указан");
+    const date = formatDealCreatedDate(getDealCreatedAt(deal));
+    const manager = escapeHtml(getDealResponsibleName(deal));
+
+    return `
+        <div class="crm-header crm-list-header">
+            <div class="crm-list-header-main">
+                <div class="deal-num">${dealLink}${dealActionButtons}</div>
+                <div class="crm-list-header-meta">
+                    <span class="crm-list-client">👤 ${client}</span>
+                    ${date ? `<span class="crm-list-date">${escapeHtml(date)}</span>` : ""}
+                    <span class="crm-list-manager">${manager}</span>
+                </div>
+            </div>
+            <div class="crm-list-header-status">${statusControl}</div>
+        </div>
+        <div class="client-name client-name--mobile">👤 ${client}</div>`;
+}
+
+function renderDealListSearchFooter(deal, isClosed, isDetailMode) {
+    const date = formatDealCreatedDate(getDealCreatedAt(deal));
+    const manager = escapeHtml(getDealResponsibleName(deal));
+
+    return `
+        <div class="crm-footer crm-list-footer">
+            <div class="deal-footer-left">
+                <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
+                    <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                </div>
+                <div class="deal-footer-meta deal-footer-meta--mobile">
+                    ${date ? `<div>Дата заказа: <b>${escapeHtml(date)}</b></div>` : ""}
+                    <div>Менеджер: <b>${manager}</b></div>
+                </div>
+            </div>
+            ${isDetailMode ? renderPaymentSummary(deal, isClosed) : renderDealTotalOnly(deal)}
+        </div>`;
+}
+
 function sumDealElementsTotal(deal) {
     if (!Array.isArray(deal?.elements)) return 0;
     return deal.elements.reduce((sum, element) => sum + getElementLineTotal(element), 0);
@@ -2613,7 +2652,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
         dealsCache.set(String(deal.id), deal);
 
         const card = document.createElement('div');
-        card.className = 'crm-item';
+        card.className = isDetailMode ? 'crm-item' : 'crm-item crm-item--list';
         card.id = `deal-${deal.id}`;
 
         // 1. Получаем статус основной сделки
@@ -2665,24 +2704,19 @@ function renderDealsList(deals, targetDiv, options = {}) {
                 <div class="deal-header-side">
                     ${statusControl}
                 </div>
-            </div>` : `
-            <div class="crm-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                <div class="deal-num" style="font-weight: bold; font-size: 16px;">
-                    ${dealLink}
-                    ${dealActionButtons}
-                </div>
-                ${statusControl}
-            </div>`;
+            </div>` : renderDealListSearchHeader(deal, dealLink, dealActionButtons, statusControl);
 
-        card.innerHTML = `
+        const addBtnHtml = (currentUser.role === 'staff' && !isClosed) ? `
+                <div class="add-btn-container">
+                    <button class="add-btn" onclick="addToDeal(${deal.id}, this)">+ Добавить расчет</button>
+                </div>` : '';
+
+        card.innerHTML = isDetailMode ? `
             ${dealHeaderHtml}
             <div class="client-name">👤 ${escapeHtml(deal.client?.name || deal.client_name || 'Клиент не указан')}</div>
             <div class="elements-list">
                 <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
-                ${(currentUser.role === 'staff' && !isClosed) ? `
-                <div class="add-btn-container" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; text-align: left;">
-                    <button class="add-btn" onclick="addToDeal(${deal.id}, this)">+ Добавить расчет</button>
-                </div>` : ''}
+                ${addBtnHtml}
             </div>
             <div class="crm-footer">
                 <div class="deal-footer-left">
@@ -2691,8 +2725,14 @@ function renderDealsList(deals, targetDiv, options = {}) {
                     </div>
                     ${renderDealFooterMeta(deal)}
                 </div>
-                ${isDetailMode ? renderPaymentSummary(deal, isClosed) : renderDealTotalOnly(deal)}
-            </div>`;
+                ${renderPaymentSummary(deal, isClosed)}
+            </div>` : `
+            ${dealHeaderHtml}
+            <div class="elements-list">
+                <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
+                ${addBtnHtml}
+            </div>
+            ${renderDealListSearchFooter(deal, isClosed, false)}`;
             
         targetDiv.appendChild(card);
 
