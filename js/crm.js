@@ -81,9 +81,11 @@ async function searchCRM(mode) {
         deals = deals.filter(isValidDeal);
 
         if (!deals || deals.length === 0 || !deals[0]) {
+            crmSearchCache[mode] = [];
             resDiv.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>Список заказов пуст</p>";
         } else {
-            renderDealsList(deals, resDiv);
+            crmSearchCache[mode] = deals;
+            renderDealsResults(deals, resDiv);
         }
 
     } catch (e) {
@@ -845,6 +847,199 @@ function getDealResponsibleName(deal) {
     return deal?.responsible?.name || deal?.employee_name || "—";
 }
 
+const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
+const crmSearchCache = { main: null, adv: null };
+
+function getCrmViewMode() {
+    return localStorage.getItem(CRM_VIEW_STORAGE_KEY) === "kanban" ? "kanban" : "list";
+}
+
+function syncCrmViewToggleButtons() {
+    const mode = getCrmViewMode();
+    document.querySelectorAll(".crm-view-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.view === mode);
+    });
+}
+
+function applyCrmViewLayoutClass() {
+    const isKanban = getCrmViewMode() === "kanban";
+    document.getElementById("crm-search-container")?.classList.toggle("crm-kanban-layout", isKanban);
+    document.getElementById("search-tab")?.querySelector(".container")?.classList.toggle("crm-kanban-layout", isKanban);
+}
+
+function rerenderCrmResultsFromCache(mode) {
+    const deals = crmSearchCache[mode];
+    const resId = mode === "main" ? "crmResults" : "advCrmResults";
+    const resDiv = document.getElementById(resId);
+    if (!resDiv || !deals) return;
+
+    if (!deals.length) {
+        resDiv.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>Список заказов пуст</p>";
+        return;
+    }
+
+    renderDealsResults(deals, resDiv);
+}
+
+function toggleCrmView(mode) {
+    const nextMode = mode === "kanban" ? "kanban" : "list";
+    if (getCrmViewMode() === nextMode) return;
+
+    localStorage.setItem(CRM_VIEW_STORAGE_KEY, nextMode);
+    syncCrmViewToggleButtons();
+    applyCrmViewLayoutClass();
+    rerenderCrmResultsFromCache("main");
+    rerenderCrmResultsFromCache("adv");
+}
+
+function initCrmViewToggle() {
+    syncCrmViewToggleButtons();
+    applyCrmViewLayoutClass();
+}
+
+function resolveDealStatusColumnMeta(deal) {
+    const statusObj = (deal.status && typeof deal.status === "object") ? deal.status : {};
+    const statusName = statusObj.name
+        || (typeof deal.status === "string" ? deal.status : "")
+        || deal.status_name
+        || deal.status_text
+        || "";
+    return getStatusMeta(statusName, {
+        ...statusObj,
+        id: statusObj.id ?? statusObj.status_id ?? deal.status_id ?? deal.statusId
+    });
+}
+
+function buildKanbanColumns(deals) {
+    const columns = [];
+    const columnMap = new Map();
+
+    const ensureColumn = (col) => {
+        if (!columnMap.has(col.key)) {
+            columns.push(col);
+            columnMap.set(col.key, col);
+        }
+        return columnMap.get(col.key);
+    };
+
+    getCrmStatuses().forEach(status => {
+        ensureColumn({
+            key: String(status.id),
+            id: status.id,
+            name: status.name,
+            bk_color: status.bk_color || "#dfdfdf",
+            text_color: status.text_color || "#333",
+            deals: []
+        });
+    });
+
+    deals.forEach(deal => {
+        if (!isValidDeal(deal)) return;
+        const meta = resolveDealStatusColumnMeta(deal);
+        let col = meta.id != null ? columnMap.get(String(meta.id)) : null;
+
+        if (!col) {
+            col = columns.find(item => item.name.toLowerCase() === meta.name.toLowerCase());
+        }
+
+        if (!col) {
+            col = ensureColumn({
+                key: meta.id != null ? String(meta.id) : `_name:${meta.name.toLowerCase()}`,
+                id: meta.id,
+                name: meta.name,
+                bk_color: meta.bk_color,
+                text_color: meta.text_color,
+                deals: []
+            });
+        }
+
+        col.deals.push(deal);
+    });
+
+    return columns;
+}
+
+function renderKanbanCard(deal, index) {
+    const f = getDealFinancials(deal);
+    const amountClass = f.isPaid ? "payment-ok" : "payment-alert";
+    const client = deal.client?.name || deal.client_name || "Клиент не указан";
+    const manager = getDealResponsibleName(deal);
+    const num = deal.num || deal.id;
+
+    return `
+        <article class="kanban-card" data-deal-id="${deal.id}" style="--card-index:${index}" tabindex="0" role="button" aria-label="Открыть заказ № ${escapeHtml(num)}">
+            <div class="kanban-card-num">№ ${escapeHtml(num)}</div>
+            <div class="kanban-card-client">${escapeHtml(client)}</div>
+            <div class="kanban-card-manager">${escapeHtml(manager)}</div>
+            <div class="kanban-card-amount ${amountClass}">${formatMoney(f.total)} ₽</div>
+        </article>`;
+}
+
+function bindKanbanBoardEvents(board) {
+    board.querySelectorAll(".kanban-card").forEach(card => {
+        const dealId = Number(card.dataset.dealId);
+        if (!Number.isFinite(dealId)) return;
+
+        const open = () => openDealInTab(dealId);
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
+}
+
+function renderDealsKanban(deals, targetDiv) {
+    const validDeals = deals.filter(isValidDeal).map(deal => normalizeDealForView(deal));
+    validDeals.forEach(deal => dealsCache.set(String(deal.id), deal));
+
+    const columns = buildKanbanColumns(validDeals);
+    const board = document.createElement("div");
+    board.className = "crm-kanban-board";
+
+    columns.forEach(col => {
+        const columnEl = document.createElement("section");
+        columnEl.className = "crm-kanban-column";
+        columnEl.dataset.statusKey = col.key;
+
+        const cardsHtml = col.deals.map((deal, idx) => renderKanbanCard(deal, idx)).join("");
+        const emptyHtml = col.deals.length
+            ? ""
+            : `<div class="crm-kanban-empty">Нет заказов</div>`;
+
+        columnEl.innerHTML = `
+            <header class="crm-kanban-column-header" style="--col-bg:${col.bk_color}; --col-text:${col.text_color}">
+                <span class="crm-kanban-column-title">${escapeHtml(col.name)}</span>
+                <span class="crm-kanban-column-count">${col.deals.length}</span>
+            </header>
+            <div class="crm-kanban-column-body">
+                ${cardsHtml}${emptyHtml}
+            </div>`;
+
+        board.appendChild(columnEl);
+    });
+
+    targetDiv.innerHTML = "";
+    targetDiv.appendChild(board);
+    bindKanbanBoardEvents(board);
+    requestAnimationFrame(() => board.classList.add("is-ready"));
+}
+
+function renderDealsResults(deals, targetDiv, options = {}) {
+    if (options.detailMode) {
+        renderDealsList(deals, targetDiv, options);
+        return;
+    }
+
+    if (getCrmViewMode() === "kanban") {
+        renderDealsKanban(deals, targetDiv);
+    } else {
+        renderDealsList(deals, targetDiv, options);
+    }
+}
+
 function getDealCreatedAt(deal) {
     return deal?.created_at || deal?.createdAt || "";
 }
@@ -1517,22 +1712,36 @@ async function createDealFromDeal(sourceDealId, btn) {
         const newDeal = normalizeDealResponse(data, true);
         if (!newDeal) throw new Error("Сервер не вернул новую сделку");
 
-        const wrapper = document.createElement('div');
+        const wrapper = document.createElement("div");
         let newCard = null;
 
         if (isValidDeal(newDeal)) {
-            renderDealsList([newDeal], wrapper);
-            newCard = wrapper.firstElementChild;
+            const crmMode = btn?.closest("#search-tab") ? "adv" : "main";
+            const targetDiv = btn?.closest(".tab-content")?.querySelector("#crmResults, #advCrmResults") || document.getElementById("crmResults");
+
+            if (getCrmViewMode() === "kanban" && Array.isArray(crmSearchCache[crmMode])) {
+                crmSearchCache[crmMode].unshift(newDeal);
+                renderDealsResults(crmSearchCache[crmMode], targetDiv);
+                targetDiv.querySelector(".kanban-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            } else {
+                renderDealsList([newDeal], wrapper);
+                newCard = wrapper.firstElementChild;
+                if (newCard && targetDiv) {
+                    newCard.style.borderColor = "#b8d7ff";
+                    newCard.style.background = "#f8fbff";
+                    targetDiv.prepend(newCard);
+                    newCard.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            }
         } else if (newDeal.id) {
             newCard = createDealCardById(newDeal.id);
-        }
-
-        if (newCard) {
-            newCard.style.borderColor = "#b8d7ff";
-            newCard.style.background = "#f8fbff";
-            const targetDiv = btn?.closest('.tab-content')?.querySelector('#crmResults, #advCrmResults') || document.getElementById('crmResults');
-            targetDiv.prepend(newCard);
-            newCard.scrollIntoView({ behavior: "smooth", block: "start" });
+            const targetDiv = btn?.closest(".tab-content")?.querySelector("#crmResults, #advCrmResults") || document.getElementById("crmResults");
+            if (newCard && targetDiv) {
+                newCard.style.borderColor = "#b8d7ff";
+                newCard.style.background = "#f8fbff";
+                targetDiv.prepend(newCard);
+                newCard.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
         }
     } catch (e) {
         alert("Не удалось создать новую сделку");

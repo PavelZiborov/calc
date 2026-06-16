@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
 <title>Heaven Calc Pro</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -148,6 +149,12 @@
             <button onclick="clearMainSearch()" style="background:#2f7df6;" title="Очистить поиск" aria-label="Очистить поиск">🔄</button>
         </div>
         <div id="crmLoader" class="loader">Синхронизация с сервером...</div>
+        <div class="crm-results-toolbar">
+            <div class="crm-view-toggle" role="group" aria-label="Вид списка заказов">
+                <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список">☰</button>
+                <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска">▦</button>
+            </div>
+        </div>
         <div id="crmResults"></div>
     </div>
 </div>
@@ -199,6 +206,12 @@
             <button onclick="searchCRM('adv')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
         </div>
         <div id="advCrmLoader" class="loader">Поиск по архиву...</div>
+        <div class="crm-results-toolbar">
+            <div class="crm-view-toggle" role="group" aria-label="Вид списка заказов">
+                <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список">☰</button>
+                <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска">▦</button>
+            </div>
+        </div>
         <div id="advCrmResults" class="readonly-mode"></div>
     </div>
 </div>
