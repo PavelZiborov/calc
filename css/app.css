@@ -876,9 +876,43 @@
             font-size: 15px;
         }
         #adv-search-container .adv-search-input {
-            height: 32px;
-            font-size: 13px;
-            padding: 5px 8px;
+            height: 36px;
+            font-size: 16px;
+            padding: 6px 8px;
+        }
+        .adv-search-header {
+            position: relative;
+        }
+        .adv-filters-popover-wrap {
+            position: static;
+        }
+        .adv-filters-popover {
+            left: 0;
+            right: 0;
+            width: auto;
+            max-width: none;
+            top: calc(100% + 6px);
+        }
+        .adv-filters-popover .status-dropdown-btn,
+        .adv-filters-popover .date-range-btn,
+        .adv-filters-popover .status-option,
+        .adv-filters-popover .status-option-name,
+        .adv-filters-popover .calendar-day,
+        .adv-filters-popover .calendar-month-select,
+        .adv-filters-popover .calendar-year-select {
+            font-size: 14px;
+        }
+        .adv-filters-popover label.status-option {
+            margin-top: 0;
+            font-weight: normal;
+        }
+        .adv-filters-popover .adv-filters-reset-btn,
+        .adv-filters-popover .adv-filters-apply-btn {
+            font-size: 14px;
+        }
+        #advFiltersPopover .status-dropdown-list .status-option,
+        #advFiltersPopover .status-dropdown-list .status-option-name {
+            font-size: 14px;
         }
         #adv-search-container .crm-view-btn {
             width: 26px;
@@ -1113,6 +1147,21 @@
         margin-top: 0;
         height: 38px;
         min-height: 38px;
+        font-size: 14px;
+    }
+    .adv-filters-popover .status-option,
+    .adv-filters-popover label.status-option {
+        font-size: 14px;
+        font-weight: normal;
+        margin-top: 0;
+    }
+    .adv-filters-popover .status-option-name {
+        font-size: 14px;
+    }
+    .adv-filters-popover .calendar-day,
+    .adv-filters-popover .calendar-month-select,
+    .adv-filters-popover .calendar-year-select {
+        font-size: 14px;
     }
     #adv-search-container .clear-filters-btn {
         background: #eef1f5;
