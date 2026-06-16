@@ -68,7 +68,8 @@ function normalizePreview(raw) {
     return {
         id: raw.id ?? raw.file_id ?? null,
         url,
-        thumbUrl
+        thumbUrl,
+        diskFileName: raw.diskFileName || raw.disk_file_name || null
     };
 }
 
@@ -620,9 +621,9 @@ function renderEditorProgressBlock(label, progress = null) {
     </div>`;
 }
 
-function setPreviewEditorProgress(label, progress = null) {
+function setPreviewEditorProgress(label, progress = null, meta = {}) {
     elementEditorUploadState = {
-        type: "preview",
+        type: meta.type || "preview",
         label,
         progress
     };
@@ -635,9 +636,14 @@ function setLayoutUploadProgress(label, progress = null, meta = {}) {
         label,
         progress,
         fileIndex: meta.fileIndex,
-        fileTotal: meta.fileTotal
+        fileTotal: meta.fileTotal,
+        layoutId: meta.layoutId
     };
     renderElementEditorAssets();
+}
+
+function isElementEditorAssetBusy() {
+    return elementEditorUploadState != null;
 }
 
 function clearElementEditorUploadState() {
@@ -1097,7 +1103,7 @@ async function loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPre
             elementAssetsCache.set(key, {
                 ...prev,
                 status: "ready",
-                preview: assets.preview,
+                preview: normalizePreview(assets.preview),
                 layouts: prev.layouts || [],
                 layoutsLoaded: prev.layoutsLoaded === true,
                 layoutsLoading: prev.layoutsLoading === true
@@ -1280,7 +1286,7 @@ function canEditElementAssets() {
 }
 
 function getElementEditorModal() {
-    const MODAL_VERSION = "5";
+    const MODAL_VERSION = "6";
     let modal = document.getElementById("element-editor-modal");
     if (modal && modal.dataset.version !== MODAL_VERSION) {
         modal.remove();
@@ -1291,7 +1297,7 @@ function getElementEditorModal() {
     modal = document.createElement("div");
     modal.id = "element-editor-modal";
     modal.className = "element-editor-backdrop";
-    modal.dataset.version = "5";
+    modal.dataset.version = "6";
     modal.style.display = "none";
     modal.innerHTML = `
         <div class="element-editor-modal" onclick="event.stopPropagation()">
@@ -1367,8 +1373,10 @@ function getElementEditorModal() {
                     </div>
                 </div>
                 <div class="element-editor-section-title">Макеты</div>
-                <div id="elementEditorLayoutsWrap" class="element-editor-layouts-wrap element-editor-drop-target">
-                    <div id="elementEditorLayouts" class="element-editor-layouts"></div>
+                <div id="elementEditorLayouts" class="element-editor-layouts"></div>
+                <div id="elementEditorLayoutDropZone" class="element-editor-layout-drop-zone element-editor-drop-target staff-only-fields">
+                    <span class="element-editor-layout-drop-title">Перетащите файлы макетов сюда</span>
+                    <span class="element-editor-layout-drop-hint">или нажмите, чтобы выбрать на компьютере</span>
                 </div>
                 <div class="element-editor-layout-add staff-only-fields">
                     <input id="elementEditorLinkInput" type="url" placeholder="Ссылка на макет" class="element-editor-input">
@@ -1427,8 +1435,14 @@ function bindElementEditorEvents(modal) {
     bindElementEditorDropZone(modal.querySelector("#elementEditorPreviewDrop"), (files) => {
         uploadPreviewFiles(files);
     });
-    bindElementEditorDropZone(modal.querySelector("#elementEditorLayoutsWrap"), (files) => {
+    const layoutDropZone = modal.querySelector("#elementEditorLayoutDropZone");
+    bindElementEditorDropZone(layoutDropZone, (files) => {
         uploadLayoutFiles(files);
+    });
+    layoutDropZone?.addEventListener("click", (event) => {
+        if (!canEditElementAssets() || isElementEditorAssetBusy()) return;
+        if (event.target.closest("a, button, input, label")) return;
+        modal.querySelector("#elementEditorLayoutFile")?.click();
     });
     modal.querySelector("#elementEditorSave")?.addEventListener("click", saveElementEditor);
     modal.querySelector("#elementEditorResponsiblesBtn")?.addEventListener("click", (event) => {
@@ -1575,14 +1589,16 @@ function renderElementEditorAssets() {
     const layoutsEl = document.getElementById("elementEditorLayouts");
     const isStaff = currentUser.role === "staff" && !currentElementEditor.isLocked;
     const uploadState = elementEditorUploadState;
-    const previewUploading = uploadState?.type === "preview";
-    const layoutUploading = uploadState?.type === "layout" || uploadState?.type === "link";
+    const previewBusy = uploadState?.type === "preview" || uploadState?.type === "preview-delete";
+    const layoutBusy = uploadState?.type === "layout"
+        || uploadState?.type === "link"
+        || uploadState?.type === "layout-delete";
 
     if (!previewEl || !layoutsEl) return;
 
     const previewReady = !!(cached.preview?.url || cached.preview?.thumbUrl);
     const layoutsLoading = cached.layoutsLoading === true;
-    const showPreviewLoading = cached.status === "loading" && !previewReady && !previewUploading;
+    const showPreviewLoading = cached.status === "loading" && !previewReady && !previewBusy;
 
     if (showPreviewLoading) {
         previewEl.innerHTML = renderEditorProgressBlock("Загрузка превью…");
@@ -1590,14 +1606,17 @@ function renderElementEditorAssets() {
     } else if (previewReady) {
         previewEl.innerHTML = "";
         setPreviewImgContent(previewEl, cached.preview, "Превью");
-        if (deleteBtn) deleteBtn.style.display = isStaff ? "inline-flex" : "none";
+        if (deleteBtn) {
+            deleteBtn.style.display = isStaff ? "inline-flex" : "none";
+            deleteBtn.disabled = previewBusy;
+        }
     } else {
         previewEl.innerHTML = `<span class="element-editor-preview-placeholder">нет превью</span>`;
         if (deleteBtn) deleteBtn.style.display = "none";
     }
 
     if (previewOverlay) {
-        if (previewUploading) {
+        if (previewBusy) {
             previewOverlay.hidden = false;
             previewOverlay.innerHTML = renderEditorProgressBlock(uploadState.label, uploadState.progress);
         } else {
@@ -1608,31 +1627,35 @@ function renderElementEditorAssets() {
 
     let layoutsHtml = "";
 
-    if (layoutsLoading && !cached.layouts?.length && !layoutUploading) {
+    if (layoutsLoading && !cached.layouts?.length && !layoutBusy) {
         layoutsHtml = renderEditorProgressBlock("Загрузка макетов…");
-    } else if (showPreviewLoading && !layoutsLoading && !cached.layouts?.length && !layoutUploading) {
+    } else if (showPreviewLoading && !layoutsLoading && !cached.layouts?.length && !layoutBusy) {
         layoutsHtml = renderEditorProgressBlock("Загрузка макетов…");
     } else {
         if (cached.layouts?.length) {
             layoutsHtml = cached.layouts.map(layout => {
                 const size = layout.size ? `<span class="element-layout-size">${escapeHtml(formatFileSize(layout.size))}</span>` : "";
                 const icon = layout.type === "link" ? "🔗" : "📄";
+                const isDeleting = layoutBusy
+                    && uploadState?.type === "layout-delete"
+                    && String(uploadState.layoutId) === String(layout.id);
                 const deleteBtnHtml = isStaff && layout.type === "file" && layoutIsDeletable(layout)
-                    ? `<button type="button" class="element-layout-del" data-layout-id="${escapeHtml(layout.id)}" title="Удалить">×</button>`
+                    ? `<button type="button" class="element-layout-del" data-layout-id="${escapeHtml(layout.id)}" title="Удалить"${layoutBusy ? " disabled" : ""}>×</button>`
                     : "";
 
                 return `
-                    <div class="element-layout-item">
+                    <div class="element-layout-item${isDeleting ? " is-deleting" : ""}">
                         <a href="${escapeHtml(layout.url)}" target="_blank" rel="noopener" class="element-layout-link">${icon} ${escapeHtml(layout.name)}</a>
                         ${size}
                         ${deleteBtnHtml}
+                        ${isDeleting ? `<div class="element-layout-item-progress">${renderEditorProgressBlock(uploadState.label, uploadState.progress)}</div>` : ""}
                     </div>`;
             }).join("");
-        } else if (!layoutUploading) {
+        } else if (!layoutBusy) {
             layoutsHtml = `<div class="element-editor-layout-empty">макетов пока нет</div>`;
         }
 
-        if (layoutUploading) {
+        if (layoutBusy && uploadState?.type !== "layout-delete") {
             layoutsHtml += `<div class="element-layout-upload-item">${renderEditorProgressBlock(uploadState.label, uploadState.progress)}</div>`;
         }
     }
@@ -1688,10 +1711,14 @@ async function uploadSinglePreviewFile(file) {
     const assets = normalizeAssetsResponse(data);
     const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
     const prev = elementAssetsCache.get(key) || { layouts: [] };
+    const preview = normalizePreview(assets.preview) || normalizePreview(prev.preview);
+    if (preview && prep.diskFileName) {
+        preview.diskFileName = prep.diskFileName;
+    }
     elementAssetsCache.set(key, {
         ...prev,
         status: "ready",
-        preview: assets.preview || prev.preview,
+        preview,
         layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
         layoutsLoaded: prev.layoutsLoaded === true,
         layoutsLoading: false
@@ -1844,7 +1871,7 @@ async function handleLayoutFileUpload(event) {
 }
 
 async function handlePreviewDelete() {
-    if (!canEditElementAssets()) return;
+    if (!canEditElementAssets() || isElementEditorAssetBusy()) return;
 
     const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
     const cached = elementAssetsCache.get(key);
@@ -1852,14 +1879,20 @@ async function handlePreviewDelete() {
 
     if (!confirm("Удалить превью?")) return;
 
+    const payload = buildElementAssetsPayload(
+        currentElementEditor.dealId,
+        currentElementEditor.elementId,
+        currentElementEditor.dealNum
+    );
+    if (cached.preview.diskFileName) {
+        payload.diskFileName = cached.preview.diskFileName;
+    }
+
+    setPreviewEditorProgress("Удаление превью…", null, { type: "preview-delete" });
+
     try {
-        await elementAssetsApi("deleteElementPreview", {
-            ...buildElementAssetsPayload(
-                currentElementEditor.dealId,
-                currentElementEditor.elementId,
-                currentElementEditor.dealNum
-            ),
-            previewId: cached.preview.id
+        await elementAssetsApi("deleteElementPreview", payload, {
+            timeoutMs: DELETE_ASSETS_TIMEOUT_MS
         });
 
         elementAssetsCache.set(key, {
@@ -1871,9 +1904,15 @@ async function handlePreviewDelete() {
             layoutsLoading: false
         });
         updateElementThumb(currentElementEditor.dealId, currentElementEditor.elementId);
-        renderElementEditorAssets();
     } catch (e) {
-        alert("Не удалось удалить превью");
+        console.warn("deleteElementPreview", e);
+        const detail = String(e?.message || "").trim();
+        alert(detail.includes("abort") || detail.includes("Abort")
+            ? "Удаление превью заняло слишком много времени. Попробуйте ещё раз."
+            : (detail || "Не удалось удалить превью"));
+    } finally {
+        clearElementEditorUploadState();
+        renderElementEditorAssets();
     }
 }
 
@@ -1921,7 +1960,7 @@ async function handleLayoutLinkAdd() {
 }
 
 async function handleLayoutDelete(layoutId) {
-    if (!canEditElementAssets() || !layoutId) return;
+    if (!canEditElementAssets() || !layoutId || isElementEditorAssetBusy()) return;
     if (!confirm("Удалить макет?")) return;
 
     const numericLayoutId = Number(layoutId);
@@ -1929,6 +1968,11 @@ async function handleLayoutDelete(layoutId) {
         alert("Не удалось определить ID макета в CRM");
         return;
     }
+
+    setLayoutUploadProgress("Удаление макета…", null, {
+        type: "layout-delete",
+        layoutId: numericLayoutId
+    });
 
     try {
         const data = await elementAssetsApi("deleteElementLayout", {
@@ -1938,7 +1982,7 @@ async function handleLayoutDelete(layoutId) {
                 currentElementEditor.dealNum
             ),
             layoutId: numericLayoutId
-        });
+        }, { timeoutMs: DELETE_ASSETS_TIMEOUT_MS });
 
         let assets = normalizeAssetsResponse(data);
         if (!assets.layouts?.length) {
@@ -1960,12 +2004,15 @@ async function handleLayoutDelete(layoutId) {
             layoutsLoaded: true,
             layoutsLoading: false
         });
-
-        renderElementEditorAssets();
     } catch (e) {
         console.warn("deleteElementLayout", e);
         const detail = String(e?.message || "").trim();
-        alert(detail || "Не удалось удалить макет");
+        alert(detail.includes("abort") || detail.includes("Abort")
+            ? "Удаление макета заняло слишком много времени. Попробуйте ещё раз."
+            : (detail || "Не удалось удалить макет"));
+    } finally {
+        clearElementEditorUploadState();
+        renderElementEditorAssets();
     }
 }
 

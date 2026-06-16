@@ -3,6 +3,7 @@ const SRA3_W = 320, SRA3_H = 450;
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
+const DELETE_ASSETS_TIMEOUT_MS = 45000;
 const SERVER_UNAVAILABLE_MESSAGE = "Сервер не отвечает, попробуйте позднее";
 function fetchWithTimeout(url, options = {}, timeoutMs = SERVER_TIMEOUT_MS) {
     const controller = new AbortController();

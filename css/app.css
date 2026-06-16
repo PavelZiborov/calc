@@ -326,10 +326,42 @@
         min-height: 48px;
         border-radius: 8px;
     }
-    .element-editor-layouts-wrap.drop-active {
-        outline: 2px dashed #2f7df6;
-        outline-offset: 2px;
-        background: rgba(47, 125, 246, 0.05);
+    .element-editor-layout-drop-zone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 8px;
+        padding: 14px 12px;
+        border: 1.5px dashed rgba(47, 125, 246, 0.32);
+        border-radius: 8px;
+        background: rgba(47, 125, 246, 0.035);
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.35;
+        text-align: center;
+        cursor: pointer;
+        box-sizing: border-box;
+    }
+    .element-editor-layout-drop-title {
+        color: #475569;
+        font-weight: 600;
+    }
+    .element-editor-layout-drop-hint {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+    .element-editor-layout-drop-zone.drop-active {
+        border-color: #2f7df6;
+        background: rgba(47, 125, 246, 0.1);
+    }
+    .element-editor-layout-drop-zone.drop-active .element-editor-layout-drop-title,
+    .element-editor-layout-drop-zone.drop-active .element-editor-layout-drop-hint {
+        color: #2f7df6;
+    }
+    .element-editor-layout-drop-zone::after {
+        display: none;
     }
     .element-layout-upload-item {
         margin-top: 6px;
@@ -337,6 +369,17 @@
         background: #f8fafc;
         border-radius: 6px;
         border: 1px dashed #ccd5e0;
+    }
+    .element-layout-item.is-deleting {
+        opacity: 0.72;
+    }
+    .element-layout-item-progress {
+        flex: 1 1 100%;
+        width: 100%;
+        margin-top: 6px;
+    }
+    .element-layout-item-progress .element-editor-progress {
+        padding: 4px 0 0;
     }
     .element-editor-preview {
         width: 100%;
