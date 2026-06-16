@@ -4,6 +4,7 @@ const elementAssetsCache = new Map();
 const dealLayoutsPrefetchToken = new Map();
 const dealElementFieldsPrefetchToken = new Map();
 let currentElementEditor = null;
+let elementEditorUploadState = null;
 
 const ELEMENT_FIELD_COST_HQ = 1057;
 const ELEMENT_FIELD_SRA3 = 1066;
@@ -620,15 +621,66 @@ function renderEditorProgressBlock(label, progress = null) {
 }
 
 function setPreviewEditorProgress(label, progress = null) {
-    const previewEl = document.getElementById("elementEditorPreview");
-    if (!previewEl) return;
-    previewEl.innerHTML = renderEditorProgressBlock(label, progress);
+    elementEditorUploadState = {
+        type: "preview",
+        label,
+        progress
+    };
+    renderElementEditorAssets();
 }
 
-function setLayoutsEditorProgress(label, progress = null) {
-    const layoutsEl = document.getElementById("elementEditorLayouts");
-    if (!layoutsEl) return;
-    layoutsEl.innerHTML = renderEditorProgressBlock(label, progress);
+function setLayoutUploadProgress(label, progress = null, meta = {}) {
+    elementEditorUploadState = {
+        type: meta.type || "layout",
+        label,
+        progress,
+        fileIndex: meta.fileIndex,
+        fileTotal: meta.fileTotal
+    };
+    renderElementEditorAssets();
+}
+
+function clearElementEditorUploadState() {
+    elementEditorUploadState = null;
+    renderElementEditorAssets();
+}
+
+function getDropZoneFiles(dataTransfer) {
+    if (!dataTransfer?.files?.length) return [];
+    return [...dataTransfer.files].filter(file => file && file.size > 0);
+}
+
+function bindElementEditorDropZone(element, onFiles) {
+    if (!element || typeof onFiles !== "function") return;
+
+    element.addEventListener("dragenter", (event) => {
+        if (!canEditElementAssets()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        element.classList.add("drop-active");
+    });
+
+    element.addEventListener("dragover", (event) => {
+        if (!canEditElementAssets()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        element.classList.add("drop-active");
+    });
+
+    element.addEventListener("dragleave", (event) => {
+        if (!element.contains(event.relatedTarget)) {
+            element.classList.remove("drop-active");
+        }
+    });
+
+    element.addEventListener("drop", (event) => {
+        if (!canEditElementAssets()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        element.classList.remove("drop-active");
+        const files = getDropZoneFiles(event.dataTransfer);
+        if (files.length) onFiles(files);
+    });
 }
 
 function buildElementAssetsPayload(dealId, elementId, dealNum) {
@@ -1228,7 +1280,7 @@ function canEditElementAssets() {
 }
 
 function getElementEditorModal() {
-    const MODAL_VERSION = "4";
+    const MODAL_VERSION = "5";
     let modal = document.getElementById("element-editor-modal");
     if (modal && modal.dataset.version !== MODAL_VERSION) {
         modal.remove();
@@ -1239,7 +1291,7 @@ function getElementEditorModal() {
     modal = document.createElement("div");
     modal.id = "element-editor-modal";
     modal.className = "element-editor-backdrop";
-    modal.dataset.version = "4";
+    modal.dataset.version = "5";
     modal.style.display = "none";
     modal.innerHTML = `
         <div class="element-editor-modal" onclick="event.stopPropagation()">
@@ -1300,27 +1352,30 @@ function getElementEditorModal() {
                     </div>
                 </div>
                 <div class="element-editor-preview-wrap">
-                    <div class="element-editor-preview-box">
+                    <div class="element-editor-preview-box element-editor-drop-target" id="elementEditorPreviewDrop">
                         <div id="elementEditorPreview" class="element-editor-preview">
                             <span class="element-editor-preview-placeholder">нет превью</span>
                         </div>
+                        <div id="elementEditorPreviewUploadOverlay" class="element-editor-preview-upload-overlay" hidden></div>
                         <div class="element-editor-preview-actions staff-only-fields">
                             <label class="element-editor-mini-btn" title="Загрузить превью">
                                 📷
-                                <input id="elementEditorPreviewFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+                                <input id="elementEditorPreviewFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
                             </label>
                             <button type="button" id="elementEditorPreviewDelete" class="element-editor-mini-btn danger" title="Удалить превью" style="display:none;">×</button>
                         </div>
                     </div>
                 </div>
                 <div class="element-editor-section-title">Макеты</div>
-                <div id="elementEditorLayouts" class="element-editor-layouts"></div>
+                <div id="elementEditorLayoutsWrap" class="element-editor-layouts-wrap element-editor-drop-target">
+                    <div id="elementEditorLayouts" class="element-editor-layouts"></div>
+                </div>
                 <div class="element-editor-layout-add staff-only-fields">
                     <input id="elementEditorLinkInput" type="url" placeholder="Ссылка на макет" class="element-editor-input">
                     <button type="button" id="elementEditorAddLink" class="element-editor-mini-btn primary" title="Добавить ссылку">+</button>
-                    <label class="element-editor-mini-btn" title="Загрузить файл">
+                    <label class="element-editor-mini-btn" title="Загрузить файлы">
                         📎
-                        <input id="elementEditorLayoutFile" type="file" hidden>
+                        <input id="elementEditorLayoutFile" type="file" multiple hidden>
                     </label>
                 </div>
             </div>
@@ -1369,6 +1424,12 @@ function bindElementEditorEvents(modal) {
     modal.querySelector("#elementEditorPreviewDelete")?.addEventListener("click", handlePreviewDelete);
     modal.querySelector("#elementEditorAddLink")?.addEventListener("click", handleLayoutLinkAdd);
     modal.querySelector("#elementEditorLayoutFile")?.addEventListener("change", handleLayoutFileUpload);
+    bindElementEditorDropZone(modal.querySelector("#elementEditorPreviewDrop"), (files) => {
+        uploadPreviewFiles(files);
+    });
+    bindElementEditorDropZone(modal.querySelector("#elementEditorLayoutsWrap"), (files) => {
+        uploadLayoutFiles(files);
+    });
     modal.querySelector("#elementEditorSave")?.addEventListener("click", saveElementEditor);
     modal.querySelector("#elementEditorResponsiblesBtn")?.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1495,6 +1556,7 @@ function openElementEditor(event, trigger) {
 function closeElementEditor() {
     document.getElementById("elementEditorResponsiblesDropdown")?.classList.remove("open");
     document.getElementById("elementEditorUnitsDropdown")?.classList.remove("open");
+    elementEditorUploadState = null;
     const modal = document.getElementById("element-editor-modal");
     if (modal) modal.style.display = "none";
     document.body.style.overflow = "";
@@ -1508,15 +1570,19 @@ function renderElementEditorAssets() {
     const key = assetsCacheKey(dealId, elementId);
     const cached = elementAssetsCache.get(key) || { status: "loading", preview: null, layouts: [] };
     const previewEl = document.getElementById("elementEditorPreview");
+    const previewOverlay = document.getElementById("elementEditorPreviewUploadOverlay");
     const deleteBtn = document.getElementById("elementEditorPreviewDelete");
     const layoutsEl = document.getElementById("elementEditorLayouts");
     const isStaff = currentUser.role === "staff" && !currentElementEditor.isLocked;
+    const uploadState = elementEditorUploadState;
+    const previewUploading = uploadState?.type === "preview";
+    const layoutUploading = uploadState?.type === "layout" || uploadState?.type === "link";
 
     if (!previewEl || !layoutsEl) return;
 
     const previewReady = !!(cached.preview?.url || cached.preview?.thumbUrl);
     const layoutsLoading = cached.layoutsLoading === true;
-    const showPreviewLoading = cached.status === "loading" && !previewReady;
+    const showPreviewLoading = cached.status === "loading" && !previewReady && !previewUploading;
 
     if (showPreviewLoading) {
         previewEl.innerHTML = renderEditorProgressBlock("Загрузка превью…");
@@ -1530,112 +1596,251 @@ function renderElementEditorAssets() {
         if (deleteBtn) deleteBtn.style.display = "none";
     }
 
-    if (layoutsLoading) {
-        layoutsEl.innerHTML = renderEditorProgressBlock("Загрузка макетов…");
-        return;
+    if (previewOverlay) {
+        if (previewUploading) {
+            previewOverlay.hidden = false;
+            previewOverlay.innerHTML = renderEditorProgressBlock(uploadState.label, uploadState.progress);
+        } else {
+            previewOverlay.hidden = true;
+            previewOverlay.innerHTML = "";
+        }
     }
 
-    if (showPreviewLoading && !layoutsLoading) {
-        layoutsEl.innerHTML = renderEditorProgressBlock("Загрузка макетов…");
-        return;
+    let layoutsHtml = "";
+
+    if (layoutsLoading && !cached.layouts?.length && !layoutUploading) {
+        layoutsHtml = renderEditorProgressBlock("Загрузка макетов…");
+    } else if (showPreviewLoading && !layoutsLoading && !cached.layouts?.length && !layoutUploading) {
+        layoutsHtml = renderEditorProgressBlock("Загрузка макетов…");
+    } else {
+        if (cached.layouts?.length) {
+            layoutsHtml = cached.layouts.map(layout => {
+                const size = layout.size ? `<span class="element-layout-size">${escapeHtml(formatFileSize(layout.size))}</span>` : "";
+                const icon = layout.type === "link" ? "🔗" : "📄";
+                const deleteBtnHtml = isStaff && layout.type === "file" && layoutIsDeletable(layout)
+                    ? `<button type="button" class="element-layout-del" data-layout-id="${escapeHtml(layout.id)}" title="Удалить">×</button>`
+                    : "";
+
+                return `
+                    <div class="element-layout-item">
+                        <a href="${escapeHtml(layout.url)}" target="_blank" rel="noopener" class="element-layout-link">${icon} ${escapeHtml(layout.name)}</a>
+                        ${size}
+                        ${deleteBtnHtml}
+                    </div>`;
+            }).join("");
+        } else if (!layoutUploading) {
+            layoutsHtml = `<div class="element-editor-layout-empty">макетов пока нет</div>`;
+        }
+
+        if (layoutUploading) {
+            layoutsHtml += `<div class="element-layout-upload-item">${renderEditorProgressBlock(uploadState.label, uploadState.progress)}</div>`;
+        }
     }
 
-    if (!cached.layouts?.length) {
-        layoutsEl.innerHTML = `<div class="element-editor-layout-empty">макетов пока нет</div>`;
-        return;
-    }
-
-    layoutsEl.innerHTML = cached.layouts.map(layout => {
-        const size = layout.size ? `<span class="element-layout-size">${escapeHtml(formatFileSize(layout.size))}</span>` : "";
-        const icon = layout.type === "link" ? "🔗" : "📄";
-        const deleteBtnHtml = isStaff && layout.type === "file" && layoutIsDeletable(layout)
-            ? `<button type="button" class="element-layout-del" data-layout-id="${escapeHtml(layout.id)}" title="Удалить">×</button>`
-            : "";
-
-        return `
-            <div class="element-layout-item">
-                <a href="${escapeHtml(layout.url)}" target="_blank" rel="noopener" class="element-layout-link">${icon} ${escapeHtml(layout.name)}</a>
-                ${size}
-                ${deleteBtnHtml}
-            </div>`;
-    }).join("");
+    layoutsEl.innerHTML = layoutsHtml;
 
     layoutsEl.querySelectorAll(".element-layout-del").forEach(btn => {
         btn.addEventListener("click", () => handleLayoutDelete(btn.dataset.layoutId));
     });
 }
 
-async function handlePreviewUpload(event) {
+async function uploadSinglePreviewFile(file) {
+    if (!PREVIEW_IMAGE_TYPES.includes(file.type)) {
+        throw new Error("unsupported preview type");
+    }
+    if (file.size > 16 * 1024 * 1024) {
+        throw new Error("preview source too large");
+    }
+
+    setPreviewEditorProgress("Сжатие изображения…", 0.08);
+    const uploadFile = await compressPreviewImage(file);
+    if (uploadFile.size > MAX_PREVIEW_BYTES) {
+        throw new Error("preview too large");
+    }
+
+    const payload = buildElementAssetsPayload(
+        currentElementEditor.dealId,
+        currentElementEditor.elementId,
+        currentElementEditor.dealNum
+    );
+
+    setPreviewEditorProgress("Регистрация превью…", 0.18);
+    const prep = await elementAssetsApi("uploadElementPreview", {
+        ...payload,
+        fileName: uploadFile.name,
+        mimeType: uploadFile.type || "image/jpeg",
+        clientUpload: true
+    }, { timeoutMs: SERVER_TIMEOUT_MS });
+
+    if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
+
+    await uploadFileToYandexUrl(prep.uploadUrl, uploadFile, uploadFile.type, (ratio) => {
+        setPreviewEditorProgress("Загрузка превью…", 0.2 + ratio * 0.65);
+    });
+
+    setPreviewEditorProgress("Сохранение превью…", 0.92);
+    const data = await elementAssetsApi("uploadElementPreview", {
+        ...payload,
+        uploadComplete: true,
+        diskFileName: prep.diskFileName || undefined
+    }, { timeoutMs: SERVER_TIMEOUT_MS });
+
+    const assets = normalizeAssetsResponse(data);
+    const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
+    const prev = elementAssetsCache.get(key) || { layouts: [] };
+    elementAssetsCache.set(key, {
+        ...prev,
+        status: "ready",
+        preview: assets.preview || prev.preview,
+        layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
+        layoutsLoaded: prev.layoutsLoaded === true,
+        layoutsLoading: false
+    });
+
+    updateElementThumb(currentElementEditor.dealId, currentElementEditor.elementId);
+}
+
+async function uploadPreviewFiles(files) {
     if (!canEditElementAssets()) return;
 
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    if (!PREVIEW_IMAGE_TYPES.includes(file.type)) {
+    const images = [...files].filter(file => PREVIEW_IMAGE_TYPES.includes(file.type));
+    if (!images.length) {
         alert("Превью: только JPG, PNG, WebP или GIF");
         return;
     }
-    if (file.size > 16 * 1024 * 1024) {
-        alert("Превью: исходник не больше 16 МБ");
-        return;
-    }
 
-    const previewEl = document.getElementById("elementEditorPreview");
     setPreviewEditorProgress("Подготовка изображения…");
 
     try {
-        setPreviewEditorProgress("Сжатие изображения…", 0.08);
-        const uploadFile = await compressPreviewImage(file);
-        if (uploadFile.size > MAX_PREVIEW_BYTES) {
-            throw new Error("preview too large");
+        for (let i = 0; i < images.length; i++) {
+            const file = images[i];
+            const prefix = images.length > 1 ? `(${i + 1}/${images.length}) ` : "";
+            try {
+                setPreviewEditorProgress(`${prefix}Подготовка…`);
+                await uploadSinglePreviewFile(file);
+            } catch (e) {
+                console.warn("uploadElementPreview", file.name, e);
+                if (images.length === 1) throw e;
+            }
         }
-
-        const payload = buildElementAssetsPayload(
-            currentElementEditor.dealId,
-            currentElementEditor.elementId,
-            currentElementEditor.dealNum
-        );
-
-        setPreviewEditorProgress("Регистрация превью…", 0.18);
-        const prep = await elementAssetsApi("uploadElementPreview", {
-            ...payload,
-            fileName: uploadFile.name,
-            mimeType: uploadFile.type || "image/jpeg",
-            clientUpload: true
-        }, { timeoutMs: SERVER_TIMEOUT_MS });
-
-        if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
-
-        await uploadFileToYandexUrl(prep.uploadUrl, uploadFile, uploadFile.type, (ratio) => {
-            setPreviewEditorProgress("Загрузка превью…", 0.2 + ratio * 0.65);
-        });
-
-        setPreviewEditorProgress("Сохранение превью…", 0.92);
-        const data = await elementAssetsApi("uploadElementPreview", {
-            ...payload,
-            uploadComplete: true,
-            diskFileName: prep.diskFileName || undefined
-        }, { timeoutMs: SERVER_TIMEOUT_MS });
-
-        const assets = normalizeAssetsResponse(data);
-        const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
-        const prev = elementAssetsCache.get(key) || { layouts: [] };
-        elementAssetsCache.set(key, {
-            status: "ready",
-            preview: assets.preview || prev.preview,
-            layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || [])
-        });
-
-        updateElementThumb(currentElementEditor.dealId, currentElementEditor.elementId);
-        renderElementEditorAssets();
     } catch (e) {
-        console.warn("uploadElementPreview", e);
-        alert(file.size > MAX_PREVIEW_BYTES
+        alert(images[0]?.size > MAX_PREVIEW_BYTES
             ? "Не удалось сжать превью до 500 КБ"
             : "Не удалось загрузить превью");
+    } finally {
+        clearElementEditorUploadState();
         renderElementEditorAssets();
     }
+}
+
+async function handlePreviewUpload(event) {
+    const files = [...(event?.target?.files || [])];
+    if (event?.target) event.target.value = "";
+    if (!files.length) return;
+    await uploadPreviewFiles(files);
+}
+
+async function uploadSingleLayoutFile(file, options = {}) {
+    if (file.size > MAX_LAYOUT_FILE_MB * 1024 * 1024) {
+        throw new Error(`Файл не больше ${MAX_LAYOUT_FILE_MB} МБ`);
+    }
+
+    const payload = buildElementAssetsPayload(
+        currentElementEditor.dealId,
+        currentElementEditor.elementId,
+        currentElementEditor.dealNum
+    );
+    const safeFileName = toSafeUploadFileName(file.name, "layout");
+    const updateProgress = (label, progress) => {
+        if (typeof options.onProgress === "function") {
+            options.onProgress(label, progress);
+        } else {
+            setLayoutUploadProgress(label, progress, options.meta);
+        }
+    };
+
+    updateProgress("Регистрация макета…", 0.15);
+    const prep = await elementAssetsApi("addElementLayout", {
+        ...payload,
+        type: "file",
+        fileName: safeFileName,
+        fileSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        clientUpload: true
+    }, { timeoutMs: SERVER_TIMEOUT_MS });
+
+    if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
+
+    await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream", (ratio) => {
+        updateProgress("Загрузка файла…", 0.2 + ratio * 0.65);
+    });
+
+    updateProgress("Сохранение макета…", 0.92);
+    const data = await elementAssetsApi("addElementLayout", {
+        ...payload,
+        type: "file",
+        uploadComplete: true
+    }, { timeoutMs: SERVER_TIMEOUT_MS });
+
+    const assets = normalizeAssetsResponse(data);
+    const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
+    const prev = elementAssetsCache.get(key) || {};
+    elementAssetsCache.set(key, {
+        ...prev,
+        status: "ready",
+        preview: assets.preview ?? prev.preview ?? null,
+        layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
+        layoutsLoaded: true,
+        layoutsLoading: false
+    });
+}
+
+async function uploadLayoutFiles(files) {
+    if (!canEditElementAssets()) return;
+
+    const list = [...files].filter(file => file && file.size > 0);
+    if (!list.length) return;
+
+    setLayoutUploadProgress("Подготовка файла…", 0.05);
+
+    const errors = [];
+
+    try {
+        for (let i = 0; i < list.length; i++) {
+            const file = list[i];
+            const labelPrefix = list.length > 1 ? `Файл ${i + 1}/${list.length}: ` : "";
+
+            try {
+                await uploadSingleLayoutFile(file, {
+                    onProgress: (label, ratio) => {
+                        const base = i / list.length;
+                        setLayoutUploadProgress(`${labelPrefix}${label}`, base + ratio / list.length, {
+                            type: "layout",
+                            fileIndex: i + 1,
+                            fileTotal: list.length
+                        });
+                    }
+                });
+            } catch (e) {
+                console.warn("addElementLayout file", file.name, e);
+                errors.push(file.name);
+            }
+        }
+    } finally {
+        clearElementEditorUploadState();
+        renderElementEditorAssets();
+    }
+
+    if (errors.length) {
+        alert(`Не удалось загрузить: ${errors.join(", ")}`);
+    }
+}
+
+async function handleLayoutFileUpload(event) {
+    const files = [...(event?.target?.files || [])];
+    if (event?.target) event.target.value = "";
+    if (!files.length) return;
+    await uploadLayoutFiles(files);
 }
 
 async function handlePreviewDelete() {
@@ -1679,7 +1884,7 @@ async function handleLayoutLinkAdd() {
     const url = (input?.value || "").trim();
     if (!url) return;
 
-    setLayoutsEditorProgress("Добавление ссылки…");
+    setLayoutUploadProgress("Добавление ссылки…", null, { type: "link" });
 
     try {
         const data = await elementAssetsApi("addElementLayout", {
@@ -1705,74 +1910,12 @@ async function handleLayoutLinkAdd() {
         });
 
         if (input) input.value = "";
+        clearElementEditorUploadState();
         renderElementEditorAssets();
     } catch (e) {
         console.warn("addElementLayout link", e);
+        clearElementEditorUploadState();
         alert("Не удалось добавить ссылку");
-    }
-}
-
-async function handleLayoutFileUpload(event) {
-    if (!canEditElementAssets()) return;
-
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    if (file.size > MAX_LAYOUT_FILE_MB * 1024 * 1024) {
-        alert(`Файл не больше ${MAX_LAYOUT_FILE_MB} МБ`);
-        return;
-    }
-
-    setLayoutsEditorProgress("Подготовка файла…", 0.05);
-
-    try {
-        const payload = buildElementAssetsPayload(
-            currentElementEditor.dealId,
-            currentElementEditor.elementId,
-            currentElementEditor.dealNum
-        );
-
-        const safeFileName = toSafeUploadFileName(file.name, "layout");
-
-        setLayoutsEditorProgress("Регистрация макета…", 0.15);
-        const prep = await elementAssetsApi("addElementLayout", {
-            ...payload,
-            type: "file",
-            fileName: safeFileName,
-            fileSize: file.size,
-            mimeType: file.type || "application/octet-stream",
-            clientUpload: true
-        }, { timeoutMs: SERVER_TIMEOUT_MS });
-
-        if (!prep?.uploadUrl) throw new Error("uploadUrl missing");
-
-        await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream", (ratio) => {
-            setLayoutsEditorProgress("Загрузка файла…", 0.2 + ratio * 0.65);
-        });
-
-        setLayoutsEditorProgress("Сохранение макета…", 0.92);
-        const data = await elementAssetsApi("addElementLayout", {
-            ...payload,
-            type: "file",
-            uploadComplete: true
-        }, { timeoutMs: SERVER_TIMEOUT_MS });
-
-        const assets = normalizeAssetsResponse(data);
-        const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
-        const prev = elementAssetsCache.get(key) || {};
-        elementAssetsCache.set(key, {
-            status: "ready",
-            preview: assets.preview ?? prev.preview ?? null,
-            layouts: assets.layouts?.length ? assets.layouts : (prev.layouts || []),
-            layoutsLoaded: true,
-            layoutsLoading: false
-        });
-
-        renderElementEditorAssets();
-    } catch (e) {
-        console.warn("addElementLayout file", e);
-        alert(e?.message || "Не удалось загрузить макет");
         renderElementEditorAssets();
     }
 }
