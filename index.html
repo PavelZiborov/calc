@@ -158,6 +158,12 @@
         <div class="adv-search-header">
             <div class="adv-toolbar-line">
                 <div class="adv-toolbar-left">
+                    <div class="adv-search-inline">
+                        <input type="text" id="advSearchInput" placeholder="Поиск…">
+                        <button type="button" class="adv-search-submit" onclick="searchCRM('adv')" title="Найти" aria-label="Найти">🔍</button>
+                    </div>
+                </div>
+                <div class="adv-toolbar-right">
                     <div class="adv-filters-popover-wrap" id="advFiltersPopoverWrap">
                         <button type="button" class="adv-toolbar-icon-btn adv-filters-btn" id="advFiltersBtn" onclick="toggleAdvFiltersPopover(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false">⚙</button>
                         <div class="adv-filters-popover" id="advFiltersPopover" onclick="event.stopPropagation()">
@@ -203,12 +209,6 @@
                     <div class="crm-view-toggle" role="group" aria-label="Вид списка заказов">
                         <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список">☰</button>
                         <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска">▦</button>
-                    </div>
-                </div>
-                <div class="adv-toolbar-right">
-                    <div class="adv-search-inline">
-                        <input type="text" id="advSearchInput" placeholder="Поиск…">
-                        <button type="button" class="adv-search-submit" onclick="searchCRM('adv')" title="Найти" aria-label="Найти">🔍</button>
                     </div>
                 </div>
             </div>

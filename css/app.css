@@ -941,14 +941,16 @@
         display: flex;
         align-items: center;
         gap: 6px;
-        flex: 0 0 auto;
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: flex-start;
     }
     .adv-toolbar-right {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        flex: 1 1 auto;
-        min-width: 0;
+        gap: 6px;
+        flex: 0 0 auto;
     }
     .adv-toolbar-icon-btn {
         margin: 0;
@@ -1000,7 +1002,8 @@
         display: none;
         position: absolute;
         top: calc(100% + 6px);
-        left: 0;
+        right: 0;
+        left: auto;
         z-index: 1300;
         width: min(320px, calc(100vw - 24px));
         padding: 12px;

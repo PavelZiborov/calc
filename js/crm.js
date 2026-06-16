@@ -1386,6 +1386,8 @@ function initCrmViewToggle() {
     applyCrmViewLayoutClass();
     updateAdvFilterUi();
 }
+
+function resolveDealStatusColumnMeta(deal) {
     const statusObj = (deal.status && typeof deal.status === "object") ? deal.status : {};
     const statusName = statusObj.name
         || (typeof deal.status === "string" ? deal.status : "")
