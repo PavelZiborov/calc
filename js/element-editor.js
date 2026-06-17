@@ -2493,9 +2493,12 @@ function updateElementRowDom(dealId, elementId, element) {
     row.textContent = `${name}, ${qty} ${units}, ${price} руб.`;
 
     const totalEl = row.closest(".element-row")?.querySelector(".element-row-total");
+    const lineTotal = getElementLineTotal(element);
     if (totalEl) {
-        totalEl.textContent = `${getElementLineTotal(element).toLocaleString("ru-RU", { minimumFractionDigits: 2 })} руб.`;
+        totalEl.textContent = `${lineTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} руб.`;
     }
+    const rowEl = row.closest(".element-row");
+    if (rowEl) rowEl.setAttribute("data-price", String(lineTotal));
 }
 
 async function saveElementEditor() {

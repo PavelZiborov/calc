@@ -41,6 +41,83 @@ function collectAdvSearchParams() {
     };
 }
 
+function saveAdvSearchUiState() {
+    if (currentUser.role !== "staff") return;
+    try {
+        const { q, filters } = collectAdvSearchParams();
+        localStorage.setItem(ADV_SEARCH_UI_STATE_KEY, JSON.stringify({
+            q,
+            filters,
+            dateFrom: document.getElementById("advDateFrom")?.value || "",
+            dateTo: document.getElementById("advDateTo")?.value || "",
+            viewMode: getCrmViewMode(),
+            listPage: advSearchListPage
+        }));
+    } catch (_) {}
+}
+
+function restoreAdvSearchUiState() {
+    if (currentUser.role !== "staff") return false;
+
+    let state;
+    try {
+        state = JSON.parse(localStorage.getItem(ADV_SEARCH_UI_STATE_KEY) || "null");
+    } catch (_) {
+        return false;
+    }
+    if (!state || typeof state !== "object") return false;
+
+    const searchInput = document.getElementById("advSearchInput");
+    if (searchInput && state.q != null) searchInput.value = state.q;
+
+    document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => {
+        input.checked = false;
+    });
+    document.querySelectorAll('#advManagerList input[type="checkbox"]').forEach(input => {
+        input.checked = false;
+    });
+
+    const filters = state.filters || {};
+    if (filters.openDealsOnly) {
+        const openFilter = document.querySelector('#advStatusList input[data-preset="open-deals"]');
+        if (openFilter) openFilter.checked = true;
+    } else if (Array.isArray(filters.status)) {
+        filters.status.forEach(id => {
+            const input = document.querySelector(`#advStatusList input[type="checkbox"][value="${CSS.escape(String(id))}"]`);
+            if (input) input.checked = true;
+        });
+    }
+
+    if (Array.isArray(filters.managers)) {
+        filters.managers.forEach(id => {
+            const input = document.querySelector(`#advManagerList input[type="checkbox"][value="${CSS.escape(String(id))}"]`);
+            if (input) input.checked = true;
+        });
+    }
+
+    const dateFromEl = document.getElementById("advDateFrom");
+    const dateToEl = document.getElementById("advDateTo");
+    calendarRangeStart = state.dateFrom || "";
+    calendarRangeEnd = state.dateTo || "";
+    if (dateFromEl) dateFromEl.value = calendarRangeStart;
+    if (dateToEl) dateToEl.value = calendarRangeEnd;
+    if (calendarRangeStart) {
+        const parsed = new Date(calendarRangeStart);
+        if (!Number.isNaN(parsed.getTime())) calendarMonth = parsed;
+    }
+
+    if (state.viewMode === "kanban" || state.viewMode === "list") {
+        localStorage.setItem(CRM_VIEW_STORAGE_KEY, state.viewMode);
+    }
+    if (Number.isFinite(Number(state.listPage)) && Number(state.listPage) > 0) {
+        advSearchListPage = Number(state.listPage);
+    }
+
+    if (typeof renderCalendar === "function") renderCalendar();
+    updateAdvFilterUi();
+    return true;
+}
+
 function saveAdvKanbanScrollState() {
     const board = document.querySelector("#advCrmResults .crm-kanban-board");
     if (board) advKanbanBoardScrollLeft = board.scrollLeft;
@@ -255,6 +332,7 @@ async function searchCRM(mode, triggerEvent, options = {}) {
 
         if (mode === "adv") {
             advSearchFiltersFingerprint = advFingerprint;
+            saveAdvSearchUiState();
             if (!options.keepKanbanScroll) {
                 advKanbanBoardScrollLeft = 0;
             }
@@ -1056,6 +1134,7 @@ function clearAdvFilters() {
     calendarMonth = new Date();
     updateAdvFilterUi();
     renderCalendar();
+    saveAdvSearchUiState();
 }
 
 function clearMainSearch() {
@@ -1258,6 +1337,7 @@ function getDealResponsibleName(deal) {
 }
 
 const CRM_VIEW_STORAGE_KEY = "calc_crm_view_mode";
+const ADV_SEARCH_UI_STATE_KEY = "calc_adv_search_ui";
 const crmSearchCache = { main: null, adv: null };
 let advSearchFiltersFingerprint = null;
 let advSearchListPage = 1;
@@ -1865,6 +1945,7 @@ function toggleCrmView(mode) {
     if (getCrmViewMode() === nextMode) return;
 
     localStorage.setItem(CRM_VIEW_STORAGE_KEY, nextMode);
+    saveAdvSearchUiState();
     syncCrmViewToggleButtons();
     applyCrmViewLayoutClass();
 
@@ -2132,14 +2213,17 @@ function getDealFinancials(deal) {
     );
     const explicitDebt = deal?.debt ?? deal?.debt_amount ?? deal?.debtAmount;
     const debtFromApi = explicitDebt != null ? toMoneyNumber(explicitDebt, 0) : null;
+    const elementsSum = sumDealElementsTotal(deal);
 
     let total = toMoneyNumber(deal?.amount ?? deal?.total ?? deal?.sum, null);
+    if (total != null && elementsSum > 0 && total + 0.01 < elementsSum * 0.75) {
+        total = elementsSum;
+    }
     if (total == null && debtFromApi != null) {
         total = paid + debtFromApi;
     }
-    if (total == null) {
-        const elementsSum = sumDealElementsTotal(deal);
-        if (elementsSum > 0) total = elementsSum;
+    if (total == null && elementsSum > 0) {
+        total = elementsSum;
     }
     if (total == null) total = paid + (debtFromApi ?? 0);
 
@@ -2979,40 +3063,56 @@ async function saveDeal(id, trigger = null) {
     }
 }
 
-function updateDealTotal(el) {
-    let sum = 0;
-    el.querySelectorAll('.element-row').forEach(r => {
-        const bEl = r.querySelector('b');
-        if (bEl && bEl.innerText) {
-            const b = bEl.innerText.replace(/\D/g, '');
-            if (b) sum += parseInt(b, 10);
-            return;
-        }
+function parseElementRowTotal(row) {
+    if (!row) return 0;
 
-        // Для строк, пришедших из CRM, где нет <b>, берём последнее значение "руб." / "₽"
-        const txt = (r.innerText || "").replace(/\s+/g, ' ');
-        const m = txt.match(/(\d[\d\s]*)(?:[.,](\d{1,2}))?\s*(?:руб\.|₽)/i);
-        if (m) {
-            const intPart = Number((m[1] || "").replace(/\s+/g, ''));
-            const decPart = m[2] ? Number(m[2]) / 100 : 0;
-            if (Number.isFinite(intPart)) sum += Math.round(intPart + decPart);
+    const dataPrice = row.getAttribute("data-price");
+    if (dataPrice != null && dataPrice !== "") {
+        const fromDataPrice = Number(dataPrice);
+        if (Number.isFinite(fromDataPrice)) return fromDataPrice;
+    }
+
+    const dataTotalSum = row.getAttribute("data-total-sum");
+    if (dataTotalSum != null && dataTotalSum !== "") {
+        const fromAttr = Number(dataTotalSum);
+        if (Number.isFinite(fromAttr)) return fromAttr;
+    }
+
+    const totalEl = row.querySelector(".element-row-total");
+    if (totalEl) {
+        return toMoneyNumber(totalEl.textContent.replace(/\s*(руб\.|₽)\s*$/i, ""), 0);
+    }
+
+    return 0;
+}
+
+function updateDealTotal(el) {
+    if (!el) return;
+
+    let sum = 0;
+    el.querySelectorAll(".element-row").forEach(row => {
+        const lineTotal = parseElementRowTotal(row);
+        if (Number.isFinite(lineTotal)) sum += lineTotal;
+        if (row.hasAttribute("data-price") || row.querySelector(".element-row-total")) {
+            row.setAttribute("data-price", String(lineTotal));
         }
     });
-    const id = el.dataset.dealId || el.id?.replace('list-', '');
-    const card = el.closest('.crm-item');
+
+    const id = el.dataset.dealId || el.id?.replace("list-", "");
+    const card = el.closest(".crm-item");
     const deal = dealsCache.get(String(id));
     if (deal) {
         const financials = getDealFinancials(deal);
         deal.amount = sum;
         deal.debt = Math.max(0, sum - financials.paid);
         dealsCache.set(String(id), deal);
-        if (document.getElementById('deal-tab')) saveOpenDealState(deal);
+        if (document.getElementById("deal-tab")) saveOpenDealState(deal);
 
-        const paymentBlock = card?.querySelector('.deal-payment-block');
+        const paymentBlock = card?.querySelector(".deal-payment-block");
         if (paymentBlock) {
             refreshPaymentBlock(id, card);
         } else {
-            const totalOnlyEl = card?.querySelector('.deal-total-only');
+            const totalOnlyEl = card?.querySelector(".deal-total-only");
             if (totalOnlyEl) totalOnlyEl.outerHTML = renderDealTotalOnly(deal);
         }
         return;

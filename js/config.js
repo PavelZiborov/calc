@@ -136,6 +136,7 @@ let lastCalcData = null;
 const dealsCache = new Map();
 let dealTabFetchToken = 0;
 const tabScrollPositions = {};
+const ACTIVE_TAB_STORAGE_KEY = "calc_active_tab";
 let lastNonDealTabId = "main-tab";
 let calendarMonth = new Date();
 let calendarRangeStart = "";

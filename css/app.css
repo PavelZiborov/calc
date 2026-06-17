@@ -23,6 +23,7 @@
         display: flex;
         align-items: flex-end;
         gap: 6px;
+        width: 100%;
         margin: -20px -20px 10px;
         padding: 6px 12px 0;
         background: #f5f6fa;
@@ -59,16 +60,14 @@
         gap: 3px;
         flex: 1 1 auto;
         min-width: 0;
-        overflow-x: auto;
-        max-width: none;
-        width: auto;
+        width: 100%;
         margin: 0;
         border-bottom: 1px solid #ddd;
         padding-bottom: 0;
-        -webkit-overflow-scrolling: touch;
     }
     .tab-btn {
-        flex: 0 0 auto;
+        flex: 1 1 0;
+        min-width: 0;
         margin-top: 0;
         padding: 5px 14px;
         font-size: 13px;
@@ -82,6 +81,10 @@
         transition: 0.2s;
         width: auto;
         height: auto;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .tab-btn.active { background: #2f7df6; color: white; }
     .tab-close-btn { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:8px; border-radius:50%; font-size:13px; line-height:1; color:inherit; opacity:0.75; }
@@ -1198,8 +1201,8 @@
         #main-tab .col { min-width: 0; }
         #main-tab #crm-search-container .row { flex-direction: column; align-items: stretch !important; }
         #main-tab #crm-search-container .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
-        .tabs-nav { overflow-x: auto; gap: 3px; margin-bottom: 0; border-bottom-width: 1px; padding-bottom: 0; }
-        .tab-btn { flex: 0 0 auto; width: auto; margin-top: 0; padding: 5px 12px; font-size: 13px; border-radius: 6px 6px 0 0; }
+        .tabs-nav { gap: 3px; margin-bottom: 0; border-bottom-width: 1px; padding-bottom: 0; }
+        .tab-btn { flex: 1 1 0; min-width: 0; margin-top: 0; padding: 5px 12px; font-size: 13px; border-radius: 6px 6px 0 0; }
         .rec-price-box { padding: 14px; }
         .rec-price-label { font-size: 12px; }
         .rec-price-val { font-size: 24px; line-height: 1.15; }

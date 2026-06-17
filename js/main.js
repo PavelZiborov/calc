@@ -21,11 +21,9 @@ window.onload = () => {
     validateStoredSessionOnLoad();
     applyPermissions();
     if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
+    if (typeof restoreAdvSearchUiState === "function") restoreAdvSearchUiState();
     if (typeof initCrmViewToggle === "function") initCrmViewToggle();
-    if (currentUser.role === "staff" || currentUser.role === "client") {
-        // Восстановление вкладки заказа — без принудительного logout при 401
-        restoreOpenDealTab();
-    }
+    if (typeof restoreAppUiState === "function") restoreAppUiState();
     
     document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
     document.getElementById('advSearchInput').addEventListener('keypress', (e) => {

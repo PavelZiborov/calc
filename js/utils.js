@@ -21,6 +21,10 @@ function switchTab(id, trigger = null) {
         || document.querySelector(`.tab-btn[data-tab-target="${id}"]`);
     if (activeBtn) activeBtn.classList.add('active');
 
+    try {
+        localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, id);
+    } catch (_) {}
+
     requestAnimationFrame(() => {
         window.scrollTo(0, tabScrollPositions[id] || 0);
         if (typeof applyCrmViewLayoutClass === "function") applyCrmViewLayoutClass();
@@ -28,6 +32,28 @@ function switchTab(id, trigger = null) {
             runAdvSearchOnTabOpen();
         }
     });
+}
+
+function restoreAppUiState() {
+    if (currentUser.role !== "staff" && currentUser.role !== "client") return;
+
+    const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || "main-tab";
+
+    if (savedTab === "search-tab" && currentUser.role === "staff") {
+        const btn = document.getElementById("adv-tab-btn");
+        if (btn) {
+            switchTab("search-tab", btn);
+            return;
+        }
+    }
+
+    if (savedTab === "deal-tab" && typeof readOpenDealState === "function") {
+        const saved = readOpenDealState();
+        if (saved?.dealId && typeof restoreOpenDealTab === "function") {
+            restoreOpenDealTab();
+            return;
+        }
+    }
 }
 function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }
 function fillFormatOptions(p) { let el = document.getElementById("format"); el.innerHTML = ""; let data = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); for (let k in data) { let o = document.createElement("option"); o.value = k; o.text = Array.isArray(data[k]) ? `${k} (${data[k][0]}x${data[k][1]} мм)` : data[k]; el.appendChild(o); } }
