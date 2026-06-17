@@ -41,7 +41,8 @@ function persistSessionMeta(user = currentUser) {
             statuses: user.statuses || [],
             paymentMethods: user.paymentMethods || [],
             elementStatuses: user.elementStatuses || [],
-            managers: user.managers || []
+            managers: user.managers || [],
+            categories: user.categories || []
         }));
     } catch (e) {
         console.warn("Не удалось сохранить метаданные сессии", e);
@@ -76,7 +77,8 @@ function readSession() {
             statuses: meta?.statuses || raw.statuses,
             paymentMethods: meta?.paymentMethods || raw.paymentMethods,
             elementStatuses: meta?.elementStatuses || raw.elementStatuses,
-            managers: meta?.managers || raw.managers
+            managers: meta?.managers || raw.managers,
+            categories: meta?.categories || raw.categories
         }, raw.login || raw.name || "");
     } catch (e) {
         console.warn("Не удалось восстановить метаданные сессии, используем компактную", e);
@@ -91,7 +93,8 @@ function readSession() {
             statuses: [],
             paymentMethods: [],
             elementStatuses: [],
-            managers: []
+            managers: [],
+            categories: []
         }, raw.login || raw.name || "");
     }
 }
@@ -322,7 +325,8 @@ function buildUserSession(session, fallbackLogin = "") {
         statuses: normalizeStatuses(session.dealStatuses || session.statuses),
         paymentMethods: normalizePaymentMethods(session.paymentMethods),
         elementStatuses: normalizeElementStatuses(session.elementStatuses),
-        managers: normalizeManagers(session.managers || session.employees || session.responsibles)
+        managers: normalizeManagers(session.managers || session.employees || session.responsibles),
+        categories: normalizeCategories(session.categories)
     };
 }
 
@@ -339,6 +343,18 @@ function normalizeManagers(managers) {
         .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
+function normalizeCategories(categories) {
+    if (!Array.isArray(categories)) return [];
+
+    return categories
+        .map(category => ({
+            id: Number(category.category_id ?? category.categoryId ?? category.id),
+            name: String(category.name || "").trim()
+        }))
+        .filter(category => Number.isFinite(category.id) && category.name)
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+}
+
 function getCrmStatuses() {
     return normalizeStatuses(currentUser.statuses);
 }
@@ -349,6 +365,16 @@ function getManagers() {
 
 function getPaymentMethods() {
     return normalizePaymentMethods(currentUser.paymentMethods);
+}
+
+function getCategories() {
+    return normalizeCategories(currentUser.categories);
+}
+
+function getDefaultElementCategoryId() {
+    const categories = getCategories();
+    const preferred = categories.find(cat => cat.id === 2896) || categories[0];
+    return preferred?.id ?? null;
 }
 
 function authHeaders() {

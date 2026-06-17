@@ -2706,10 +2706,15 @@ function renderDealsList(deals, targetDiv, options = {}) {
                 </div>
             </div>` : renderDealListSearchHeader(deal, dealLink, dealActionButtons, statusControl);
 
-        const addBtnHtml = (currentUser.role === 'staff' && !isClosed) ? `
+        const addBtnHtml = (currentUser.role === 'staff' && !isClosed)
+            ? `
                 <div class="add-btn-container">
-                    <button class="add-btn" onclick="addToDeal(${deal.id}, this)">+ Добавить расчет</button>
-                </div>` : '';
+                    <div class="deal-add-buttons">
+                        <button class="add-btn" onclick="addToDeal(${deal.id}, this)">+ Добавить просчет из калькулятора</button>
+                        ${isDetailMode ? `<button class="add-btn add-btn-secondary" onclick="openManualElementEditor(${deal.id})">+ Добавить вручную</button>` : ""}
+                    </div>
+                </div>`
+            : '';
 
         card.innerHTML = isDetailMode ? `
             ${dealHeaderHtml}
@@ -2863,6 +2868,7 @@ function addToDeal(id, trigger = null) {
     if (!list) return;
 
     const s = window.currentCalcState; // Состояние из n8n
+    const categoryId = typeof getDefaultElementCategoryId === "function" ? getDefaultElementCategoryId() : null;
     const row = document.createElement('div'); 
     row.className = 'element-row new-row';
     
@@ -2879,6 +2885,8 @@ function addToDeal(id, trigger = null) {
     row.setAttribute('data-sra3-sheets', Number(lastCalcData.sra3Sheets ?? 0));
     row.setAttribute('data-total-sum', finalTotal); 
     row.setAttribute('data-price-one', finalPriceOne); // Сохраняем готовую строку/число
+    row.setAttribute('data-category-id', categoryId != null ? String(categoryId) : "");
+    row.setAttribute('data-units', "шт");
 
     row.style.cssText = "padding:6px 8px; border-left:3px solid #8ab8ff; background:#f6f9ff; border-bottom:1px solid #e3ebf7; border-radius:4px; margin:4px 0;";
     row.innerHTML = `
@@ -2916,19 +2924,21 @@ async function saveDeal(id, trigger = null) {
             const sendSra3Sheets = Number(r.getAttribute('data-sra3-sheets'));
             const sendCostTotal = Math.round(Number(r.getAttribute('data-cost-total')));
             const sendCostHQ = Math.round(Number(r.getAttribute('data-cost-hq')));
+            const sendCategoryId = Number(r.getAttribute('data-category-id')) || (typeof getDefaultElementCategoryId === "function" ? getDefaultElementCategoryId() : null);
+            const sendUnits = String(r.getAttribute('data-units') || "шт").trim() || "шт";
 
             const item = { 
                 name: r.getAttribute('data-full-name'), 
                 quantity: sendQty, 
                 total: sendTotal, // Итоговая сумма
                 price: sendPrice, // Цена за единицу (теперь точно 18.94)
-                cost: sendCostTotal,
+                cost: Number.isFinite(sendCostTotal) ? sendCostTotal : null,
                 // Доп.поля для n8n: далее на сервере можно сделать PUT в CRM
                 sra3_sheets: Number.isFinite(sendSra3Sheets) ? sendSra3Sheets : null,
                 cost_total: Number.isFinite(sendCostTotal) ? sendCostTotal : null,
                 cost_hq: Number.isFinite(sendCostHQ) ? sendCostHQ : null,
-                category_id: 2896, 
-                units: "шт" 
+                category_id: Number.isFinite(sendCategoryId) ? sendCategoryId : null,
+                units: sendUnits
             };
 
             const response = await fetch(N8N_URL, { 
@@ -2979,9 +2989,9 @@ function updateDealTotal(el) {
             return;
         }
 
-        // Для строк, пришедших из CRM, где нет <b>, берём последнее значение "руб."
+        // Для строк, пришедших из CRM, где нет <b>, берём последнее значение "руб." / "₽"
         const txt = (r.innerText || "").replace(/\s+/g, ' ');
-        const m = txt.match(/(\d[\d\s]*)(?:[.,](\d{1,2}))?\s*руб\./i);
+        const m = txt.match(/(\d[\d\s]*)(?:[.,](\d{1,2}))?\s*(?:руб\.|₽)/i);
         if (m) {
             const intPart = Number((m[1] || "").replace(/\s+/g, ''));
             const decPart = m[2] ? Number(m[2]) / 100 : 0;

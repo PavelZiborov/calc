@@ -335,6 +335,21 @@ function getSelectedElementEditorResponsibleIds() {
         .filter(id => Number.isFinite(id) && id > 0);
 }
 
+function collectSelectedResponsiblesFromEditor() {
+    const list = document.getElementById("elementEditorResponsiblesList");
+    if (!list) return [];
+
+    const noneInput = list.querySelector('input[data-none="1"]');
+    if (noneInput?.checked) return [];
+
+    return [...list.querySelectorAll('input[type="checkbox"]:checked:not([data-none="1"])')]
+        .map(input => ({
+            id: Number(input.value),
+            name: String(input.dataset.name || "").trim() || `#${input.value}`
+        }))
+        .filter(item => Number.isFinite(item.id) && item.id > 0);
+}
+
 function renderElementEditorResponsiblesList(element) {
     const list = document.getElementById("elementEditorResponsiblesList");
     const readonlyEl = document.getElementById("elementEditorResponsiblesReadonly");
@@ -1399,13 +1414,321 @@ function isElementEditorOpen(dealId, elementId) {
 }
 
 function canEditElementAssets() {
-    return currentUser.role === "staff"
-        && currentElementEditor
-        && !currentElementEditor.isLocked;
+    if (currentUser.role !== "staff" || !currentElementEditor || currentElementEditor.isLocked) return false;
+    if (currentElementEditor.isCreate && !currentElementEditor.showAssets) return false;
+    return Boolean(currentElementEditor.elementId);
+}
+
+function fillElementEditorCategorySelect(modal) {
+    const select = modal?.querySelector("#elementEditorCategory");
+    if (!select) return;
+
+    const categories = typeof getCategories === "function" ? getCategories() : [];
+    select.innerHTML = categories.length
+        ? categories.map(cat => `<option value="${escapeHtml(cat.id)}">${escapeHtml(cat.name)}</option>`).join("")
+        : `<option value="">Категории не загружены</option>`;
+
+    const defaultId = typeof getDefaultElementCategoryId === "function" ? getDefaultElementCategoryId() : 2896;
+    const preferred = categories.find(cat => cat.id === defaultId) || categories[0];
+    if (preferred) select.value = String(preferred.id);
+}
+
+function setElementEditorLayout({ isCreate = false, showAssets = true } = {}) {
+    const modal = document.getElementById("element-editor-modal");
+    if (!modal) return;
+
+    modal.classList.toggle("element-editor-create-mode", isCreate);
+    modal.classList.toggle("element-editor-assets-hidden", !showAssets);
+
+    const categoryWrap = modal.querySelector("#elementEditorCategoryWrap");
+    if (categoryWrap) categoryWrap.style.display = isCreate ? "" : "none";
+
+    const nameInput = modal.querySelector("#elementEditorName");
+    if (nameInput) {
+        nameInput.readOnly = !isCreate;
+        nameInput.classList.toggle("element-editor-input-readonly", !isCreate);
+        nameInput.tabIndex = isCreate ? 0 : -1;
+    }
+
+    const saveAssetsBtn = modal.querySelector("#elementEditorSaveAssets");
+    if (saveAssetsBtn) {
+        saveAssetsBtn.style.display = isCreate && !showAssets ? "" : "none";
+    }
+}
+
+function unwrapSaveElementResponse(data) {
+    let payload = data;
+    if (Array.isArray(payload)) payload = payload[0]?.json ?? payload[0];
+    if (payload?.json && typeof payload.json === "object") payload = payload.json;
+
+    const element = payload?.element && typeof payload.element === "object" ? payload.element : payload;
+    const elementId = Number(
+        payload?.elementId
+        ?? payload?.element_id
+        ?? element?.id
+        ?? element?.element_id
+        ?? element?.elementId
+    );
+
+    return {
+        elementId: Number.isFinite(elementId) && elementId > 0 ? elementId : null,
+        element
+    };
+}
+
+async function saveNewDealElement(dealId, item) {
+    const response = await fetchWithTimeout(N8N_URL, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+            action: "save",
+            dealId: Number(dealId),
+            item
+        })
+    });
+
+    if (response.status === 401) {
+        handleUnauthorized();
+        throw new Error("Unauthorized");
+    }
+    if (!response.ok) throw new Error("save failed");
+
+    return unwrapSaveElementResponse(await parseApiResponse(response));
+}
+
+async function resolveCreatedElementId(dealId, item, saveResult) {
+    if (saveResult?.elementId) return saveResult.elementId;
+
+    if (typeof reloadDealTabContent === "function") {
+        await reloadDealTabContent(dealId);
+    }
+
+    const deal = dealsCache.get(String(dealId));
+    if (!deal?.elements?.length) throw new Error("element not found after save");
+
+    const byName = deal.elements.find(el => getElementName(el) === item.name);
+    const fallback = deal.elements[deal.elements.length - 1];
+    const elementId = Number(getElementId(byName || fallback));
+    if (!Number.isFinite(elementId) || elementId <= 0) {
+        throw new Error("elementId missing after save");
+    }
+    return elementId;
+}
+
+function collectNewElementItemFromEditor(modal) {
+    const name = String(modal.querySelector("#elementEditorName")?.value || "").trim();
+    const qty = Number(modal.querySelector("#elementEditorQty")?.value) || 0;
+    const price = Number(modal.querySelector("#elementEditorPrice")?.value);
+    const total = Number(modal.querySelector("#elementEditorTotal")?.value);
+    const costRaw = modal.querySelector("#elementEditorCost")?.value;
+    const costHqRaw = modal.querySelector("#elementEditorCostHq")?.value;
+    const sra3Raw = modal.querySelector("#elementEditorSra3")?.value;
+    const categoryId = Number(modal.querySelector("#elementEditorCategory")?.value);
+
+    const resolvedTotal = Number.isFinite(total)
+        ? total
+        : (Number.isFinite(price) && qty > 0 ? qty * price : 0);
+    const resolvedPrice = Number.isFinite(price)
+        ? price
+        : (qty > 0 ? resolvedTotal / qty : 0);
+
+    const item = {
+        name,
+        quantity: qty,
+        total: resolvedTotal,
+        price: resolvedPrice,
+        units: getElementEditorUnitsValue() || "шт"
+    };
+
+    if (Number.isFinite(categoryId) && categoryId > 0) {
+        item.category_id = categoryId;
+    }
+
+    if (costRaw !== "") {
+        const cost = Math.round(Number(costRaw));
+        if (Number.isFinite(cost)) {
+            item.cost = cost;
+            item.cost_total = cost;
+        }
+    }
+    if (costHqRaw !== "") {
+        const costHq = Math.round(Number(costHqRaw));
+        if (Number.isFinite(costHq)) item.cost_hq = costHq;
+    }
+    if (sra3Raw !== "") {
+        const sra3 = Number(sra3Raw);
+        if (Number.isFinite(sra3)) item.sra3_sheets = sra3;
+    }
+
+    const responsibleIds = getSelectedElementEditorResponsibleIds();
+    if (responsibleIds.length) {
+        item.responsible_ids = responsibleIds;
+    }
+
+    return item;
+}
+
+function seedEmptyElementAssetsCache(dealId, elementId) {
+    elementAssetsCache.set(assetsCacheKey(dealId, elementId), {
+        status: "ready",
+        preview: null,
+        previewMissing: true,
+        layouts: [],
+        layoutsLoaded: true,
+        layoutsLoading: false
+    });
+}
+
+async function activateElementEditorAfterCreate(dealId, elementId, savedResponsibles = null) {
+    const deal = dealsCache.get(String(dealId));
+    const elementIndex = Array.isArray(deal?.elements)
+        ? deal.elements.findIndex(el => String(getElementId(el)) === String(elementId))
+        : -1;
+
+    currentElementEditor = {
+        dealId: String(dealId),
+        dealNum: getDealNum(dealId),
+        elementId: String(elementId),
+        elementIndex: elementIndex >= 0 ? elementIndex : null,
+        isLocked: false,
+        isCreate: false,
+        showAssets: true
+    };
+
+    const modal = document.getElementById("element-editor-modal");
+    const element = findDealElement(dealId, elementId, currentElementEditor.elementIndex);
+    if (!modal || !element) return;
+
+    if (Array.isArray(savedResponsibles)) {
+        element.responsibles = savedResponsibles;
+        element._responsiblesLoaded = true;
+    }
+
+    setElementEditorStaffMode(true);
+    setElementEditorLayout({ isCreate: false, showAssets: true });
+
+    modal.querySelector("#elementEditorName").value = getElementName(element);
+    modal.querySelector("#elementEditorQty").value = getElementQuantity(element) || "";
+    modal.querySelector("#elementEditorPrice").value = Number.isFinite(getElementPrice(element)) ? getElementPrice(element) : "";
+    modal.querySelector("#elementEditorTotal").value = Number.isFinite(getElementLineTotal(element)) ? getElementLineTotal(element) : "";
+    modal.querySelector("#elementEditorLinkInput").value = "";
+
+    fillElementEditorFields(element);
+    fillElementEditorMeta(element);
+    seedEmptyElementAssetsCache(dealId, elementId);
+    renderElementEditorAssets();
+}
+
+async function saveNewElementFromEditor(openAssetsAfter = false) {
+    if (!currentElementEditor?.isCreate || currentUser.role !== "staff") return;
+
+    const modal = document.getElementById("element-editor-modal");
+    const saveBtn = modal?.querySelector("#elementEditorSave");
+    const saveAssetsBtn = modal?.querySelector("#elementEditorSaveAssets");
+    if (saveBtn?.disabled || saveAssetsBtn?.disabled) return;
+
+    const item = collectNewElementItemFromEditor(modal);
+    const savedResponsibles = collectSelectedResponsiblesFromEditor();
+    if (!item.name) {
+        alert("Введите наименование позиции");
+        return;
+    }
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+        alert("Укажите количество больше 0");
+        return;
+    }
+    if (!item.category_id) {
+        alert("Выберите категорию");
+        return;
+    }
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "…";
+    }
+    if (saveAssetsBtn) {
+        saveAssetsBtn.disabled = true;
+        saveAssetsBtn.textContent = "…";
+    }
+
+    try {
+        const saveResult = await saveNewDealElement(currentElementEditor.dealId, item);
+        const elementId = await resolveCreatedElementId(currentElementEditor.dealId, item, saveResult);
+
+        if (openAssetsAfter) {
+            seedEmptyElementAssetsCache(currentElementEditor.dealId, elementId);
+            if (typeof reloadDealTabContent === "function") {
+                await reloadDealTabContent(currentElementEditor.dealId);
+            }
+            await activateElementEditorAfterCreate(
+                currentElementEditor.dealId,
+                elementId,
+                savedResponsibles
+            );
+            return;
+        }
+
+        if (typeof reloadDealTabContent === "function") {
+            await reloadDealTabContent(currentElementEditor.dealId);
+        } else if (document.getElementById("deal-tab")) {
+            await reloadDealTabContent?.(currentElementEditor.dealId);
+        }
+        closeElementEditor();
+    } catch (e) {
+        alert("Не удалось сохранить позицию");
+        console.error(e);
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Сохранить и закрыть";
+        }
+        if (saveAssetsBtn) {
+            saveAssetsBtn.disabled = false;
+            saveAssetsBtn.textContent = "Сохранить и добавить макеты";
+        }
+    }
+}
+
+function openManualElementEditor(dealId) {
+    if (!ensureActiveSession()) return;
+    if (currentUser.role !== "staff") return;
+
+    currentElementEditor = {
+        dealId: String(dealId),
+        dealNum: getDealNum(dealId),
+        elementId: null,
+        elementIndex: null,
+        isLocked: false,
+        isCreate: true,
+        showAssets: false
+    };
+
+    const modal = getElementEditorModal();
+    setElementEditorStaffMode(true);
+    setElementEditorLayout({ isCreate: true, showAssets: false });
+    fillElementEditorCategorySelect(modal);
+
+    modal.querySelector("#elementEditorName").value = "";
+    modal.querySelector("#elementEditorQty").value = "1";
+    modal.querySelector("#elementEditorPrice").value = "";
+    modal.querySelector("#elementEditorTotal").value = "";
+    modal.querySelector("#elementEditorCost").value = "";
+    modal.querySelector("#elementEditorCostHq").value = "";
+    modal.querySelector("#elementEditorSra3").value = "";
+    modal.querySelector("#elementEditorLinkInput").value = "";
+
+    fillElementEditorFields({});
+    fillElementEditorMeta({});
+    setElementEditorUnitsValue("шт");
+    renderElementEditorAssets();
+
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+    modal.querySelector("#elementEditorName")?.focus();
 }
 
 function getElementEditorModal() {
-    const MODAL_VERSION = "6";
+    const MODAL_VERSION = "8";
     let modal = document.getElementById("element-editor-modal");
     if (modal && modal.dataset.version !== MODAL_VERSION) {
         modal.remove();
@@ -1416,7 +1739,7 @@ function getElementEditorModal() {
     modal = document.createElement("div");
     modal.id = "element-editor-modal";
     modal.className = "element-editor-backdrop";
-    modal.dataset.version = "6";
+    modal.dataset.version = "8";
     modal.style.display = "none";
     modal.innerHTML = `
         <div class="element-editor-modal" onclick="event.stopPropagation()">
@@ -1426,6 +1749,10 @@ function getElementEditorModal() {
             <div class="element-editor-body">
                 <label class="element-editor-label" title="Название задаётся при добавлении позиции в CRM; API не позволяет переименовать">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
+                <div id="elementEditorCategoryWrap" class="element-editor-create-only" style="display:none;">
+                    <label class="element-editor-label">Категория</label>
+                    <select id="elementEditorCategory" class="element-editor-input"></select>
+                </div>
                 <div class="element-editor-row4">
                     <div>
                         <label class="element-editor-label">Кол-во</label>
@@ -1476,6 +1803,7 @@ function getElementEditorModal() {
                         <div id="elementEditorResponsiblesReadonly" class="element-editor-readonly-text"></div>
                     </div>
                 </div>
+                <div class="element-editor-assets-block">
                 <div class="element-editor-preview-wrap">
                     <div class="element-editor-preview-box element-editor-drop-target" id="elementEditorPreviewDrop">
                         <div id="elementEditorPreview" class="element-editor-preview">
@@ -1505,10 +1833,12 @@ function getElementEditorModal() {
                         <input id="elementEditorLayoutFile" type="file" multiple hidden>
                     </label>
                 </div>
+                </div>
             </div>
             <div class="element-editor-footer">
                 <button type="button" class="element-editor-cancel" onclick="closeElementEditor()">Закрыть</button>
-                <button type="button" id="elementEditorSave" class="element-editor-save staff-only-fields">Сохранить</button>
+                <button type="button" id="elementEditorSaveAssets" class="element-editor-save element-editor-save-secondary staff-only-fields" style="display:none;">Сохранить и добавить макеты</button>
+                <button type="button" id="elementEditorSave" class="element-editor-save staff-only-fields">Сохранить и закрыть</button>
             </div>
         </div>`;
 
@@ -1563,7 +1893,14 @@ function bindElementEditorEvents(modal) {
         if (event.target.closest("a, button, input, label")) return;
         modal.querySelector("#elementEditorLayoutFile")?.click();
     });
-    modal.querySelector("#elementEditorSave")?.addEventListener("click", saveElementEditor);
+    modal.querySelector("#elementEditorSave")?.addEventListener("click", () => {
+        if (currentElementEditor?.isCreate) {
+            saveNewElementFromEditor(false);
+            return;
+        }
+        saveElementEditor();
+    });
+    modal.querySelector("#elementEditorSaveAssets")?.addEventListener("click", () => saveNewElementFromEditor(true));
     modal.querySelector("#elementEditorResponsiblesBtn")?.addEventListener("click", (event) => {
         event.stopPropagation();
         document.getElementById("elementEditorUnitsDropdown")?.classList.remove("open");
@@ -1621,7 +1958,9 @@ function setElementEditorStaffMode(isStaff) {
     }
 
     const nameInput = modal.querySelector("#elementEditorName");
-    if (nameInput) nameInput.readOnly = true;
+    if (nameInput && !currentElementEditor?.isCreate) {
+        nameInput.readOnly = true;
+    }
 }
 
 function openElementEditor(event, trigger) {
@@ -1642,12 +1981,15 @@ function openElementEditor(event, trigger) {
         dealNum: getDealNum(dealId),
         elementId: String(elementId),
         elementIndex: elementIndex != null ? Number(elementIndex) : null,
-        isLocked
+        isLocked,
+        isCreate: false,
+        showAssets: true
     };
 
     const modal = getElementEditorModal();
     const isStaff = currentUser.role === "staff" && !isLocked;
     setElementEditorStaffMode(isStaff);
+    setElementEditorLayout({ isCreate: false, showAssets: true });
 
     const name = getElementName(element);
     const qty = getElementQuantity(element);
@@ -1670,6 +2012,9 @@ function openElementEditor(event, trigger) {
     document.body.style.overflow = "hidden";
 
     const key = assetsCacheKey(dealId, elementId);
+    if (elementAssetsCache.get(key)?.previewMissing) {
+        elementAssetsCache.delete(key);
+    }
     ensureElementAssetsForEditor(
         dealId,
         elementId,
@@ -2154,6 +2499,9 @@ function updateElementRowDom(dealId, elementId, element) {
 }
 
 async function saveElementEditor() {
+    if (currentElementEditor?.isCreate) {
+        return saveNewElementFromEditor(false);
+    }
     if (!canEditElementAssets()) return;
 
     const modal = document.getElementById("element-editor-modal");
@@ -2252,7 +2600,7 @@ async function saveElementEditor() {
     } finally {
         if (saveBtn) {
             saveBtn.disabled = false;
-            saveBtn.textContent = "Сохранить";
+            saveBtn.textContent = "Сохранить и закрыть";
         }
     }
 }

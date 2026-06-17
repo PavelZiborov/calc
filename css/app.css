@@ -584,6 +584,8 @@
     }
     .element-editor-cancel { background: #eef1f5; color: #555; }
     .element-editor-save { background: #2f7df6; color: #fff; }
+    .element-editor-save-secondary { background: #27ae60; color: #fff; }
+    .element-editor-assets-hidden .element-editor-assets-block { display: none; }
     .element-row-total { flex: 0 0 auto; margin-left: auto; font-weight: bold; white-space: nowrap; font-size: 12px; line-height: 1.2; text-align: right; }
     .deal-total-only { font-weight: bold; font-size: 12px; line-height: 1.2; }
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
@@ -596,6 +598,12 @@
     .deal-action-group { display:inline-flex; align-items:center; gap:2px; margin-left:6px; vertical-align:middle; }
     .deal-action-group .deal-action-btn { margin:0; width:17px; height:17px; min-width:17px; font-size:10px; line-height:15px; border-radius:4px; }
     .deal-action-group .deal-crm-btn { margin-left:5px; }
+    .deal-add-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .add-btn-secondary { background:#eef1f5; color:#334155; border:1px solid #d9dde3; }
+    .add-btn-secondary:hover { background:#e6ebf2; }
+    .deal-category-select-wrap { display:flex; align-items:center; gap:8px; margin-top:2px; }
+    .deal-category-select-label { font-size:12px; color:#666; }
+    .deal-category-select { height:28px; border:1px solid #d5dde6; border-radius:7px; padding:0 10px; background:#fff; font-size:12px; color:#334155; max-width: 360px; }
     .deal-header-detail { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
     .deal-num-line { display:flex; align-items:center; flex-wrap:wrap; gap:4px; min-width:0; }
     .deal-header-side { display:flex; align-items:flex-start; gap:8px; flex-shrink:0; }
@@ -701,6 +709,7 @@
             padding-top: 0;
             border-top: none;
         }
+        .crm-item--list .deal-category-select-wrap { display:none; }
         .crm-item--list .add-btn {
             padding: 2px 8px;
             font-size: 11px;
