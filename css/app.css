@@ -15,9 +15,74 @@
     .col{ flex:1; }
     button{ margin-top:25px; padding:15px; width:100%; background:#2f7df6; border:none; color:white; font-size:18px; border-radius:8px; cursor:pointer; font-weight: bold; transition: 0.2s; }
     button:hover { background: #1e5fcb; }
-    
-    .tabs-nav { display: flex; gap: 5px; max-width: 900px; margin: 0 auto 15px auto; border-bottom: 2px solid #ddd; }
-    .tab-btn { padding: 12px 25px; background: #e0e0e0; border: none; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; color: #666; transition: 0.3s; }
+
+    .app-top-bar {
+        position: sticky;
+        top: 0;
+        z-index: 1100;
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        margin: -20px -20px 10px;
+        padding: 6px 12px 0;
+        background: #f5f6fa;
+        border-bottom: 1px solid #dcdfe4;
+        box-sizing: border-box;
+    }
+    .app-user-btn {
+        flex: 0 0 auto;
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        padding: 0;
+        margin: 0 0 2px;
+        border-radius: 6px;
+        border: 1px solid #cfd5dd;
+        background: #fff;
+        color: #5f6b7a;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+    .app-user-btn:hover { background: #eef3fb; color: #2f7df6; border-color: #b8ccf5; }
+    .app-user-btn.is-logged-in {
+        background: #2f7df6;
+        color: #fff;
+        border-color: #2f7df6;
+    }
+    .app-user-btn.is-logged-in:hover { background: #1e5fcb; border-color: #1e5fcb; }
+    .app-user-btn-icon { display: block; }
+
+    .tabs-nav {
+        display: flex;
+        gap: 3px;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-x: auto;
+        max-width: none;
+        width: auto;
+        margin: 0;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 0;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tab-btn {
+        flex: 0 0 auto;
+        margin-top: 0;
+        padding: 5px 14px;
+        font-size: 13px;
+        line-height: 1.2;
+        background: #e0e0e0;
+        border: none;
+        border-radius: 6px 6px 0 0;
+        cursor: pointer;
+        font-weight: bold;
+        color: #666;
+        transition: 0.2s;
+        width: auto;
+        height: auto;
+    }
     .tab-btn.active { background: #2f7df6; color: white; }
     .tab-close-btn { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:8px; border-radius:50%; font-size:13px; line-height:1; color:inherit; opacity:0.75; }
     .tab-close-btn:hover { background:rgba(0,0,0,0.12); opacity:1; }
@@ -994,6 +1059,56 @@
         border-radius: 15px;
         position: relative;
     }
+    .auth-modal-close {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        cursor: pointer;
+        font-size: 24px;
+        color: #999;
+        line-height: 1;
+    }
+    .auth-panel-title {
+        text-align: center;
+        margin: 0 0 20px;
+        color: #2f7df6;
+    }
+    .auth-user-card {
+        text-align: center;
+        margin-bottom: 16px;
+    }
+    .auth-role-badge {
+        display: inline-block;
+        background: #7f8c8d;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: bold;
+        text-transform: uppercase;
+        color: #fff;
+    }
+    .auth-role-badge--staff { background: #e67e22; }
+    .auth-role-badge--client { background: #27ae60; }
+    .auth-user-name {
+        margin-top: 10px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #333;
+        word-break: break-word;
+    }
+    .auth-logout-btn {
+        margin-top: 0;
+        background: #eef1f5;
+        color: #555;
+    }
+    .auth-logout-btn:hover { background: #e2e8f0; color: #333; }
+    .auth-login-error {
+        color: #e74c3c;
+        margin-top: 15px;
+        font-size: 13px;
+        text-align: center;
+        font-weight: bold;
+    }
     @media (max-width: 600px), (max-height: 700px) {
         #auth-modal {
             padding-top: 16px;
@@ -1002,9 +1117,12 @@
     }
     @media (max-width: 600px) {
         body { padding: 8px; font-size: 14px; overflow-x: hidden; }
-        #user-bar { padding: 10px 12px !important; gap: 10px; flex-wrap: wrap; }
-        #user-display-name { display: inline-block; max-width: 58vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-        #authBtn { padding: 8px 14px !important; font-size: 16px !important; }
+        .app-top-bar {
+            margin: -8px -8px 8px;
+            padding: 4px 8px 0;
+            gap: 4px;
+        }
+        .app-user-btn { width: 28px; height: 28px; min-width: 28px; margin-bottom: 1px; }
         .container { width: 100%; padding: 14px; border-radius: 10px; box-sizing: border-box; }
         h2 { font-size: 20px; line-height: 1.2; }
         h3 { font-size: 18px; line-height: 1.25; }
@@ -1080,8 +1198,8 @@
         #main-tab .col { min-width: 0; }
         #main-tab #crm-search-container .row { flex-direction: column; align-items: stretch !important; }
         #main-tab #crm-search-container .row > div[style*="flex: 0 0"] { flex: 0 0 auto !important; width: 100%; }
-        .tabs-nav { overflow-x: auto; gap: 4px; margin-bottom: 10px; border-bottom: 0; padding-bottom: 2px; }
-        .tab-btn { flex: 0 0 auto; width: auto; margin-top: 0; padding: 10px 12px; font-size: 14px; border-radius: 8px; }
+        .tabs-nav { overflow-x: auto; gap: 3px; margin-bottom: 0; border-bottom-width: 1px; padding-bottom: 0; }
+        .tab-btn { flex: 0 0 auto; width: auto; margin-top: 0; padding: 5px 12px; font-size: 13px; border-radius: 6px 6px 0 0; }
         .rec-price-box { padding: 14px; }
         .rec-price-label { font-size: 12px; }
         .rec-price-val { font-size: 24px; line-height: 1.15; }
@@ -1385,7 +1503,7 @@
         width: 100%;
     }
 
-    /* Полноэкранный канбан: без шапки пользователя, без скролла страницы */
+    /* Полноэкранный канбан: компактная шапка, без скролла страницы */
     body.crm-kanban-active {
         height: 100dvh;
         overflow: hidden;
@@ -1394,24 +1512,14 @@
         display: flex;
         flex-direction: column;
     }
-    body.crm-kanban-active #user-bar {
-        display: none !important;
+    body.crm-kanban-active .app-top-bar {
+        flex: 0 0 auto;
+        margin: -6px -10px 4px;
+        padding: 4px 10px 0;
     }
     body.crm-kanban-active .tabs-nav {
-        flex: 0 0 auto;
-        max-width: none;
-        width: 100%;
-        margin: 0 0 4px;
-        padding-bottom: 0;
-        border-bottom-width: 1px;
-        gap: 3px;
-    }
-    body.crm-kanban-active .tab-btn {
-        margin-top: 0;
-        padding: 5px 14px;
-        font-size: 13px;
-        line-height: 1.2;
-        border-radius: 6px 6px 0 0;
+        flex: 1 1 auto;
+        margin: 0;
     }
     body.crm-kanban-active .tab-close-btn {
         width: 14px;

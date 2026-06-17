@@ -189,39 +189,24 @@ function resetAuthToGuest() {
     sessionStorage.removeItem("calc_session_meta");
     currentUser = { role: "guest", login: "", token: "" };
 
-    const badge = document.getElementById('role-badge');
-    const nameDisp = document.getElementById('user-display-name');
-    const authBtn = document.getElementById('authBtn');
     const crmContainer = document.getElementById('crm-search-container');
     const advTabBtn = document.getElementById('adv-tab-btn');
 
-    if (badge) {
-        badge.innerText = "ГОСТЬ";
-        badge.style.background = "#7f8c8d";
-    }
-    if (nameDisp) nameDisp.innerText = "Режим просмотра";
-    if (authBtn) {
-        authBtn.innerText = "Войти";
-        authBtn.onclick = toggleAuthModal;
-    }
+    if (typeof updateAuthModalUi === "function") updateAuthModalUi();
     if (crmContainer) crmContainer.style.display = 'none';
     if (advTabBtn) advTabBtn.style.display = 'none';
 }
 
 function ensureActiveSession(options = {}) {
     if (currentUser.role !== "staff" && currentUser.role !== "client") {
-        if (!options.silent) {
-            const modal = document.getElementById("auth-modal");
-            if (modal) modal.style.display = "flex";
-        }
+        if (!options.silent) toggleAuthModal(true);
         return false;
     }
 
     if (!extractSessionToken(currentUser)) {
         resetAuthToGuest();
         if (!options.silent) alert("Сессия истекла. Войдите снова.");
-        const modal = document.getElementById("auth-modal");
-        if (modal) modal.style.display = "flex";
+        toggleAuthModal(true);
         return false;
     }
 
@@ -232,8 +217,7 @@ function handleUnauthorized(options = {}) {
     if (options.silent) return;
     resetAuthToGuest();
     alert("Сессия истекла. Войдите снова.");
-    const modal = document.getElementById("auth-modal");
-    if (modal) modal.style.display = "flex";
+    toggleAuthModal(true);
 }
 
 function normalizeStatuses(statuses) {
