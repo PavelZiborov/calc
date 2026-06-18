@@ -8,7 +8,6 @@ let elementEditorUploadState = null;
 
 const ELEMENT_FIELD_COST_HQ = 1057;
 const ELEMENT_FIELD_SRA3 = 1066;
-const MAX_LAYOUT_FILE_MB = 50;
 const MAX_PREVIEW_BYTES = 512000;
 const PREVIEW_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const PREVIEW_FETCH_MAX_RETRIES = 3;
@@ -621,7 +620,7 @@ async function compressPreviewImage(file) {
     throw new Error("preview too large");
 }
 
-async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgress = null) {
+async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgress = null, timeoutMs = UPLOAD_TIMEOUT_MS) {
     if (typeof onProgress !== "function") {
         const response = await fetchWithTimeout(uploadUrl, {
             method: "PUT",
@@ -629,7 +628,7 @@ async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgres
             headers: {
                 "Content-Type": mimeType || file.type || "application/octet-stream"
             }
-        }, UPLOAD_TIMEOUT_MS);
+        }, timeoutMs);
 
         if (!response.ok) {
             throw new Error(`Yandex upload failed (${response.status})`);
@@ -640,7 +639,7 @@ async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgres
     await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", uploadUrl);
-        xhr.timeout = UPLOAD_TIMEOUT_MS;
+        xhr.timeout = timeoutMs;
         xhr.setRequestHeader("Content-Type", mimeType || file.type || "application/octet-stream");
         xhr.upload.onprogress = (event) => {
             if (event.lengthComputable && event.total > 0) {
@@ -2231,10 +2230,14 @@ async function handlePreviewUpload(event) {
     await uploadPreviewFiles(files);
 }
 
+function getLayoutUploadTimeoutMs(fileSize = 0) {
+    const mb = Number(fileSize) / (1024 * 1024);
+    const scaled = UPLOAD_TIMEOUT_MS + Math.max(0, mb) * 4000;
+    return Math.min(2 * 60 * 60 * 1000, Math.max(UPLOAD_TIMEOUT_MS, scaled));
+}
+
 async function uploadSingleLayoutFile(file, options = {}) {
-    if (file.size > MAX_LAYOUT_FILE_MB * 1024 * 1024) {
-        throw new Error(`Файл не больше ${MAX_LAYOUT_FILE_MB} МБ`);
-    }
+    const uploadTimeoutMs = getLayoutUploadTimeoutMs(file.size);
 
     const payload = buildElementAssetsPayload(
         currentElementEditor.dealId,
@@ -2264,14 +2267,14 @@ async function uploadSingleLayoutFile(file, options = {}) {
 
     await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream", (ratio) => {
         updateProgress("Загрузка файла…", 0.2 + ratio * 0.65);
-    });
+    }, uploadTimeoutMs);
 
     updateProgress("Сохранение макета…", 0.92);
     const data = await elementAssetsApi("addElementLayout", {
         ...payload,
         type: "file",
         uploadComplete: true
-    }, { timeoutMs: SERVER_TIMEOUT_MS });
+    }, { timeoutMs: Math.max(SERVER_TIMEOUT_MS, uploadTimeoutMs) });
 
     const assets = normalizeAssetsResponse(data);
     const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);

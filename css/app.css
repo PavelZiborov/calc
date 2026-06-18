@@ -655,6 +655,130 @@
     .element-editor-save-secondary { background: #27ae60; color: #fff; }
     .element-editor-assets-hidden .element-editor-assets-block { display: none; }
     .element-row-total { flex: 0 0 auto; margin-left: auto; font-weight: bold; white-space: nowrap; font-size: 12px; line-height: 1.2; text-align: right; }
+    .element-row-delete-btn {
+        flex: 0 0 auto;
+        margin: 0;
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+        padding: 0;
+        border: 1px solid #e2b5b5;
+        border-radius: 50%;
+        background: #f3d5d5;
+        color: #9b2c2c;
+        font-size: 14px;
+        line-height: 18px;
+        cursor: pointer;
+        text-align: center;
+    }
+    .element-row-delete-btn:hover { background: #ff4d4d; color: #fff; border-color: #ff4d4d; }
+    .deal-element-delete-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #fff4e5;
+        border: 1px solid #f0c987;
+        color: #7a4b00;
+        font-size: 13px;
+    }
+    .deal-element-delete-banner[hidden] { display: none !important; }
+    .deal-element-delete-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .deal-element-delete-cancel,
+    .deal-element-delete-confirm {
+        margin: 0;
+        width: auto;
+        height: auto;
+        min-width: 0;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+    }
+    .deal-element-delete-cancel { background: #fff; color: #555; border: 1px solid #d9dde3; }
+    .deal-element-delete-confirm { background: #ff4d4d; color: #fff; border: 1px solid #ff4d4d; }
+    .deal-element-delete-confirm:disabled { opacity: 0.6; cursor: wait; }
+    .deal-extra-panel {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #eef1f5;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .deal-extra-section { display: flex; flex-direction: column; gap: 6px; }
+    .deal-extra-label { font-size: 12px; font-weight: 600; color: #555; }
+    .deal-extra-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .deal-cost-info-input,
+    .deal-requisites-text {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #d5dde6;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+        line-height: 1.4;
+        font-family: inherit;
+        resize: vertical;
+        min-height: 72px;
+    }
+    .deal-cost-info-input:focus,
+    .deal-requisites-text:focus { outline: none; border-color: #2f7df6; box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.12); }
+    .deal-extra-actions-row { align-items: flex-start; }
+    .deal-create-invoice-btn {
+        margin: 0;
+        width: auto;
+        height: auto;
+        min-width: 0;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid #2f7df6;
+        background: #2f7df6;
+        color: #fff;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .deal-create-invoice-btn:hover { background: #1e5fcb; border-color: #1e5fcb; }
+    .deal-requisites-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+    .deal-requisites-tab {
+        margin: 0;
+        width: auto;
+        height: auto;
+        min-width: 0;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #d9dde3;
+        background: #f4f6f8;
+        color: #555;
+        font-size: 12px;
+        cursor: pointer;
+    }
+    .deal-requisites-tab.active { background: #2f7df6; border-color: #2f7df6; color: #fff; }
+    .deal-requisites-add-btn {
+        margin: 0;
+        width: auto;
+        height: auto;
+        min-width: 0;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px dashed #b8c4d4;
+        background: #fff;
+        color: #2f7df6;
+        font-size: 12px;
+        cursor: pointer;
+    }
+    .deal-requisites-add-btn:hover { background: #eef4ff; }
+    .deal-requisites-panel { display: none; }
+    .deal-requisites-panel.active { display: block; }
     .deal-total-only { font-weight: bold; font-size: 12px; line-height: 1.2; }
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
     .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
