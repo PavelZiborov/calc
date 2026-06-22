@@ -2402,10 +2402,10 @@ function renderDealInvoiceInfoBody(fields) {
 }
 
 function applyDealInvoiceInfo(dealId, fields) {
-    const section = document.querySelector(`.deal-invoice-info[data-deal-id="${CSS.escape(String(dealId))}"]`);
-    const body = section?.querySelector(".deal-invoice-info-body");
-    if (!body) return;
-    body.innerHTML = renderDealInvoiceInfoBody(fields);
+    const row = document.querySelector(`.deal-invoice-row[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    const display = row?.querySelector(".deal-invoice-display");
+    if (!display) return;
+    display.innerHTML = renderDealInvoiceInfoBody(fields);
 }
 
 function getDealClientId(deal) {
@@ -2612,8 +2612,9 @@ function renderDealExtraPanel(deal) {
                 <label class="deal-extra-label">Информация по себестоимости</label>
                 <textarea class="deal-cost-info-input" rows="3" placeholder="Заметки по себестоимости заказа…" onblur="saveDealCostInfoDraft(${dealId}, this.value)">${costInfo}</textarea>
             </div>
-            <div class="deal-extra-section deal-extra-actions-row">
-                <button type="button" class="deal-create-invoice-btn" onclick="createDealInvoice(${dealId})">Создать счёт</button>
+            <div class="deal-invoice-row" data-deal-id="${dealId}">
+                <button type="button" class="deal-create-invoice-btn" onclick="showInvoiceRequisitesModal(${dealId})">Создать счёт</button>
+                <div class="deal-invoice-display"><div class="deal-invoice-empty">Загрузка…</div></div>
             </div>
             <div class="deal-extra-section deal-requisites-section" data-deal-id="${dealId}"${clientId ? ` data-client-id="${clientId}"` : ""}>
                 <div class="deal-extra-label-row">
@@ -2625,16 +2626,129 @@ function renderDealExtraPanel(deal) {
                 </div>
                 <div class="deal-req-list"><div class="deal-req-empty deal-req-loading">Загрузка реквизитов…</div></div>
             </div>
-            <div class="deal-extra-section deal-invoice-info" data-deal-id="${dealId}">
-                <span class="deal-extra-label">Счёт</span>
-                <div class="deal-invoice-info-body"><div class="deal-invoice-empty">Загрузка…</div></div>
-            </div>
         </div>`;
 }
 
-function createDealInvoice(dealId) {
+async function showInvoiceRequisitesModal(dealId) {
     if (!ensureActiveSession()) return;
-    alert("Создание счёта будет подключено на следующем этапе.");
+
+    const deal = loadedDeals.get(String(dealId));
+    if (!deal) return;
+
+    const clientId = getDealClientId(deal);
+    if (!clientId) {
+        alert("Клиент не привязан к сделке");
+        return;
+    }
+
+    let requisites = clientRequisitesCache.get(String(clientId));
+    if (!requisites) {
+        requisites = await fetchClientRequisites(clientId);
+        if (!requisites) {
+            alert("Не удалось загрузить реквизиты");
+            return;
+        }
+        clientRequisitesCache.set(String(clientId), requisites);
+    }
+
+    if (!requisites.length) {
+        alert("У клиента нет реквизитов. Добавьте их в карточке клиента.");
+        return;
+    }
+
+    const selectedId = readSelectedRequisiteId(dealId);
+    const modalHtml = `
+        <div class="invoice-modal-overlay" onclick="if(event.target===this) closeInvoiceModal()">
+            <div class="invoice-modal">
+                <div class="invoice-modal-header">
+                    <h3>Выберите реквизиты для выставления счёта</h3>
+                    <button type="button" class="invoice-modal-close" onclick="closeInvoiceModal()">✕</button>
+                </div>
+                <div class="invoice-modal-body">
+                    <div class="invoice-req-list">
+                        ${requisites.map(req => `
+                            <label class="invoice-req-option">
+                                <input type="radio" name="invoice-req" value="${escapeHtml(req.id)}" ${String(req.id) === String(selectedId) ? 'checked' : ''}>
+                                <span class="invoice-req-option-text">
+                                    <span class="invoice-req-name">${escapeHtml(req.name || req.title)}</span>
+                                    ${req.inn ? `<span class="invoice-req-inn">ИНН ${escapeHtml(req.inn)}</span>` : ""}
+                                </span>
+                            </label>
+                        `).join("")}
+                    </div>
+                </div>
+                <div class="invoice-modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeInvoiceModal()">Отмена</button>
+                    <button type="button" class="btn-primary" onclick="submitInvoiceWithRequisite(${dealId})">Выставить счёт</button>
+                </div>
+            </div>
+        </div>`;
+
+    let modal = document.getElementById("invoiceModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "invoiceModal";
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = modalHtml;
+    modal.style.display = "block";
+}
+
+function closeInvoiceModal() {
+    const modal = document.getElementById("invoiceModal");
+    if (modal) modal.style.display = "none";
+}
+
+async function submitInvoiceWithRequisite(dealId) {
+    const modal = document.getElementById("invoiceModal");
+    const radioChecked = modal?.querySelector('input[name="invoice-req"]:checked');
+    const requisiteId = radioChecked?.value;
+
+    if (!requisiteId) {
+        alert("Выберите реквизиты");
+        return;
+    }
+
+    closeInvoiceModal();
+
+    if (!ensureActiveSession({ silent: true })) return;
+
+    const submitBtn = document.querySelector(`.deal-invoice-row[data-deal-id="${dealId}"] .deal-create-invoice-btn`);
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "createInvoice",
+                dealId: Number(dealId),
+                requisiteId: String(requisiteId)
+            })
+        });
+
+        if (response.status === 401) {
+            handleUnauthorized();
+            return;
+        }
+
+        if (response.ok) {
+            const payload = await response.json();
+            if (payload?.ok || payload?.success) {
+                alert("Счёт выставлен успешно");
+                // TODO: обновить инфо о счёте в UI
+            } else {
+                alert("Ошибка при выставлении счёта: " + (payload?.message || "неизвестная ошибка"));
+            }
+        } else {
+            alert("Ошибка при выставлении счёта");
+        }
+    } catch (e) {
+        console.error("createInvoice failed", e);
+        alert("Ошибка: " + (e.message || "неизвестная ошибка"));
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 function ensureDeleteElementBanner(listEl) {

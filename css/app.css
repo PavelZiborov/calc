@@ -857,6 +857,157 @@
     .deal-invoice-date { color: #555; font-size: 12px; }
     .deal-invoice-link { color: #2F6BD8; font-size: 13px; text-decoration: none; }
     .deal-invoice-link:hover { text-decoration: underline; }
+    .deal-invoice-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        background: #f7faff;
+        border: 1px solid #d5dde6;
+        border-radius: 8px;
+    }
+    .deal-invoice-row .deal-create-invoice-btn {
+        margin: 0;
+        flex: 0 0 auto;
+    }
+    .deal-invoice-display {
+        flex: 1;
+        min-width: 0;
+    }
+    /* Модальное окно для выбора реквизитов */
+    .invoice-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(28, 27, 25, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    .invoice-modal {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.2);
+        width: 90%;
+        max-width: 450px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .invoice-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        border-bottom: 1px solid #eef1f5;
+    }
+    .invoice-modal-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1f2d3d;
+    }
+    .invoice-modal-close {
+        margin: 0;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        padding: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: #8a93a0;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .invoice-modal-close:hover { background: #f4f6f8; color: #1f2d3d; }
+    .invoice-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+    }
+    .invoice-req-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .invoice-req-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        transition: background .12s ease, border-color .12s ease;
+    }
+    .invoice-req-option:hover { background: #f4f8ff; }
+    .invoice-req-option input[type="radio"] {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 0;
+        padding: 0;
+        border: none;
+        background: none;
+    }
+    .invoice-req-option-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+        min-width: 0;
+    }
+    .invoice-req-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1f2d3d;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+    .invoice-req-inn {
+        font-size: 11px;
+        color: #8a93a0;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: .2px;
+    }
+    .invoice-modal-footer {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        padding: 12px 16px;
+        border-top: 1px solid #eef1f5;
+        background: #f9fafb;
+    }
+    .btn-primary, .btn-secondary {
+        margin: 0;
+        padding: 9px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: background .12s ease, color .12s ease;
+    }
+    .btn-primary {
+        background: #2F6BD8;
+        color: #fff;
+    }
+    .btn-primary:hover { background: #2459B8; }
+    .btn-primary:disabled { background: #c9d4e3; cursor: not-allowed; }
+    .btn-secondary {
+        background: #e8eef6;
+        color: #2F6BD8;
+    }
+    .btn-secondary:hover { background: #dce4f0; }
     .deal-total-only { font-weight: bold; font-size: 12px; line-height: 1.2; }
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
     .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
