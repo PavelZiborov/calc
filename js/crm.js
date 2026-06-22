@@ -2244,6 +2244,9 @@ const dealAdditionalFieldsCache = new Map();
 const dealCostInfoPushTimers = new Map();
 // clientId -> [{ id, title, inn, name }] реквизиты клиента из CRM
 const clientRequisitesCache = new Map();
+// dealId -> { number, date, onlineLink, editLink } данные выставленного счёта.
+// onlineLink — статическая ссылка-превью счёта (МоёДело), встраиваемая в iframe.
+const dealInvoiceCache = new Map();
 
 function readDealCostInfoDraft(dealId) {
     try {
@@ -2378,34 +2381,95 @@ function formatInvoiceDate(raw) {
     return text;
 }
 
-function renderDealInvoiceInfoBody(fields) {
+function isHttpUrl(value) {
+    return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+// Собираем данные счёта из доп.полей CRM (после перезагрузки страницы).
+function buildInvoiceFromFields(fields) {
     const map = fields || {};
     const number = String(map[DEAL_FIELD_INVOICE_NUMBER] || "").trim();
-    const date = formatInvoiceDate(map[DEAL_FIELD_INVOICE_DATE]);
-    const link = String(map[DEAL_FIELD_INVOICE_LINK] || "").trim();
+    const date = String(map[DEAL_FIELD_INVOICE_DATE] || "").trim();
+    const onlineLink = String(map[DEAL_FIELD_INVOICE_LINK] || "").trim();
+    if (!number && !date && !onlineLink) return null;
+    return { number, date, onlineLink, editLink: "" };
+}
 
-    if (!number && !link && !date) {
+function renderInvoiceCardMarkup(dealId, invoice) {
+    if (!invoice || (!invoice.number && !invoice.onlineLink && !invoice.date)) {
         return `<div class="deal-invoice-empty">Счёт ещё не создан</div>`;
     }
 
-    const title = number ? `Счёт № ${escapeHtml(number)}` : "Счёт";
+    const title = invoice.number ? `Счёт № ${escapeHtml(invoice.number)}` : "Счёт";
+    const date = formatInvoiceDate(invoice.date);
     const dateHtml = date ? `<span class="deal-invoice-date">от ${escapeHtml(date)}</span>` : "";
-    const linkHtml = /^https?:\/\//i.test(link)
-        ? `<a class="deal-invoice-link" href="${escapeHtml(link)}" target="_blank" rel="noopener">🔗 Открыть счёт</a>`
-        : "";
+    const hasPreview = isHttpUrl(invoice.onlineLink);
+    const hasEdit = isHttpUrl(invoice.editLink);
+
+    const headAttrs = hasPreview ? ` onclick="toggleInvoicePreview(${dealId})" title="Показать/скрыть счёт"` : "";
+    const caret = hasPreview ? `<span class="deal-invoice-caret" aria-hidden="true">▸</span>` : "";
+
+    const actionsHtml = (hasPreview || hasEdit) ? `
+            <div class="deal-invoice-actions">
+                ${hasPreview ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.onlineLink)}" target="_blank" rel="noopener">🔗 В новой вкладке</a>` : ""}
+                ${hasEdit ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.editLink)}" target="_blank" rel="noopener">✏️ Редактировать</a>` : ""}
+            </div>` : "";
 
     return `
-        <div class="deal-invoice-card">
-            <div class="deal-invoice-head"><span class="deal-invoice-title">${title}</span>${dateHtml}</div>
-            ${linkHtml}
+        <div class="deal-invoice-card${hasPreview ? " is-expandable" : ""}">
+            <div class="deal-invoice-head"${headAttrs}>
+                ${caret}<span class="deal-invoice-title">${title}</span>${dateHtml}
+            </div>
+            ${actionsHtml}
         </div>`;
 }
 
-function applyDealInvoiceInfo(dealId, fields) {
+// Полноширинное превью счёта (рендерится в отдельный слот под строкой).
+function renderInvoicePreviewMarkup(invoice) {
+    if (!invoice || !isHttpUrl(invoice.onlineLink)) return "";
+    return `
+        <div class="deal-invoice-preview" hidden>
+            <iframe class="deal-invoice-iframe" loading="lazy" referrerpolicy="no-referrer" title="Превью счёта"></iframe>
+            <div class="deal-invoice-preview-hint">Если счёт не отобразился — <a href="${escapeHtml(invoice.onlineLink)}" target="_blank" rel="noopener">откройте в новой вкладке</a>.</div>
+        </div>`;
+}
+
+function renderInvoiceDisplay(dealId) {
     const row = document.querySelector(`.deal-invoice-row[data-deal-id="${CSS.escape(String(dealId))}"]`);
-    const display = row?.querySelector(".deal-invoice-display");
-    if (!display) return;
-    display.innerHTML = renderDealInvoiceInfoBody(fields);
+    if (!row) return;
+    const invoice = dealInvoiceCache.get(String(dealId));
+    const display = row.querySelector(".deal-invoice-display");
+    const slot = row.querySelector(".deal-invoice-preview-slot");
+    if (display) display.innerHTML = renderInvoiceCardMarkup(dealId, invoice);
+    if (slot) slot.innerHTML = renderInvoicePreviewMarkup(invoice);
+}
+
+// Раскрытие/скрытие inline-превью счёта. iframe грузим лениво при первом открытии.
+function toggleInvoicePreview(dealId) {
+    const row = document.querySelector(`.deal-invoice-row[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    const card = row?.querySelector(".deal-invoice-card");
+    const preview = row?.querySelector(".deal-invoice-preview");
+    const iframe = preview?.querySelector(".deal-invoice-iframe");
+    if (!preview || !iframe) return;
+
+    const willShow = preview.hidden;
+    if (willShow && !iframe.getAttribute("src")) {
+        const invoice = dealInvoiceCache.get(String(dealId));
+        if (isHttpUrl(invoice?.onlineLink)) iframe.setAttribute("src", invoice.onlineLink);
+    }
+    preview.hidden = !willShow;
+    card?.classList.toggle("is-expanded", willShow);
+}
+
+function applyDealInvoiceInfo(dealId, fields) {
+    const fromFields = buildInvoiceFromFields(fields);
+    if (fromFields) {
+        // Сохраняем editLink, если он уже был получен при создании счёта в этой сессии.
+        const existing = dealInvoiceCache.get(String(dealId));
+        if (existing?.editLink && !fromFields.editLink) fromFields.editLink = existing.editLink;
+        dealInvoiceCache.set(String(dealId), fromFields);
+    }
+    renderInvoiceDisplay(dealId);
 }
 
 function getDealClientId(deal) {
@@ -2455,87 +2519,6 @@ function normalizeRequisitesList(list) {
         });
 }
 
-function getDealRequisitesSection(dealId) {
-    return document.querySelector(`.deal-requisites-section[data-deal-id="${CSS.escape(String(dealId))}"]`);
-}
-
-function renderRequisitesListMarkup(dealId, items, selectedId, filter = "") {
-    const needle = String(filter || "").trim().toLowerCase();
-    const filtered = needle
-        ? items.filter(it => it.title.toLowerCase().includes(needle))
-        : items;
-
-    if (!filtered.length) {
-        return needle
-            ? `<div class="deal-req-empty">Ничего не найдено по «${escapeHtml(filter)}»</div>`
-            : `<div class="deal-req-empty">У клиента нет реквизитов в CRM</div>`;
-    }
-
-    return filtered.map(item => {
-        const isSel = String(item.id) === String(selectedId);
-        const nameHtml = escapeHtml(item.name || item.title);
-        const innHtml = item.inn ? `<span class="deal-req-inn">ИНН ${escapeHtml(item.inn)}</span>` : "";
-        return `
-        <button type="button" class="deal-req-item${isSel ? " is-selected" : ""}" data-req-id="${escapeHtml(item.id)}" onclick="selectDealRequisite(${dealId}, '${escapeHtml(item.id)}')">
-            <span class="deal-req-radio" aria-hidden="true"></span>
-            <span class="deal-req-text">
-                <span class="deal-req-name">${nameHtml}</span>
-                ${innHtml}
-            </span>
-        </button>`;
-    }).join("");
-}
-
-function renderDealRequisitesBody(dealId, state) {
-    const section = getDealRequisitesSection(dealId);
-    const listEl = section?.querySelector(".deal-req-list");
-    const searchWrap = section?.querySelector(".deal-req-search");
-    if (!listEl) return;
-
-    if (state === "loading") {
-        listEl.innerHTML = `<div class="deal-req-empty deal-req-loading">Загрузка реквизитов…</div>`;
-        if (searchWrap) searchWrap.style.display = "none";
-        return;
-    }
-    if (state === "error") {
-        listEl.innerHTML = `<div class="deal-req-empty deal-req-error">Не удалось загрузить реквизиты</div>`;
-        if (searchWrap) searchWrap.style.display = "none";
-        return;
-    }
-    if (state === "no-client") {
-        listEl.innerHTML = `<div class="deal-req-empty">Клиент не привязан к сделке</div>`;
-        if (searchWrap) searchWrap.style.display = "none";
-        return;
-    }
-
-    const clientId = section?.dataset.clientId;
-    const items = clientRequisitesCache.get(String(clientId)) || [];
-    const selectedId = readSelectedRequisiteId(dealId);
-    const filterInput = section?.querySelector(".deal-req-search-input");
-    const filter = filterInput?.value || "";
-
-    // Поиск показываем только когда реквизитов много.
-    if (searchWrap) searchWrap.style.display = items.length > 6 ? "block" : "none";
-
-    listEl.innerHTML = renderRequisitesListMarkup(dealId, items, selectedId, filter);
-}
-
-function selectDealRequisite(dealId, requisiteId) {
-    const current = readSelectedRequisiteId(dealId);
-    // Повторный клик по выбранному — снимаем выбор.
-    const next = String(current) === String(requisiteId) ? "" : String(requisiteId);
-    saveSelectedRequisiteId(dealId, next);
-
-    const section = getDealRequisitesSection(dealId);
-    section?.querySelectorAll(".deal-req-item").forEach(btn => {
-        btn.classList.toggle("is-selected", next && String(btn.dataset.reqId) === next);
-    });
-}
-
-function filterDealRequisites(dealId) {
-    renderDealRequisitesBody(dealId, "ready");
-}
-
 function openClientRequisitesEditor(clientId) {
     if (!clientId) return;
     window.open(`https://crm.heavendevelop.ru/editClient/${clientId}`, "_blank", "noopener");
@@ -2569,33 +2552,17 @@ async function fetchClientRequisites(clientId) {
     }
 }
 
+// Реквизиты не показываются в карточке — только предзагружаем в кеш,
+// чтобы модалка по кнопке «Создать счёт» открывалась мгновенно.
 function scheduleDealRequisitesLoading(deal) {
-    const dealId = deal?.id;
-    if (!dealId || currentUser.role !== "staff") return;
+    if (currentUser.role !== "staff") return;
 
     const clientId = getDealClientId(deal);
-    const section = getDealRequisitesSection(dealId);
-    if (section && clientId) section.dataset.clientId = String(clientId);
+    if (!clientId) return;
+    if (clientRequisitesCache.has(String(clientId))) return;
 
-    if (!clientId) {
-        renderDealRequisitesBody(dealId, "no-client");
-        return;
-    }
-
-    const cached = clientRequisitesCache.get(String(clientId));
-    if (cached) {
-        renderDealRequisitesBody(dealId, "ready");
-        return;
-    }
-
-    renderDealRequisitesBody(dealId, "loading");
     fetchClientRequisites(clientId).then(list => {
-        if (list == null) {
-            renderDealRequisitesBody(dealId, "error");
-            return;
-        }
-        clientRequisitesCache.set(String(clientId), list);
-        renderDealRequisitesBody(dealId, "ready");
+        if (list != null) clientRequisitesCache.set(String(clientId), list);
     });
 }
 
@@ -2612,19 +2579,12 @@ function renderDealExtraPanel(deal) {
                 <label class="deal-extra-label">Информация по себестоимости</label>
                 <textarea class="deal-cost-info-input" rows="3" placeholder="Заметки по себестоимости заказа…" onblur="saveDealCostInfoDraft(${dealId}, this.value)">${costInfo}</textarea>
             </div>
-            <div class="deal-invoice-row" data-deal-id="${dealId}">
-                <button type="button" class="deal-create-invoice-btn" onclick="showInvoiceRequisitesModal(${dealId})">Создать счёт</button>
-                <div class="deal-invoice-display"><div class="deal-invoice-empty">Загрузка…</div></div>
-            </div>
-            <div class="deal-extra-section deal-requisites-section" data-deal-id="${dealId}"${clientId ? ` data-client-id="${clientId}"` : ""}>
-                <div class="deal-extra-label-row">
-                    <span class="deal-extra-label">Реквизиты клиента</span>
-                    ${clientId ? `<button type="button" class="deal-requisites-add-btn" onclick="openClientRequisitesEditor(${clientId})" title="Добавить реквизиты в карточке клиента">+ Добавить в CRM ↗</button>` : ""}
+            <div class="deal-invoice-row" data-deal-id="${dealId}"${clientId ? ` data-client-id="${clientId}"` : ""}>
+                <div class="deal-invoice-row-main">
+                    <button type="button" class="deal-create-invoice-btn" onclick="showInvoiceRequisitesModal(${dealId})">Создать счёт</button>
+                    <div class="deal-invoice-display"><div class="deal-invoice-empty">Загрузка…</div></div>
                 </div>
-                <div class="deal-req-search" style="display:none;">
-                    <input type="text" class="deal-req-search-input" placeholder="Поиск по ИНН или названию…" oninput="filterDealRequisites(${dealId})">
-                </div>
-                <div class="deal-req-list"><div class="deal-req-empty deal-req-loading">Загрузка реквизитов…</div></div>
+                <div class="deal-invoice-preview-slot"></div>
             </div>
         </div>`;
 }
@@ -2632,10 +2592,9 @@ function renderDealExtraPanel(deal) {
 async function showInvoiceRequisitesModal(dealId) {
     if (!ensureActiveSession()) return;
 
-    const deal = loadedDeals.get(String(dealId));
-    if (!deal) return;
-
-    const clientId = getDealClientId(deal);
+    // clientId берём из data-атрибута строки счёта (проставлен в renderDealExtraPanel).
+    const row = document.querySelector(`.deal-invoice-row[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    const clientId = row?.dataset.clientId ? Number(row.dataset.clientId) : null;
     if (!clientId) {
         alert("Клиент не привязан к сделке");
         return;
@@ -2651,35 +2610,43 @@ async function showInvoiceRequisitesModal(dealId) {
         clientRequisitesCache.set(String(clientId), requisites);
     }
 
-    if (!requisites.length) {
-        alert("У клиента нет реквизитов. Добавьте их в карточке клиента.");
-        return;
-    }
-
     const selectedId = readSelectedRequisiteId(dealId);
+    const addBtn = `<button type="button" class="invoice-req-add-btn" onclick="openClientRequisitesEditor(${clientId})" title="Добавить реквизиты в карточке клиента">+ Добавить в CRM ↗</button>`;
+
+    const bodyHtml = requisites.length
+        ? `<div class="invoice-req-list">
+                ${requisites.map(req => `
+                    <label class="invoice-req-option">
+                        <input type="radio" name="invoice-req" value="${escapeHtml(req.id)}" ${String(req.id) === String(selectedId) ? 'checked' : ''}>
+                        <span class="invoice-req-option-text">
+                            <span class="invoice-req-name">${escapeHtml(req.name || req.title)}</span>
+                            ${req.inn ? `<span class="invoice-req-inn">ИНН ${escapeHtml(req.inn)}</span>` : ""}
+                        </span>
+                    </label>
+                `).join("")}
+            </div>`
+        : `<div class="invoice-req-empty">У клиента нет реквизитов в CRM.<br>Добавьте их, чтобы выставить счёт.</div>`;
+
+    const footerHtml = requisites.length
+        ? `<button type="button" class="btn-secondary" onclick="closeInvoiceModal()">Отмена</button>
+           <button type="button" class="btn-primary" onclick="submitInvoiceWithRequisite(${dealId})">Выставить счёт</button>`
+        : `<button type="button" class="btn-secondary" onclick="closeInvoiceModal()">Закрыть</button>`;
+
     const modalHtml = `
         <div class="invoice-modal-overlay" onclick="if(event.target===this) closeInvoiceModal()">
             <div class="invoice-modal">
                 <div class="invoice-modal-header">
-                    <h3>Выберите реквизиты для выставления счёта</h3>
-                    <button type="button" class="invoice-modal-close" onclick="closeInvoiceModal()">✕</button>
-                </div>
-                <div class="invoice-modal-body">
-                    <div class="invoice-req-list">
-                        ${requisites.map(req => `
-                            <label class="invoice-req-option">
-                                <input type="radio" name="invoice-req" value="${escapeHtml(req.id)}" ${String(req.id) === String(selectedId) ? 'checked' : ''}>
-                                <span class="invoice-req-option-text">
-                                    <span class="invoice-req-name">${escapeHtml(req.name || req.title)}</span>
-                                    ${req.inn ? `<span class="invoice-req-inn">ИНН ${escapeHtml(req.inn)}</span>` : ""}
-                                </span>
-                            </label>
-                        `).join("")}
+                    <h3>${requisites.length ? "Выберите реквизиты для счёта" : "Реквизиты клиента"}</h3>
+                    <div class="invoice-modal-header-actions">
+                        ${addBtn}
+                        <button type="button" class="invoice-modal-close" onclick="closeInvoiceModal()">✕</button>
                     </div>
                 </div>
+                <div class="invoice-modal-body">
+                    ${bodyHtml}
+                </div>
                 <div class="invoice-modal-footer">
-                    <button type="button" class="btn-secondary" onclick="closeInvoiceModal()">Отмена</button>
-                    <button type="button" class="btn-primary" onclick="submitInvoiceWithRequisite(${dealId})">Выставить счёт</button>
+                    ${footerHtml}
                 </div>
             </div>
         </div>`;
@@ -2709,6 +2676,9 @@ async function submitInvoiceWithRequisite(dealId) {
         return;
     }
 
+    // Запоминаем выбор, чтобы при следующем открытии он был предвыбран.
+    saveSelectedRequisiteId(dealId, requisiteId);
+
     closeInvoiceModal();
 
     if (!ensureActiveSession({ silent: true })) return;
@@ -2734,11 +2704,15 @@ async function submitInvoiceWithRequisite(dealId) {
 
         if (response.ok) {
             const payload = await response.json();
-            if (payload?.ok || payload?.success) {
-                alert("Счёт выставлен успешно");
-                // TODO: обновить инфо о счёте в UI
+            // Ответ приходит массивом из одного объекта (может быть и в payload.data).
+            const data = Array.isArray(payload)
+                ? payload[0]
+                : (Array.isArray(payload?.data) ? payload.data[0] : (payload?.data || payload));
+
+            if (data && data.invoice_number != null && data.invoice_number !== "") {
+                applyCreatedInvoice(dealId, data);
             } else {
-                alert("Ошибка при выставлении счёта: " + (payload?.message || "неизвестная ошибка"));
+                alert("Ошибка при выставлении счёта: " + (data?.message || payload?.message || "неизвестная ошибка"));
             }
         } else {
             alert("Ошибка при выставлении счёта");
@@ -2749,6 +2723,29 @@ async function submitInvoiceWithRequisite(dealId) {
     } finally {
         if (submitBtn) submitBtn.disabled = false;
     }
+}
+
+// Применяем данные только что созданного счёта: обновляем кеш, доп.поля и UI,
+// затем сразу раскрываем inline-превью, чтобы менеджер увидел результат.
+function applyCreatedInvoice(dealId, data) {
+    const invoice = {
+        number: String(data.invoice_number ?? "").trim(),
+        date: String(data.invoice_date ?? "").trim(),
+        onlineLink: String(data.invoice_online_link ?? "").trim(),
+        editLink: String(data.invoice_edit_link ?? "").trim()
+    };
+    dealInvoiceCache.set(String(dealId), invoice);
+
+    // Синхронизируем доп.поля CRM в памяти, чтобы перерисовки карточки не затёрли счёт.
+    const map = dealAdditionalFieldsCache.get(String(dealId)) || {};
+    map[DEAL_FIELD_INVOICE_NUMBER] = invoice.number;
+    map[DEAL_FIELD_INVOICE_DATE] = invoice.date;
+    map[DEAL_FIELD_INVOICE_LINK] = invoice.onlineLink;
+    dealAdditionalFieldsCache.set(String(dealId), map);
+
+    renderInvoiceDisplay(dealId);
+    // Раскрываем превью сразу после создания.
+    if (isHttpUrl(invoice.onlineLink)) toggleInvoicePreview(dealId);
 }
 
 function ensureDeleteElementBanner(listEl) {
