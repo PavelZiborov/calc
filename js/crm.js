@@ -519,10 +519,10 @@ function renderElementStatusControl(dealId, element, elementIndex, statusMeta, i
     const elementId = getElementId(element);
 
     if (currentUser.role !== 'staff' || isLocked) {
-        return `<span title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${icon}</span>`;
+        return `<span class="element-status-cell" title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${icon}</span>`;
     }
 
-    return `<button type="button" class="item-status-control" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}">${icon}</button>`;
+    return `<button type="button" class="item-status-control element-status-cell" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}">${icon}</button>`;
 }
 
 function showStatusMenu(event, trigger) {
@@ -1211,13 +1211,92 @@ function createRowHtml(name, qty, price, statusName, isNew = false, options = {}
             ? `<button type="button" class="element-row-delete-btn" onclick="this.parentElement.remove(); updateDealTotal(this.closest('.deal-elements-list'));" title="Удалить" aria-label="Удалить">×</button>`
             : "");
 
+    const units = escapeHtml(getElementUnits(options.element || {}));
+    // Компактная строка для мобильных (как было): «название, кол-во ед., цена руб.».
+    const compactText = `${escapeHtml(name)}, ${q} ${units}, ${p} руб.`;
+
+    // Десктопные столбцы (только детальная карточка заказа): название | количество | себестоимость.
+    let desktopColsHtml = "";
+    if (isDetailMode) {
+        const nameColClass = canOpenEditor
+            ? "element-row-name element-row-col element-row-text-clickable"
+            : "element-row-name element-row-col";
+        let costColHtml = "";
+        if (currentUser.role === "staff") {
+            const cost = typeof getElementCost === "function" ? getElementCost(options.element || {}) : null;
+            costColHtml = renderElementCostCell(cost);
+        }
+        desktopColsHtml = `
+            <span class="${nameColClass}"${textClick}>${escapeHtml(name)}</span>
+            <span class="element-row-qty element-row-col">${q} ${units}</span>
+            ${costColHtml}`;
+    }
+
     return `
         <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}"${rowAttrs}>
             ${statusControl}
             ${thumbHtml}
-            <span class="${textClass}"${textClick}>${escapeHtml(name)}, ${q} ${escapeHtml(getElementUnits(options.element || {}))}, ${p} руб.</span>
-            <span class="element-row-total">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} руб.</span>
+            <span class="${textClass}"${textClick}>${compactText}</span>
+            ${desktopColsHtml}
+            <span class="element-row-total">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})}<span class="rub-suffix"> руб.</span></span>
             ${deleteBtnHtml}
+        </div>`;
+}
+
+// Ячейка себестоимости (десктоп): значение под маской (скрыто по умолчанию) либо явный
+// индикатор «не указана», если себестоимость не заполнена.
+function renderElementCostCell(cost) {
+    if (cost == null) {
+        return `<span class="element-row-cost element-row-col is-empty" title="Себестоимость не заполнена">не указана</span>`;
+    }
+    const num = Math.round(cost).toLocaleString('ru-RU');
+    return `<span class="element-row-cost element-row-col"><span class="cost-val">${num}</span><span class="cost-mask">•••••</span></span>`;
+}
+
+// Видимость себестоимости (глобально, по умолчанию скрыто). Хранится в localStorage.
+let dealCostsVisible = (function () {
+    try { return localStorage.getItem("calc_costs_visible") === "1"; } catch (_) { return false; }
+})();
+
+function applyDealCostsVisibility() {
+    document.querySelectorAll(".elements-list").forEach(el => {
+        el.classList.toggle("costs-hidden", !dealCostsVisible);
+    });
+    document.querySelectorAll(".cost-eye-btn").forEach(btn => {
+        btn.textContent = dealCostsVisible ? "🙈" : "👁️";
+        btn.setAttribute("aria-pressed", dealCostsVisible ? "true" : "false");
+        btn.title = dealCostsVisible ? "Скрыть себестоимость" : "Показать себестоимость";
+    });
+}
+
+function toggleDealCosts(event) {
+    event?.stopPropagation?.();
+    dealCostsVisible = !dealCostsVisible;
+    try { localStorage.setItem("calc_costs_visible", dealCostsVisible ? "1" : "0"); } catch (_) {}
+    applyDealCostsVisibility();
+}
+
+// Шапка столбцов над списком позиций (только десктоп, детальная карточка — скрывается через CSS).
+// Себестоимость и хвостовая ячейка-распорка (под кнопку удаления) — только для staff в открытой сделке.
+function renderElementColsHeader(options = {}) {
+    const isStaff = currentUser.role === "staff";
+    const hasDeleteCol = isStaff && !options.isClosed;
+    const eyeIcon = dealCostsVisible ? "🙈" : "👁️";
+    const eyeTitle = dealCostsVisible ? "Скрыть себестоимость" : "Показать себестоимость";
+    const costHead = isStaff
+        ? `<span class="ecol ecol-cost">Себес.<button type="button" class="cost-eye-btn" onclick="toggleDealCosts(event)" title="${eyeTitle}" aria-pressed="${dealCostsVisible ? "true" : "false"}" aria-label="${eyeTitle}">${eyeIcon}</button></span>`
+        : "";
+    const actionsSpacer = hasDeleteCol ? `<span class="ecol ecol-actions"></span>` : "";
+
+    return `
+        <div class="element-cols-head">
+            <span class="ecol ecol-status" title="Статус">Статус</span>
+            <span class="ecol ecol-thumb" title="Превью">🖼</span>
+            <span class="ecol ecol-name">Название</span>
+            <span class="ecol ecol-qty">Кол-во</span>
+            ${costHead}
+            <span class="ecol ecol-total">Сумма</span>
+            ${actionsSpacer}
         </div>`;
 }
 
@@ -2150,8 +2229,21 @@ function renderDealFooterMeta(deal) {
 }
 
 const DEAL_COST_INFO_PREFIX = "calc_deal_cost_info_";
-const DEAL_REQUISITES_PREFIX = "calc_deal_requisites_";
+const DEAL_REQUISITE_SEL_PREFIX = "calc_deal_requisite_sel_"; // выбранный реквизит клиента для счёта
 let pendingElementDelete = null;
+
+// CRM additional-field ids (карточка сделки, вкладка заказа)
+const DEAL_FIELD_COST_INFO = 476;      // Информация по себестоимости
+const DEAL_FIELD_INVOICE_NUMBER = 477; // Номер счёта
+const DEAL_FIELD_INVOICE_DATE = 1105;  // Дата счёта
+const DEAL_FIELD_INVOICE_LINK = 1104;  // Ссылка на счёт
+
+// dealId -> { [fieldId]: value } последняя загрузка доп.полей из CRM
+const dealAdditionalFieldsCache = new Map();
+// dealId -> таймер дебаунса PUT себестоимости в CRM
+const dealCostInfoPushTimers = new Map();
+// clientId -> [{ id, title, inn, name }] реквизиты клиента из CRM
+const clientRequisitesCache = new Map();
 
 function readDealCostInfoDraft(dealId) {
     try {
@@ -2162,60 +2254,349 @@ function readDealCostInfoDraft(dealId) {
 }
 
 function saveDealCostInfoDraft(dealId, value) {
+    const text = String(value ?? "");
     try {
-        localStorage.setItem(`${DEAL_COST_INFO_PREFIX}${dealId}`, String(value ?? ""));
+        localStorage.setItem(`${DEAL_COST_INFO_PREFIX}${dealId}`, text);
     } catch (_) {}
+    // CRM — источник правды; localStorage остаётся запасным кэшем.
+    scheduleDealCostInfoPush(dealId, text);
 }
 
-function readDealRequisitesDraft(dealId) {
+function scheduleDealCostInfoPush(dealId, value) {
+    const key = String(dealId);
+    const cached = dealAdditionalFieldsCache.get(key);
+    // Не дёргаем CRM, если значение не менялось относительно последней загрузки.
+    if (cached && String(cached[DEAL_FIELD_COST_INFO] ?? "") === value) return;
+
+    const prevTimer = dealCostInfoPushTimers.get(key);
+    if (prevTimer) clearTimeout(prevTimer);
+
+    const timer = setTimeout(() => {
+        dealCostInfoPushTimers.delete(key);
+        pushDealAdditionalField(dealId, DEAL_FIELD_COST_INFO, value).then(ok => {
+            if (ok) {
+                const map = dealAdditionalFieldsCache.get(key) || {};
+                map[DEAL_FIELD_COST_INFO] = value;
+                dealAdditionalFieldsCache.set(key, map);
+            }
+        });
+    }, 600);
+    dealCostInfoPushTimers.set(key, timer);
+}
+
+async function pushDealAdditionalField(dealId, fieldId, value) {
+    if (!ensureActiveSession({ silent: true })) return false;
     try {
-        const raw = localStorage.getItem(`${DEAL_REQUISITES_PREFIX}${dealId}`);
-        if (!raw) return [{ id: "1", title: "Реквизиты 1", text: "" }];
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed) || !parsed.length) {
-            return [{ id: "1", title: "Реквизиты 1", text: "" }];
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "saveDealAdditionalField",
+                dealId: Number(dealId),
+                fieldId: Number(fieldId),
+                value: String(value ?? "")
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return false;
         }
-        return parsed.map((item, index) => ({
-            id: String(item?.id ?? index + 1),
-            title: String(item?.title || `Реквизиты ${index + 1}`),
-            text: String(item?.text || "")
-        }));
-    } catch (_) {
-        return [{ id: "1", title: "Реквизиты 1", text: "" }];
+        return response.ok;
+    } catch (e) {
+        console.warn("saveDealAdditionalField failed", e);
+        return false;
     }
 }
 
-function saveDealRequisitesDraft(dealId, items) {
+async function fetchDealAdditionalFields(dealId) {
+    if (!ensureActiveSession({ silent: true })) return null;
     try {
-        localStorage.setItem(`${DEAL_REQUISITES_PREFIX}${dealId}`, JSON.stringify(items));
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "getDealAdditionalFields",
+                dealId: Number(dealId)
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return null;
+        }
+        if (!response.ok) return null;
+
+        const payload = await response.json();
+        const list = Array.isArray(payload?.fields)
+            ? payload.fields
+            : (Array.isArray(payload) ? payload : []);
+
+        const map = {};
+        list.forEach(field => {
+            if (field?.id == null) return;
+            // value отсутствует, когда поле не заполнено.
+            map[field.id] = field.value != null ? String(field.value) : "";
+        });
+        return map;
+    } catch (e) {
+        console.warn("getDealAdditionalFields failed", e);
+        return null;
+    }
+}
+
+function scheduleDealExtraFieldsLoading(deal) {
+    const dealId = deal?.id;
+    if (!dealId || currentUser.role !== "staff") return;
+
+    fetchDealAdditionalFields(dealId).then(map => {
+        if (!map) return;
+        dealAdditionalFieldsCache.set(String(dealId), map);
+        applyDealCostInfoFromCrm(dealId, map[DEAL_FIELD_COST_INFO] || "");
+        applyDealInvoiceInfo(dealId, map);
+    });
+
+    scheduleDealRequisitesLoading(deal);
+}
+
+function applyDealCostInfoFromCrm(dealId, value) {
+    const panel = document.querySelector(`.deal-extra-panel[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    const textarea = panel?.querySelector(".deal-cost-info-input");
+    if (!textarea) return;
+    // Не перетираем то, что менеджер сейчас редактирует.
+    if (document.activeElement === textarea) return;
+
+    textarea.value = value;
+    try {
+        localStorage.setItem(`${DEAL_COST_INFO_PREFIX}${dealId}`, value);
     } catch (_) {}
+}
+
+function formatInvoiceDate(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return "";
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[3]}.${match[2]}.${match[1]}`;
+    return text;
+}
+
+function renderDealInvoiceInfoBody(fields) {
+    const map = fields || {};
+    const number = String(map[DEAL_FIELD_INVOICE_NUMBER] || "").trim();
+    const date = formatInvoiceDate(map[DEAL_FIELD_INVOICE_DATE]);
+    const link = String(map[DEAL_FIELD_INVOICE_LINK] || "").trim();
+
+    if (!number && !link && !date) {
+        return `<div class="deal-invoice-empty">Счёт ещё не создан</div>`;
+    }
+
+    const title = number ? `Счёт № ${escapeHtml(number)}` : "Счёт";
+    const dateHtml = date ? `<span class="deal-invoice-date">от ${escapeHtml(date)}</span>` : "";
+    const linkHtml = /^https?:\/\//i.test(link)
+        ? `<a class="deal-invoice-link" href="${escapeHtml(link)}" target="_blank" rel="noopener">🔗 Открыть счёт</a>`
+        : "";
+
+    return `
+        <div class="deal-invoice-card">
+            <div class="deal-invoice-head"><span class="deal-invoice-title">${title}</span>${dateHtml}</div>
+            ${linkHtml}
+        </div>`;
+}
+
+function applyDealInvoiceInfo(dealId, fields) {
+    const section = document.querySelector(`.deal-invoice-info[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    const body = section?.querySelector(".deal-invoice-info-body");
+    if (!body) return;
+    body.innerHTML = renderDealInvoiceInfoBody(fields);
+}
+
+function getDealClientId(deal) {
+    const id = deal?.client?.id ?? deal?.client_id ?? deal?.clientId;
+    const num = Number(id);
+    return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+function readSelectedRequisiteId(dealId) {
+    try {
+        return localStorage.getItem(`${DEAL_REQUISITE_SEL_PREFIX}${dealId}`) || "";
+    } catch (_) {
+        return "";
+    }
+}
+
+function saveSelectedRequisiteId(dealId, requisiteId) {
+    try {
+        if (requisiteId) {
+            localStorage.setItem(`${DEAL_REQUISITE_SEL_PREFIX}${dealId}`, String(requisiteId));
+        } else {
+            localStorage.removeItem(`${DEAL_REQUISITE_SEL_PREFIX}${dealId}`);
+        }
+    } catch (_) {}
+}
+
+// "ИНН Название" -> { inn, name }. ИНН — ведущие 10–12 цифр, остальное — название.
+function parseRequisiteTitle(title) {
+    const text = String(title || "").trim();
+    const match = text.match(/^(\d{8,12})\s+(.*)$/);
+    if (match) return { inn: match[1], name: match[2].trim() };
+    return { inn: "", name: text };
+}
+
+function normalizeRequisitesList(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+        .filter(item => item && item.id != null)
+        .map(item => {
+            const parsed = parseRequisiteTitle(item.title);
+            return {
+                id: String(item.id),
+                title: String(item.title || ""),
+                inn: parsed.inn,
+                name: parsed.name
+            };
+        });
 }
 
 function getDealRequisitesSection(dealId) {
     return document.querySelector(`.deal-requisites-section[data-deal-id="${CSS.escape(String(dealId))}"]`);
 }
 
-function renderDealRequisitesSection(dealId, activeTabId = null) {
+function renderRequisitesListMarkup(dealId, items, selectedId, filter = "") {
+    const needle = String(filter || "").trim().toLowerCase();
+    const filtered = needle
+        ? items.filter(it => it.title.toLowerCase().includes(needle))
+        : items;
+
+    if (!filtered.length) {
+        return needle
+            ? `<div class="deal-req-empty">Ничего не найдено по «${escapeHtml(filter)}»</div>`
+            : `<div class="deal-req-empty">У клиента нет реквизитов в CRM</div>`;
+    }
+
+    return filtered.map(item => {
+        const isSel = String(item.id) === String(selectedId);
+        const nameHtml = escapeHtml(item.name || item.title);
+        const innHtml = item.inn ? `<span class="deal-req-inn">ИНН ${escapeHtml(item.inn)}</span>` : "";
+        return `
+        <button type="button" class="deal-req-item${isSel ? " is-selected" : ""}" data-req-id="${escapeHtml(item.id)}" onclick="selectDealRequisite(${dealId}, '${escapeHtml(item.id)}')">
+            <span class="deal-req-radio" aria-hidden="true"></span>
+            <span class="deal-req-text">
+                <span class="deal-req-name">${nameHtml}</span>
+                ${innHtml}
+            </span>
+        </button>`;
+    }).join("");
+}
+
+function renderDealRequisitesBody(dealId, state) {
     const section = getDealRequisitesSection(dealId);
-    if (!section) return;
+    const listEl = section?.querySelector(".deal-req-list");
+    const searchWrap = section?.querySelector(".deal-req-search");
+    if (!listEl) return;
 
-    const items = readDealRequisitesDraft(dealId);
-    const activeId = activeTabId || section.dataset.activeTab || items[0]?.id || "1";
-    section.dataset.activeTab = activeId;
+    if (state === "loading") {
+        listEl.innerHTML = `<div class="deal-req-empty deal-req-loading">Загрузка реквизитов…</div>`;
+        if (searchWrap) searchWrap.style.display = "none";
+        return;
+    }
+    if (state === "error") {
+        listEl.innerHTML = `<div class="deal-req-empty deal-req-error">Не удалось загрузить реквизиты</div>`;
+        if (searchWrap) searchWrap.style.display = "none";
+        return;
+    }
+    if (state === "no-client") {
+        listEl.innerHTML = `<div class="deal-req-empty">Клиент не привязан к сделке</div>`;
+        if (searchWrap) searchWrap.style.display = "none";
+        return;
+    }
 
-    const tabsEl = section.querySelector(".deal-requisites-tabs");
-    const panelsEl = section.querySelector(".deal-requisites-panels");
-    if (!tabsEl || !panelsEl) return;
+    const clientId = section?.dataset.clientId;
+    const items = clientRequisitesCache.get(String(clientId)) || [];
+    const selectedId = readSelectedRequisiteId(dealId);
+    const filterInput = section?.querySelector(".deal-req-search-input");
+    const filter = filterInput?.value || "";
 
-    tabsEl.innerHTML = items.map((item, index) => `
-        <button type="button" class="deal-requisites-tab${String(item.id) === String(activeId) ? " active" : ""}" data-tab-id="${escapeHtml(item.id)}" onclick="switchDealRequisiteTab(${dealId}, '${escapeHtml(item.id)}', this)">${escapeHtml(item.title || `Реквизиты ${index + 1}`)}</button>
-    `).join("");
+    // Поиск показываем только когда реквизитов много.
+    if (searchWrap) searchWrap.style.display = items.length > 6 ? "block" : "none";
 
-    panelsEl.innerHTML = items.map(item => `
-        <div class="deal-requisites-panel${String(item.id) === String(activeId) ? " active" : ""}" data-tab-id="${escapeHtml(item.id)}">
-            <textarea class="deal-requisites-text" rows="4" placeholder="Реквизиты для счёта" onblur="saveDealRequisiteText(${dealId}, '${escapeHtml(item.id)}', this)">${escapeHtml(item.text || "")}</textarea>
-        </div>
-    `).join("");
+    listEl.innerHTML = renderRequisitesListMarkup(dealId, items, selectedId, filter);
+}
+
+function selectDealRequisite(dealId, requisiteId) {
+    const current = readSelectedRequisiteId(dealId);
+    // Повторный клик по выбранному — снимаем выбор.
+    const next = String(current) === String(requisiteId) ? "" : String(requisiteId);
+    saveSelectedRequisiteId(dealId, next);
+
+    const section = getDealRequisitesSection(dealId);
+    section?.querySelectorAll(".deal-req-item").forEach(btn => {
+        btn.classList.toggle("is-selected", next && String(btn.dataset.reqId) === next);
+    });
+}
+
+function filterDealRequisites(dealId) {
+    renderDealRequisitesBody(dealId, "ready");
+}
+
+function openClientRequisitesEditor(clientId) {
+    if (!clientId) return;
+    window.open(`https://crm.heavendevelop.ru/editClient/${clientId}`, "_blank", "noopener");
+}
+
+async function fetchClientRequisites(clientId) {
+    if (!ensureActiveSession({ silent: true })) return null;
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "getClientRequisites",
+                clientId: Number(clientId)
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return null;
+        }
+        if (!response.ok) return null;
+
+        const payload = await response.json();
+        const list = Array.isArray(payload?.requisites)
+            ? payload.requisites
+            : (Array.isArray(payload) ? payload : []);
+        return normalizeRequisitesList(list);
+    } catch (e) {
+        console.warn("getClientRequisites failed", e);
+        return null;
+    }
+}
+
+function scheduleDealRequisitesLoading(deal) {
+    const dealId = deal?.id;
+    if (!dealId || currentUser.role !== "staff") return;
+
+    const clientId = getDealClientId(deal);
+    const section = getDealRequisitesSection(dealId);
+    if (section && clientId) section.dataset.clientId = String(clientId);
+
+    if (!clientId) {
+        renderDealRequisitesBody(dealId, "no-client");
+        return;
+    }
+
+    const cached = clientRequisitesCache.get(String(clientId));
+    if (cached) {
+        renderDealRequisitesBody(dealId, "ready");
+        return;
+    }
+
+    renderDealRequisitesBody(dealId, "loading");
+    fetchClientRequisites(clientId).then(list => {
+        if (list == null) {
+            renderDealRequisitesBody(dealId, "error");
+            return;
+        }
+        clientRequisitesCache.set(String(clientId), list);
+        renderDealRequisitesBody(dealId, "ready");
+    });
 }
 
 function renderDealExtraPanel(deal) {
@@ -2223,18 +2604,7 @@ function renderDealExtraPanel(deal) {
 
     const dealId = deal.id;
     const costInfo = escapeHtml(readDealCostInfoDraft(dealId));
-    const requisites = readDealRequisitesDraft(dealId);
-    const activeId = requisites[0]?.id || "1";
-
-    const tabsHtml = requisites.map((item, index) => `
-        <button type="button" class="deal-requisites-tab${String(item.id) === String(activeId) ? " active" : ""}" data-tab-id="${escapeHtml(item.id)}" onclick="switchDealRequisiteTab(${dealId}, '${escapeHtml(item.id)}', this)">${escapeHtml(item.title || `Реквизиты ${index + 1}`)}</button>
-    `).join("");
-
-    const panelsHtml = requisites.map(item => `
-        <div class="deal-requisites-panel${String(item.id) === String(activeId) ? " active" : ""}" data-tab-id="${escapeHtml(item.id)}">
-            <textarea class="deal-requisites-text" rows="4" placeholder="Реквизиты для счёта" onblur="saveDealRequisiteText(${dealId}, '${escapeHtml(item.id)}', this)">${escapeHtml(item.text || "")}</textarea>
-        </div>
-    `).join("");
+    const clientId = getDealClientId(deal);
 
     return `
         <div class="deal-extra-panel" data-deal-id="${dealId}">
@@ -2245,50 +2615,21 @@ function renderDealExtraPanel(deal) {
             <div class="deal-extra-section deal-extra-actions-row">
                 <button type="button" class="deal-create-invoice-btn" onclick="createDealInvoice(${dealId})">Создать счёт</button>
             </div>
-            <div class="deal-extra-section deal-requisites-section" data-deal-id="${dealId}" data-active-tab="${escapeHtml(activeId)}">
+            <div class="deal-extra-section deal-requisites-section" data-deal-id="${dealId}"${clientId ? ` data-client-id="${clientId}"` : ""}>
                 <div class="deal-extra-label-row">
-                    <span class="deal-extra-label">Реквизиты</span>
-                    <button type="button" class="deal-requisites-add-btn" onclick="addDealRequisiteTab(${dealId})">+ Добавить</button>
+                    <span class="deal-extra-label">Реквизиты клиента</span>
+                    ${clientId ? `<button type="button" class="deal-requisites-add-btn" onclick="openClientRequisitesEditor(${clientId})" title="Добавить реквизиты в карточке клиента">+ Добавить в CRM ↗</button>` : ""}
                 </div>
-                <div class="deal-requisites-tabs">${tabsHtml}</div>
-                <div class="deal-requisites-panels">${panelsHtml}</div>
+                <div class="deal-req-search" style="display:none;">
+                    <input type="text" class="deal-req-search-input" placeholder="Поиск по ИНН или названию…" oninput="filterDealRequisites(${dealId})">
+                </div>
+                <div class="deal-req-list"><div class="deal-req-empty deal-req-loading">Загрузка реквизитов…</div></div>
+            </div>
+            <div class="deal-extra-section deal-invoice-info" data-deal-id="${dealId}">
+                <span class="deal-extra-label">Счёт</span>
+                <div class="deal-invoice-info-body"><div class="deal-invoice-empty">Загрузка…</div></div>
             </div>
         </div>`;
-}
-
-function saveDealRequisiteText(dealId, tabId, textarea) {
-    const items = readDealRequisitesDraft(dealId);
-    const next = items.map(item => (
-        String(item.id) === String(tabId)
-            ? { ...item, text: String(textarea?.value || "") }
-            : item
-    ));
-    saveDealRequisitesDraft(dealId, next);
-}
-
-function switchDealRequisiteTab(dealId, tabId, trigger = null) {
-    const section = getDealRequisitesSection(dealId);
-    if (!section) return;
-    section.dataset.activeTab = String(tabId);
-    section.querySelectorAll(".deal-requisites-tab").forEach(btn => {
-        btn.classList.toggle("active", String(btn.dataset.tabId) === String(tabId));
-    });
-    section.querySelectorAll(".deal-requisites-panel").forEach(panel => {
-        panel.classList.toggle("active", String(panel.dataset.tabId) === String(tabId));
-    });
-    if (trigger) trigger.classList.add("active");
-}
-
-function addDealRequisiteTab(dealId) {
-    const items = readDealRequisitesDraft(dealId);
-    const nextId = String(Date.now());
-    items.push({
-        id: nextId,
-        title: `Реквизиты ${items.length + 1}`,
-        text: ""
-    });
-    saveDealRequisitesDraft(dealId, items);
-    renderDealRequisitesSection(dealId, nextId);
 }
 
 function createDealInvoice(dealId) {
@@ -3077,7 +3418,8 @@ function renderDealsList(deals, targetDiv, options = {}) {
         card.innerHTML = isDetailMode ? `
             ${dealHeaderHtml}
             <div class="client-name">👤 ${escapeHtml(deal.client?.name || deal.client_name || 'Клиент не указан')}</div>
-            <div class="elements-list">
+            <div class="elements-list${dealCostsVisible ? "" : " costs-hidden"}">
+                ${Array.isArray(deal.elements) && deal.elements.length ? renderElementColsHeader({ isClosed }) : ""}
                 <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
                 ${addBtnHtml}
             </div>
@@ -3102,6 +3444,9 @@ function renderDealsList(deals, targetDiv, options = {}) {
 
         if (isDetailMode && typeof scheduleElementAssetsLoading === "function") {
             scheduleElementAssetsLoading(deal);
+        }
+        if (isDetailMode && currentUser.role === "staff") {
+            scheduleDealExtraFieldsLoading(deal);
         }
     });
 

@@ -172,6 +172,10 @@
     .element-row-text { flex: 1 1 auto; min-width: 0; padding-right: 6px; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; word-break: break-word; }
     .element-row-text-clickable { cursor: pointer; color: #2F6BD8; }
     .element-row-text-clickable:hover { text-decoration: underline; }
+    /* Десктопные столбцы строки позиции (кол-во / себестоимость / название) — по умолчанию скрыты,
+       включаются только на десктопе в детальной карточке заказа. На мобильных остаётся компактная строка. */
+    .element-row-col { display: none; }
+    .element-cols-head { display: none; }
     .element-preview-thumb {
         flex: 0 0 22px;
         width: 22px;
@@ -714,8 +718,7 @@
     .deal-extra-section { display: flex; flex-direction: column; gap: 6px; }
     .deal-extra-label { font-size: 12px; font-weight: 600; color: #555; }
     .deal-extra-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .deal-cost-info-input,
-    .deal-requisites-text {
+    .deal-cost-info-input {
         width: 100%;
         box-sizing: border-box;
         border: 1px solid #d5dde6;
@@ -727,8 +730,7 @@
         resize: vertical;
         min-height: 72px;
     }
-    .deal-cost-info-input:focus,
-    .deal-requisites-text:focus { outline: none; border-color: #2F6BD8; box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.12); }
+    .deal-cost-info-input:focus { outline: none; border-color: #2F6BD8; box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.12); }
     .deal-extra-actions-row { align-items: flex-start; }
     .deal-create-invoice-btn {
         margin: 0;
@@ -744,26 +746,6 @@
         cursor: pointer;
     }
     .deal-create-invoice-btn:hover { background: #2459B8; border-color: #2459B8; }
-    .deal-requisites-tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 8px;
-    }
-    .deal-requisites-tab {
-        margin: 0;
-        width: auto;
-        height: auto;
-        min-width: 0;
-        padding: 6px 10px;
-        border-radius: 999px;
-        border: 1px solid #d9dde3;
-        background: #f4f6f8;
-        color: #555;
-        font-size: 12px;
-        cursor: pointer;
-    }
-    .deal-requisites-tab.active { background: #2F6BD8; border-color: #2F6BD8; color: #fff; }
     .deal-requisites-add-btn {
         margin: 0;
         width: auto;
@@ -776,10 +758,105 @@
         color: #2F6BD8;
         font-size: 12px;
         cursor: pointer;
+        white-space: nowrap;
     }
     .deal-requisites-add-btn:hover { background: #eef4ff; }
-    .deal-requisites-panel { display: none; }
-    .deal-requisites-panel.active { display: block; }
+    /* Реквизиты клиента: поиск + выбираемый список */
+    .deal-req-search { margin-bottom: 8px; }
+    .deal-req-search-input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #d5dde6;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 13px;
+        font-family: inherit;
+    }
+    .deal-req-search-input:focus { outline: none; border-color: #2F6BD8; box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.12); }
+    .deal-req-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 260px;
+        overflow-y: auto;
+        border: 1px solid #eef1f5;
+        border-radius: 10px;
+        padding: 4px;
+        background: #fff;
+    }
+    .deal-req-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        margin: 0;
+        text-align: left;
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        cursor: pointer;
+        transition: background .12s ease, border-color .12s ease;
+    }
+    .deal-req-item:hover { background: #f4f8ff; }
+    .deal-req-item.is-selected { background: #eef4ff; border-color: #2F6BD8; }
+    .deal-req-radio {
+        flex: 0 0 auto;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid #c2ccd8;
+        position: relative;
+        box-sizing: border-box;
+    }
+    .deal-req-item.is-selected .deal-req-radio { border-color: #2F6BD8; }
+    .deal-req-item.is-selected .deal-req-radio::after {
+        content: "";
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #2F6BD8;
+        transform: translate(-50%, -50%);
+    }
+    .deal-req-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .deal-req-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1f2d3d;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+    .deal-req-inn {
+        font-size: 11px;
+        color: #8a93a0;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: .2px;
+    }
+    .deal-req-empty {
+        padding: 14px 10px;
+        text-align: center;
+        font-size: 12px;
+        color: #8a93a0;
+    }
+    .deal-req-loading { font-style: italic; }
+    .deal-req-error { color: #c0392b; }
+    .deal-invoice-info-body { font-size: 13px; }
+    .deal-invoice-empty { color: #8a93a0; font-style: italic; }
+    .deal-invoice-card {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 12px;
+        border: 1px solid #d5dde6;
+        border-radius: 8px;
+        background: #f7faff;
+    }
+    .deal-invoice-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .deal-invoice-title { font-weight: 600; color: #1f2d3d; }
+    .deal-invoice-date { color: #555; font-size: 12px; }
+    .deal-invoice-link { color: #2F6BD8; font-size: 13px; text-decoration: none; }
+    .deal-invoice-link:hover { text-decoration: underline; }
     .deal-total-only { font-weight: bold; font-size: 12px; line-height: 1.2; }
     .loader { text-align: center; display: none; margin: 20px 0; font-style: italic; color: #666; }
     .add-btn { margin:0; padding: 4px 10px; font-size: 12px; background: #27ae60; width: auto; height: auto; }
@@ -915,6 +992,125 @@
         .crm-item--list .deal-total-only {
             font-size: 11px;
         }
+        /* Детальная карточка заказа на десктопе: позиция отображается столбцами
+           статус | превью | название | количество | себестоимость | сумма.
+           Ширины колонок одинаковы у шапки (.ecol-*) и у строк — выравнивание гарантировано. */
+        .crm-item:not(.crm-item--list) .element-row { align-items: center; }
+        .crm-item:not(.crm-item--list) .element-row > .element-row-text { display: none; }
+        .crm-item:not(.crm-item--list) .element-row-col { display: block; }
+
+        .crm-item:not(.crm-item--list) .element-cols-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0 5px;
+            margin: 0 0 2px;
+            border-bottom: 1px solid #e8edf3;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            color: #98a2b0;
+        }
+        .crm-item:not(.crm-item--list) .ecol { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* фиксированные ширины должны включать padding/border, иначе кнопка статуса «разъедет» */
+        .crm-item:not(.crm-item--list) .element-cols-head .ecol,
+        .crm-item:not(.crm-item--list) .element-row > .element-status-cell,
+        .crm-item:not(.crm-item--list) .element-row > .element-preview-thumb,
+        .crm-item:not(.crm-item--list) .element-row-qty,
+        .crm-item:not(.crm-item--list) .element-row-cost,
+        .crm-item:not(.crm-item--list) .element-row > .element-row-total { box-sizing: border-box; }
+
+        /* колонка СТАТУС (узкая) */
+        .crm-item:not(.crm-item--list) .ecol-status,
+        .crm-item:not(.crm-item--list) .element-row > .element-status-cell {
+            flex: 0 0 40px;
+            width: 40px;
+            max-width: 40px;
+            min-width: 40px;
+            margin: 0 !important;
+            text-align: center;
+        }
+        /* колонка ПРЕВЬЮ (узкая) */
+        .crm-item:not(.crm-item--list) .ecol-thumb,
+        .crm-item:not(.crm-item--list) .element-row > .element-preview-thumb {
+            flex: 0 0 22px;
+            width: 22px;
+            min-width: 22px;
+            text-align: center;
+        }
+        /* колонка НАЗВАНИЕ (растягивается) */
+        .crm-item:not(.crm-item--list) .ecol-name,
+        .crm-item:not(.crm-item--list) .element-row-name {
+            flex: 1 1 auto;
+            min-width: 0;
+            text-align: left;
+            font-size: 12px;
+            line-height: 1.2;
+            padding-right: 6px;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .crm-item:not(.crm-item--list) .ecol-name { white-space: nowrap; }
+        /* колонка КОЛИЧЕСТВО */
+        .crm-item:not(.crm-item--list) .ecol-qty,
+        .crm-item:not(.crm-item--list) .element-row-qty {
+            flex: 0 0 72px;
+            width: 72px;
+            text-align: right;
+            white-space: nowrap;
+            color: #555;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        /* колонка СЕБЕСТОИМОСТЬ */
+        .crm-item:not(.crm-item--list) .ecol-cost,
+        .crm-item:not(.crm-item--list) .element-row-cost {
+            flex: 0 0 100px;
+            width: 100px;
+            text-align: right;
+            white-space: nowrap;
+            color: #6b7280;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        /* себестоимость под маской: скрыта по умолчанию, раскрывается глазиком */
+        .crm-item:not(.crm-item--list) .element-row-cost .cost-mask { display: none; color: #aeb6c2; letter-spacing: 1px; }
+        .crm-item:not(.crm-item--list) .elements-list.costs-hidden .element-row-cost .cost-val { display: none; }
+        .crm-item:not(.crm-item--list) .elements-list.costs-hidden .element-row-cost .cost-mask { display: inline; }
+        /* третье состояние: себестоимость не заполнена — заметный индикатор, виден всегда */
+        .crm-item:not(.crm-item--list) .element-row-cost.is-empty {
+            color: #d98324;
+            font-style: italic;
+            font-size: 11px;
+        }
+        /* кнопка-глазик у заголовка «Себес.» */
+        .cost-eye-btn {
+            margin: 0 0 0 5px;
+            padding: 0;
+            width: 18px;
+            height: 16px;
+            min-width: 18px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            vertical-align: middle;
+            opacity: .75;
+        }
+        .cost-eye-btn:hover { opacity: 1; }
+        /* колонка СУММА — на десктопе без «руб.» (только цифры) */
+        .crm-item:not(.crm-item--list) .ecol-total,
+        .crm-item:not(.crm-item--list) .element-row > .element-row-total {
+            flex: 0 0 116px;
+            width: 116px;
+            margin-left: 0;
+            text-align: right;
+        }
+        .crm-item:not(.crm-item--list) .element-row > .element-row-total .rub-suffix { display: none; }
+        /* хвостовая ячейка под кнопку удаления */
+        .crm-item:not(.crm-item--list) .ecol-actions { flex: 0 0 20px; width: 20px; }
     }
     .payment-actions { display:flex; gap:5px; justify-content:center; }
     .payment-action-btn { margin:0; width:21px; height:21px; min-width:21px; padding:0; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; border:0; box-shadow:0 2px 6px rgba(0,0,0,0.12); }

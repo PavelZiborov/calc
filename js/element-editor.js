@@ -1240,19 +1240,22 @@ async function loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPre
         return loadDealPreviewsBatch(dealId, dealNum, elementIds, layoutIdsToPrefetch, attempt + 1);
     }
 
-    const retryIds = [];
+    const missingIds = [];
 
     for (const elementId of elementIds) {
         const assets = batch?.[String(elementId)];
         const hasPreview = applyPreviewBatchResult(dealId, elementId, assets, batch == null);
         if (!hasPreview && previewNeedsFetch(elementAssetsCache.get(assetsCacheKey(dealId, elementId)))) {
-            retryIds.push(elementId);
+            missingIds.push(elementId);
         }
     }
 
-    if (retryIds.length && attempt < PREVIEW_FETCH_MAX_RETRIES) {
-        await sleep(500 * attempt);
-        await loadDealPreviewsBatch(dealId, dealNum, retryIds, null, attempt + 1);
+    // Батч на сервере резолвит download-ссылку Яндекс.Диска для каждой позиции отдельным
+    // последовательным запросом — при множестве позиций часть упирается в троттлинг и
+    // возвращается без превью. Добираем недостающие поштучно (тот же путь, что при клике на
+    // позицию), он надёжнее и обходит лимиты пачки.
+    if (missingIds.length) {
+        await Promise.all(missingIds.map(elementId => refreshElementPreview(dealId, elementId, dealNum)));
     }
 
     const layoutTargets = (layoutIdsToPrefetch || elementIds).filter(elementId => {
@@ -2484,24 +2487,46 @@ async function handleLayoutDelete(layoutId) {
 }
 
 function updateElementRowDom(dealId, elementId, element) {
-    const row = document.querySelector(
-        `.element-row[data-deal-id="${dealId}"][data-element-id="${elementId}"] .element-row-text`
+    const rowEl = document.querySelector(
+        `.element-row[data-deal-id="${dealId}"][data-element-id="${elementId}"]`
     );
-    if (!row) return;
+    if (!rowEl) return;
 
     const name = getElementName(element);
     const qty = getElementQuantity(element);
     const price = getElementPrice(element);
     const units = getElementUnits(element);
-    row.textContent = `${name}, ${qty} ${units}, ${price} руб.`;
 
-    const totalEl = row.closest(".element-row")?.querySelector(".element-row-total");
-    const lineTotal = getElementLineTotal(element);
-    if (totalEl) {
-        totalEl.textContent = `${lineTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} руб.`;
+    // Компактная строка (мобильные)
+    const compact = rowEl.querySelector(".element-row-text");
+    if (compact) compact.textContent = `${name}, ${qty} ${units}, ${price} руб.`;
+
+    // Десктопные столбцы
+    const nameCol = rowEl.querySelector(".element-row-name");
+    if (nameCol) nameCol.textContent = name;
+    const qtyCol = rowEl.querySelector(".element-row-qty");
+    if (qtyCol) qtyCol.textContent = `${qty} ${units}`;
+    const costCol = rowEl.querySelector(".element-row-cost");
+    if (costCol) {
+        const cost = getElementCost(element);
+        if (cost == null) {
+            costCol.classList.add("is-empty");
+            costCol.title = "Себестоимость не заполнена";
+            costCol.textContent = "не указана";
+        } else {
+            costCol.classList.remove("is-empty");
+            costCol.removeAttribute("title");
+            const num = Math.round(cost).toLocaleString("ru-RU");
+            costCol.innerHTML = `<span class="cost-val">${num}</span><span class="cost-mask">•••••</span>`;
+        }
     }
-    const rowEl = row.closest(".element-row");
-    if (rowEl) rowEl.setAttribute("data-price", String(lineTotal));
+
+    const lineTotal = getElementLineTotal(element);
+    const totalEl = rowEl.querySelector(".element-row-total");
+    if (totalEl) {
+        totalEl.innerHTML = `${lineTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2 })}<span class="rub-suffix"> руб.</span>`;
+    }
+    rowEl.setAttribute("data-price", String(lineTotal));
 }
 
 async function saveElementEditor() {
