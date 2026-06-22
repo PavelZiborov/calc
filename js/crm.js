@@ -2233,10 +2233,11 @@ const DEAL_REQUISITE_SEL_PREFIX = "calc_deal_requisite_sel_"; // выбранн�
 let pendingElementDelete = null;
 
 // CRM additional-field ids (карточка сделки, вкладка заказа)
-const DEAL_FIELD_COST_INFO = 476;      // Информация по себестоимости
-const DEAL_FIELD_INVOICE_NUMBER = 477; // Номер счёта
-const DEAL_FIELD_INVOICE_DATE = 1105;  // Дата счёта
-const DEAL_FIELD_INVOICE_LINK = 1104;  // Ссылка на счёт
+const DEAL_FIELD_COST_INFO = 476;       // Информация по себестоимости
+const DEAL_FIELD_INVOICE_NUMBER = 477;  // Номер счёта
+const DEAL_FIELD_INVOICE_DATE = 1105;   // Дата счёта
+const DEAL_FIELD_INVOICE_LINK = 1104;   // Ссылка на счёт (редактирование / старый формат)
+const DEAL_FIELD_INVOICE_PREVIEW = 1106; // Ссылка-превью счёта (для встраивания в iframe)
 
 // dealId -> { [fieldId]: value } последняя загрузка доп.полей из CRM
 const dealAdditionalFieldsCache = new Map();
@@ -2385,51 +2386,152 @@ function isHttpUrl(value) {
     return /^https?:\/\//i.test(String(value || "").trim());
 }
 
+// Ссылка-превью счёта МоёДело (встраиваемая в iframe): страница BillOnlineBySettlement
+// или ссылка с маркером &preview. Старые счета такой ссылки не содержат.
+function isInvoicePreviewLink(value) {
+    const url = String(value || "").trim();
+    return isHttpUrl(url) && (/BillOnlineBySettlement/i.test(url) || /[?&]preview(?:$|[=&])/i.test(url));
+}
+
 // Собираем данные счёта из доп.полей CRM (после перезагрузки страницы).
+//   1106 — ссылка-превью счёта (встраиваемая в iframe);
+//   1104 — ссылка на счёт (редактирование / старый формат).
+// Превью берём из 1106; для старых счетов, где 1106 пусто, — из 1104,
+// если она в формате превью. Иначе 1104 показываем как «Редактировать».
 function buildInvoiceFromFields(fields) {
     const map = fields || {};
     const number = String(map[DEAL_FIELD_INVOICE_NUMBER] || "").trim();
     const date = String(map[DEAL_FIELD_INVOICE_DATE] || "").trim();
-    const onlineLink = String(map[DEAL_FIELD_INVOICE_LINK] || "").trim();
-    if (!number && !date && !onlineLink) return null;
-    return { number, date, onlineLink, editLink: "" };
+    const previewField = String(map[DEAL_FIELD_INVOICE_PREVIEW] || "").trim();
+    const linkField = String(map[DEAL_FIELD_INVOICE_LINK] || "").trim();
+
+    // Превью: приоритет у выделенного поля 1106, фолбэк — 1104 в формате превью.
+    const onlineLink = isHttpUrl(previewField)
+        ? previewField
+        : (isInvoicePreviewLink(linkField) ? linkField : "");
+
+    // «Редактировать»: 1104, если это не та же превью-ссылка.
+    const editLink = (isHttpUrl(linkField) && linkField !== onlineLink && !isInvoicePreviewLink(linkField))
+        ? linkField
+        : "";
+
+    if (!number && !date && !onlineLink && !editLink) return null;
+    return { number, date, onlineLink, editLink };
+}
+
+// Мобильное отображение: встроенное превью счёта не показываем (тяжело и тесно).
+function isMobileInvoiceView() {
+    return window.matchMedia("(max-width: 600px)").matches;
 }
 
 function renderInvoiceCardMarkup(dealId, invoice) {
-    if (!invoice || (!invoice.number && !invoice.onlineLink && !invoice.date)) {
+    if (!invoice || (!invoice.number && !invoice.onlineLink && !invoice.editLink && !invoice.date)) {
         return `<div class="deal-invoice-empty">Счёт ещё не создан</div>`;
     }
 
     const title = invoice.number ? `Счёт № ${escapeHtml(invoice.number)}` : "Счёт";
     const date = formatInvoiceDate(invoice.date);
     const dateHtml = date ? `<span class="deal-invoice-date">от ${escapeHtml(date)}</span>` : "";
-    const hasPreview = isHttpUrl(invoice.onlineLink);
+    const hasOnline = isHttpUrl(invoice.onlineLink);
     const hasEdit = isHttpUrl(invoice.editLink);
+    const mobile = isMobileInvoiceView();
+    // Раскрывающееся превью — только на десктопе.
+    const canEmbed = hasOnline && !mobile;
 
-    const headAttrs = hasPreview ? ` onclick="toggleInvoicePreview(${dealId})" title="Показать/скрыть счёт"` : "";
-    const caret = hasPreview ? `<span class="deal-invoice-caret" aria-hidden="true">▸</span>` : "";
+    const headAttrs = canEmbed ? ` onclick="toggleInvoicePreview(${dealId})" title="Показать/скрыть счёт"` : "";
+    const caret = canEmbed ? `<span class="deal-invoice-caret" aria-hidden="true">▸</span>` : "";
 
-    const actionsHtml = (hasPreview || hasEdit) ? `
+    // На десктопе у старого счёта без превью-ссылки поясняем, что превью нет.
+    const noPreviewHtml = (!hasOnline && !mobile)
+        ? `<span class="deal-invoice-nopreview" title="Для этого счёта недоступно встроенное превью">превью недоступно</span>`
+        : "";
+
+    const actionsHtml = (hasOnline || hasEdit) ? `
             <div class="deal-invoice-actions">
-                ${hasPreview ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.onlineLink)}" target="_blank" rel="noopener">🔗 В новой вкладке</a>` : ""}
+                ${hasOnline ? `<button type="button" class="deal-invoice-link deal-invoice-copy" onclick="copyInvoiceLink(event, ${dealId})">📋 Скопировать ссылку на счёт</button>` : ""}
                 ${hasEdit ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.editLink)}" target="_blank" rel="noopener">✏️ Редактировать</a>` : ""}
             </div>` : "";
 
     return `
-        <div class="deal-invoice-card${hasPreview ? " is-expandable" : ""}">
+        <div class="deal-invoice-card${canEmbed ? " is-expandable" : ""} is-fresh">
             <div class="deal-invoice-head"${headAttrs}>
-                ${caret}<span class="deal-invoice-title">${title}</span>${dateHtml}
+                ${caret}<span class="deal-invoice-title">${title}</span>${dateHtml}${noPreviewHtml}
             </div>
             ${actionsHtml}
         </div>`;
 }
 
+// Копирование ссылки на счёт в буфер обмена с короткой обратной связью на кнопке.
+function copyInvoiceLink(event, dealId) {
+    event?.stopPropagation();
+    const invoice = dealInvoiceCache.get(String(dealId));
+    const url = invoice?.onlineLink;
+    if (!isHttpUrl(url)) return;
+
+    const btn = event?.currentTarget;
+    const showOk = () => {
+        if (!btn) return;
+        if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+        btn.textContent = "✓ Скопировано";
+        btn.classList.add("is-copied");
+        clearTimeout(btn._copyTimer);
+        btn._copyTimer = setTimeout(() => {
+            btn.textContent = btn.dataset.label || "📋 Скопировать ссылку на счёт";
+            btn.classList.remove("is-copied");
+        }, 1600);
+    };
+
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).then(showOk).catch(() => fallbackCopyText(url, showOk));
+    } else {
+        fallbackCopyText(url, showOk);
+    }
+}
+
+// Фолбэк-копирование для небезопасного контекста / старых браузеров.
+function fallbackCopyText(text, onDone) {
+    try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;top:-1000px;left:-1000px;opacity:0;";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        onDone?.();
+    } catch (_) {
+        alert("Не удалось скопировать. Ссылка: " + text);
+    }
+}
+
+// Состояние «счёт выставляется»: анимированный индикатор в строке счёта.
+function renderInvoiceLoading(dealId) {
+    const row = document.querySelector(`.deal-invoice-row[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    if (!row) return;
+    const display = row.querySelector(".deal-invoice-display");
+    const slot = row.querySelector(".deal-invoice-preview-slot");
+    if (slot) slot.innerHTML = "";
+    if (display) {
+        display.innerHTML = `
+            <div class="deal-invoice-loading">
+                <span class="deal-invoice-spinner" aria-hidden="true"></span>
+                <span class="deal-invoice-loading-text">Выставляется счёт…</span>
+            </div>`;
+    }
+}
+
+// Естественная ширина документа счёта МоёДело (под неё считаем масштаб).
+const INVOICE_DOC_WIDTH = 800;
+
 // Полноширинное превью счёта (рендерится в отдельный слот под строкой).
+// На мобильных не рендерим вовсе.
 function renderInvoicePreviewMarkup(invoice) {
-    if (!invoice || !isHttpUrl(invoice.onlineLink)) return "";
+    if (!invoice || !isHttpUrl(invoice.onlineLink) || isMobileInvoiceView()) return "";
     return `
         <div class="deal-invoice-preview" hidden>
-            <iframe class="deal-invoice-iframe" loading="lazy" referrerpolicy="no-referrer" title="Превью счёта"></iframe>
+            <div class="deal-invoice-stage">
+                <iframe class="deal-invoice-iframe" loading="lazy" referrerpolicy="no-referrer" title="Превью счёта"></iframe>
+            </div>
             <div class="deal-invoice-preview-hint">Если счёт не отобразился — <a href="${escapeHtml(invoice.onlineLink)}" target="_blank" rel="noopener">откройте в новой вкладке</a>.</div>
         </div>`;
 }
@@ -2442,6 +2544,27 @@ function renderInvoiceDisplay(dealId) {
     const slot = row.querySelector(".deal-invoice-preview-slot");
     if (display) display.innerHTML = renderInvoiceCardMarkup(dealId, invoice);
     if (slot) slot.innerHTML = renderInvoicePreviewMarkup(invoice);
+}
+
+// Масштабируем iframe так, чтобы документ счёта целиком влезал по ширине,
+// а высота вписывалась в экран (с прокруткой внутри для длинных счетов).
+function fitInvoicePreview(dealId) {
+    const row = document.querySelector(`.deal-invoice-row[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    const stage = row?.querySelector(".deal-invoice-stage");
+    const iframe = stage?.querySelector(".deal-invoice-iframe");
+    if (!stage || !iframe) return;
+
+    const containerW = stage.clientWidth;
+    if (!containerW) return;
+
+    const scale = Math.min(1, containerW / INVOICE_DOC_WIDTH);
+    const stageH = Math.max(360, Math.round(window.innerHeight * 0.82));
+
+    iframe.style.width = INVOICE_DOC_WIDTH + "px";
+    iframe.style.height = Math.round(stageH / scale) + "px";
+    iframe.style.transform = `scale(${scale})`;
+    iframe.style.transformOrigin = "top left";
+    stage.style.height = stageH + "px";
 }
 
 // Раскрытие/скрытие inline-превью счёта. iframe грузим лениво при первом открытии.
@@ -2459,7 +2582,20 @@ function toggleInvoicePreview(dealId) {
     }
     preview.hidden = !willShow;
     card?.classList.toggle("is-expanded", willShow);
+    if (willShow) fitInvoicePreview(dealId);
 }
+
+// Пере-масштабируем открытые превью при изменении размера окна (дебаунс).
+let invoiceFitResizeTimer = null;
+window.addEventListener("resize", () => {
+    clearTimeout(invoiceFitResizeTimer);
+    invoiceFitResizeTimer = setTimeout(() => {
+        document.querySelectorAll(".deal-invoice-card.is-expanded").forEach(card => {
+            const row = card.closest(".deal-invoice-row");
+            if (row?.dataset.dealId) fitInvoicePreview(row.dataset.dealId);
+        });
+    }, 150);
+});
 
 function applyDealInvoiceInfo(dealId, fields) {
     const fromFields = buildInvoiceFromFields(fields);
@@ -2617,7 +2753,7 @@ async function showInvoiceRequisitesModal(dealId) {
         ? `<div class="invoice-req-list">
                 ${requisites.map(req => `
                     <label class="invoice-req-option">
-                        <input type="radio" name="invoice-req" value="${escapeHtml(req.id)}" ${String(req.id) === String(selectedId) ? 'checked' : ''}>
+                        <input type="radio" name="invoice-req" value="${escapeHtml(req.id)}" data-inn="${escapeHtml(req.inn || "")}" ${String(req.id) === String(selectedId) ? 'checked' : ''}>
                         <span class="invoice-req-option-text">
                             <span class="invoice-req-name">${escapeHtml(req.name || req.title)}</span>
                             ${req.inn ? `<span class="invoice-req-inn">ИНН ${escapeHtml(req.inn)}</span>` : ""}
@@ -2670,6 +2806,7 @@ async function submitInvoiceWithRequisite(dealId) {
     const modal = document.getElementById("invoiceModal");
     const radioChecked = modal?.querySelector('input[name="invoice-req"]:checked');
     const requisiteId = radioChecked?.value;
+    const requisiteInn = radioChecked?.dataset.inn || "";
 
     if (!requisiteId) {
         alert("Выберите реквизиты");
@@ -2686,6 +2823,10 @@ async function submitInvoiceWithRequisite(dealId) {
     const submitBtn = document.querySelector(`.deal-invoice-row[data-deal-id="${dealId}"] .deal-create-invoice-btn`);
     if (submitBtn) submitBtn.disabled = true;
 
+    // Показываем анимацию «счёт выставляется».
+    renderInvoiceLoading(dealId);
+
+    let handled = false;
     try {
         const response = await fetchWithTimeout(N8N_URL, {
             method: "POST",
@@ -2693,7 +2834,9 @@ async function submitInvoiceWithRequisite(dealId) {
             body: JSON.stringify({
                 action: "createInvoice",
                 dealId: Number(dealId),
-                requisiteId: String(requisiteId)
+                requisiteId: String(requisiteId),
+                // ИНН выбранного реквизита — по нему n8n выставляет счёт.
+                inn: String(requisiteInn || "")
             })
         });
 
@@ -2711,6 +2854,7 @@ async function submitInvoiceWithRequisite(dealId) {
 
             if (data && data.invoice_number != null && data.invoice_number !== "") {
                 applyCreatedInvoice(dealId, data);
+                handled = true;
             } else {
                 alert("Ошибка при выставлении счёта: " + (data?.message || payload?.message || "неизвестная ошибка"));
             }
@@ -2722,6 +2866,8 @@ async function submitInvoiceWithRequisite(dealId) {
         alert("Ошибка: " + (e.message || "неизвестная ошибка"));
     } finally {
         if (submitBtn) submitBtn.disabled = false;
+        // При ошибке возвращаем прежнее состояние строки счёта (убираем анимацию).
+        if (!handled) renderInvoiceDisplay(dealId);
     }
 }
 
@@ -2740,7 +2886,8 @@ function applyCreatedInvoice(dealId, data) {
     const map = dealAdditionalFieldsCache.get(String(dealId)) || {};
     map[DEAL_FIELD_INVOICE_NUMBER] = invoice.number;
     map[DEAL_FIELD_INVOICE_DATE] = invoice.date;
-    map[DEAL_FIELD_INVOICE_LINK] = invoice.onlineLink;
+    map[DEAL_FIELD_INVOICE_PREVIEW] = invoice.onlineLink; // 1106 — превью
+    map[DEAL_FIELD_INVOICE_LINK] = invoice.editLink;      // 1104 — редактирование
     dealAdditionalFieldsCache.set(String(dealId), map);
 
     renderInvoiceDisplay(dealId);
