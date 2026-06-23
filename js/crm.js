@@ -2386,11 +2386,10 @@ function isHttpUrl(value) {
     return /^https?:\/\//i.test(String(value || "").trim());
 }
 
-// Ссылка-превью счёта МоёДело (встраиваемая в iframe): страница BillOnlineBySettlement
-// или ссылка с маркером &preview. Старые счета такой ссылки не содержат.
-function isInvoicePreviewLink(value) {
-    const url = String(value || "").trim();
-    return isHttpUrl(url) && (/BillOnlineBySettlement/i.test(url) || /[?&]preview(?:$|[=&])/i.test(url));
+// Ссылка на редактирование счёта в кабинете МоёДело (НЕ для встраивания в iframe).
+function isInvoiceEditLink(value) {
+    const url = String(value || "");
+    return isHttpUrl(url) && (/\/bill\/edit\b/i.test(url) || /AccDocuments\/Sales/i.test(url));
 }
 
 // Собираем данные счёта из доп.полей CRM (после перезагрузки страницы).
@@ -2405,13 +2404,14 @@ function buildInvoiceFromFields(fields) {
     const previewField = String(map[DEAL_FIELD_INVOICE_PREVIEW] || "").trim();
     const linkField = String(map[DEAL_FIELD_INVOICE_LINK] || "").trim();
 
-    // Превью: приоритет у выделенного поля 1106, фолбэк — 1104 в формате превью.
-    const onlineLink = isHttpUrl(previewField)
-        ? previewField
-        : (isInvoicePreviewLink(linkField) ? linkField : "");
+    // Превью: приоритет у выделенного поля 1106; иначе — ссылка из 1104, если это
+    // не ссылка на редактирование. Так превью показывается всегда, когда оно есть.
+    let onlineLink = "";
+    if (isHttpUrl(previewField)) onlineLink = previewField;
+    else if (isHttpUrl(linkField) && !isInvoiceEditLink(linkField)) onlineLink = linkField;
 
-    // «Редактировать»: 1104, если это не та же превью-ссылка.
-    const editLink = (isHttpUrl(linkField) && linkField !== onlineLink && !isInvoicePreviewLink(linkField))
+    // «Редактировать»: 1104, если это ссылка на редактирование (и не равна превью).
+    const editLink = (isHttpUrl(linkField) && linkField !== onlineLink && isInvoiceEditLink(linkField))
         ? linkField
         : "";
 
@@ -2521,14 +2521,17 @@ function renderInvoiceLoading(dealId) {
 }
 
 // Естественная ширина документа счёта МоёДело (под неё считаем масштаб).
-const INVOICE_DOC_WIDTH = 800;
+// Естественная ширина страницы счёта МоёДело (документ + правый блок печати/QR).
+// Подобрано так, чтобы целиком вмещался QR-код и ссылки на скачивание справа.
+const INVOICE_DOC_WIDTH = 1100;
 
 // Полноширинное превью счёта (рендерится в отдельный слот под строкой).
-// На мобильных не рендерим вовсе.
+// На мобильных не рендерим вовсе. Ссылку зашиваем в data-src, чтобы открытие
+// превью не зависело от состояния кеша (иначе iframe мог остаться пустым).
 function renderInvoicePreviewMarkup(invoice) {
     if (!invoice || !isHttpUrl(invoice.onlineLink) || isMobileInvoiceView()) return "";
     return `
-        <div class="deal-invoice-preview" hidden>
+        <div class="deal-invoice-preview" data-src="${escapeHtml(invoice.onlineLink)}" hidden>
             <div class="deal-invoice-stage">
                 <iframe class="deal-invoice-iframe" loading="lazy" referrerpolicy="no-referrer" title="Превью счёта"></iframe>
             </div>
@@ -2577,8 +2580,9 @@ function toggleInvoicePreview(dealId) {
 
     const willShow = preview.hidden;
     if (willShow && !iframe.getAttribute("src")) {
-        const invoice = dealInvoiceCache.get(String(dealId));
-        if (isHttpUrl(invoice?.onlineLink)) iframe.setAttribute("src", invoice.onlineLink);
+        // Ссылка зашита в data-src при рендере; кеш — лишь запасной источник.
+        const src = preview.dataset.src || dealInvoiceCache.get(String(dealId))?.onlineLink;
+        if (isHttpUrl(src)) iframe.setAttribute("src", src);
     }
     preview.hidden = !willShow;
     card?.classList.toggle("is-expanded", willShow);
