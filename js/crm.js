@@ -69,6 +69,7 @@ function restoreAdvSearchUiState() {
 
     const searchInput = document.getElementById("advSearchInput");
     if (searchInput && state.q != null) searchInput.value = state.q;
+    updateAdvSearchClearBtn();
 
     document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => {
         input.checked = false;
@@ -342,12 +343,12 @@ async function searchCRM(mode, triggerEvent, options = {}) {
         resDiv.innerHTML = `<p style="color:red; text-align:center;">Ошибка соединения</p>`;
     } finally {
         load.style.display = "none";
-        // Разблокировка кнопки поиска через 2 секунды
+        // Разблокировка кнопки поиска через 1 секунду
         if (btn) {
             setTimeout(() => {
                 btn.disabled = false;
                 btn.innerText = originalBtnText || "Найти";
-            }, 2000);
+            }, 1000);
         }
     }
 }
@@ -1134,7 +1135,26 @@ function clearAdvFilters() {
     calendarMonth = new Date();
     updateAdvFilterUi();
     renderCalendar();
+    updateAdvSearchClearBtn();
     saveAdvSearchUiState();
+}
+
+// Крестик в строке поиска: стирает только текст запроса, фильтры не трогает.
+function clearAdvSearchText() {
+    const input = document.getElementById('advSearchInput');
+    if (!input) return;
+    input.value = "";
+    updateAdvSearchClearBtn();
+    saveAdvSearchUiState();
+    input.focus();
+}
+
+// Показываем крестик, только когда в поле есть текст.
+function updateAdvSearchClearBtn() {
+    const input = document.getElementById('advSearchInput');
+    const btn = document.getElementById('advSearchClearBtn');
+    if (!input || !btn) return;
+    btn.hidden = input.value.length === 0;
 }
 
 function clearMainSearch() {

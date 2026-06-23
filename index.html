@@ -162,7 +162,10 @@
     <div class="container" id="adv-search-container">
         <div class="adv-search-header">
             <div class="adv-toolbar-line">
-                <input type="text" id="advSearchInput" class="adv-search-input" placeholder="Поиск…">
+                <div class="adv-search-input-wrap">
+                    <input type="text" id="advSearchInput" class="adv-search-input" placeholder="Поиск…" oninput="updateAdvSearchClearBtn()">
+                    <button type="button" class="adv-search-clear-btn" id="advSearchClearBtn" onclick="clearAdvSearchText()" title="Очистить поле поиска" aria-label="Очистить поле поиска" hidden>✕</button>
+                </div>
                 <button type="button" class="adv-toolbar-icon-btn adv-search-submit" onclick="searchCRM('adv')" title="Найти" aria-label="Найти">🔍</button>
                 <div class="adv-toolbar-actions">
                     <div class="adv-filters-popover-wrap" id="advFiltersPopoverWrap">

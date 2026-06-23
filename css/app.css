@@ -1746,7 +1746,7 @@
         #adv-search-container .adv-search-input {
             height: 36px;
             font-size: 16px;
-            padding: 6px 8px;
+            padding: 6px 30px 6px 8px;
         }
         .adv-search-header {
             position: relative;
@@ -1828,6 +1828,11 @@
         width: 100%;
         box-sizing: border-box;
     }
+    /* В режиме списка ограничиваем ширину так же, как карточку заказа (.container = 900px).
+       Канбану (.crm-kanban-layout) оставляем широкую раскладку. */
+    #adv-search-container.container:not(.crm-kanban-layout) {
+        max-width: 900px;
+    }
     #adv-search-container button {
         margin-top: 0;
         width: auto;
@@ -1852,17 +1857,47 @@
         width: 100%;
         min-width: 0;
     }
+    .adv-search-input-wrap {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+    }
     .adv-search-input {
         flex: 1 1 auto;
         min-width: 0;
         width: auto;
         height: 34px;
         margin-top: 0;
-        padding: 6px 10px;
+        padding: 6px 30px 6px 10px;
         font-size: 14px;
         border-radius: 8px;
         box-sizing: border-box;
     }
+    .adv-search-clear-btn {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: #e2e8f0;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .adv-search-clear-btn:hover { background: #cbd5e1; color: #334155; }
+    .adv-search-clear-btn[hidden] { display: none; }
     .adv-toolbar-actions {
         display: flex;
         align-items: center;
