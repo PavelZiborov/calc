@@ -2959,7 +2959,8 @@ async function sendReadinessNotification(dealId) {
                 dealId: Number(dealId),
                 dealNum: section.dataset.dealNum || "",
                 managerId: section.dataset.managerId || "",
-                managerName: section.dataset.managerName || ""
+                managerName: section.dataset.managerName || "",
+                elements: collectDealElementsForEmail(dealId)
             })
         });
         if (response.status === 401) {
@@ -2990,6 +2991,29 @@ async function sendReadinessNotification(dealId) {
 
 const DEAL_STATUS_READY = 24873; // статус сделки «Заказ готов» — триггер авто-уведомления
 
+// Собираем позиции заказа для письма: название, кол-во, статус, превью (без цен).
+// Превью берём из уже загруженного кэша элементов (временные ссылки Яндекса).
+function collectDealElementsForEmail(dealId) {
+    const deal = dealsCache.get(String(dealId));
+    const elements = Array.isArray(deal?.elements) ? deal.elements : [];
+    return elements.map(el => {
+        const elId = getElementId(el);
+        let preview = "";
+        try {
+            const cached = elementAssetsCache.get(assetsCacheKey(dealId, elId));
+            const raw = cached?.preview?.thumbUrl || cached?.preview?.url || "";
+            if (isUsableAssetUrl(raw)) preview = String(raw).trim();
+        } catch (_) {}
+        return {
+            name: getElementName(el),
+            quantity: getElementQuantity(el),
+            units: getElementUnits(el),
+            status: getElementStatusInfo(el).name || "",
+            preview
+        };
+    });
+}
+
 // Авто-уведомление при переводе сделки в «Заказ готов».
 // n8n дедупит (не шлёт повторно, если уже слали) и молчит, если контакт не выбран.
 // Тост показываем только при реальной отправке.
@@ -3006,7 +3030,8 @@ async function maybeAutoNotifyReadiness(dealId) {
                 dealId: Number(dealId),
                 dealNum: deal?.num != null ? String(deal.num) : "",
                 managerId: deal?.responsible?.id != null ? String(deal.responsible.id) : "",
-                managerName: getDealResponsibleName(deal || {})
+                managerName: getDealResponsibleName(deal || {}),
+                elements: collectDealElementsForEmail(dealId)
             })
         });
         if (!response.ok) return;
