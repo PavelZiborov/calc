@@ -626,6 +626,10 @@ async function updateDealStatusById(dealId, status) {
 
         applyDealStatusToCache(dealId, status);
         refreshDealStatusControls(dealId, status);
+
+        if (Number(status.id) === DEAL_STATUS_READY) {
+            maybeAutoNotifyReadiness(dealId);
+        }
         return true;
     } catch (e) {
         console.error(e);
@@ -729,6 +733,11 @@ async function updateCrmStatus(trigger, status, menu) {
 
         updateCachedStatus(trigger, status);
         refreshStatusControls(trigger, status);
+
+        // Авто-уведомление о готовности при переводе СДЕЛКИ в «Заказ готов».
+        if (scope === "deal" && Number(status.id) === DEAL_STATUS_READY) {
+            maybeAutoNotifyReadiness(dealId);
+        }
     } catch (e) {
         alert("Не удалось обновить статус");
         console.error(e);
@@ -2268,6 +2277,9 @@ const clientRequisitesCache = new Map();
 // dealId -> { number, date, onlineLink, editLink } данные выставленного счёта.
 // onlineLink — статическая ссылка-превью счёта (МоёДело), встраиваемая в iframe.
 const dealInvoiceCache = new Map();
+// dealId -> { selectedContactId, contacts:[{key,source,crmRef,contactId,name,email,phone,position}] }
+// контакт-получатель уведомлений о готовности заказа.
+const dealContactsCache = new Map();
 
 function readDealCostInfoDraft(dealId) {
     try {
@@ -2379,6 +2391,7 @@ function scheduleDealExtraFieldsLoading(deal) {
     });
 
     scheduleDealRequisitesLoading(deal);
+    scheduleDealContactsLoading(deal);
 }
 
 function applyDealCostInfoFromCrm(dealId, value) {
@@ -2746,7 +2759,399 @@ function renderDealExtraPanel(deal) {
                 </div>
                 <div class="deal-invoice-preview-slot"></div>
             </div>
+            <div class="deal-notify-section" data-deal-id="${dealId}"${clientId ? ` data-client-id="${clientId}"` : ""} data-deal-num="${escapeHtml(deal.num != null ? String(deal.num) : "")}" data-manager-id="${escapeHtml(deal.responsible?.id != null ? String(deal.responsible.id) : "")}" data-manager-name="${escapeHtml(getDealResponsibleName(deal))}">
+                <span class="deal-extra-label">Контакт для уведомлений о готовности</span>
+                <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
+            </div>
         </div>`;
+}
+
+// ─── Контакт для уведомлений о готовности (дропдаун + плашка-акцент) ───
+
+function getDealNotifySection(dealId) {
+    return document.querySelector(`.deal-notify-section[data-deal-id="${CSS.escape(String(dealId))}"]`);
+}
+
+function scheduleDealContactsLoading(deal) {
+    const dealId = deal?.id;
+    if (!dealId || currentUser.role !== "staff") return;
+
+    const clientId = getDealClientId(deal);
+    const section = getDealNotifySection(dealId);
+    if (section && clientId) section.dataset.clientId = String(clientId);
+
+    if (!clientId) {
+        renderDealNotifyBody(dealId, "no-client");
+        return;
+    }
+
+    renderDealNotifyBody(dealId, "loading");
+    fetchDealContacts(dealId, clientId).then(data => {
+        if (data == null) {
+            renderDealNotifyBody(dealId, "error");
+            return;
+        }
+        dealContactsCache.set(String(dealId), data);
+        renderDealNotifyBody(dealId, "ready");
+    });
+}
+
+async function fetchDealContacts(dealId, clientId) {
+    if (!ensureActiveSession({ silent: true })) return null;
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "getDealContacts",
+                dealId: Number(dealId),
+                clientId: Number(clientId)
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return null;
+        }
+        if (!response.ok) return null;
+
+        const payload = await response.json();
+        const data = Array.isArray(payload) ? payload[0] : payload;
+        const contacts = Array.isArray(data?.contacts) ? data.contacts : [];
+        return {
+            selectedContactId: data?.selectedContactId != null ? Number(data.selectedContactId) : null,
+            notifyDisabled: data?.notifyDisabled === true,
+            lastSentAt: data?.lastSentAt || null,
+            lastSentTo: data?.lastSentTo || null,
+            contacts
+        };
+    } catch (e) {
+        console.warn("getDealContacts failed", e);
+        return null;
+    }
+}
+
+function buildContactLabel(contact) {
+    const parts = [];
+    if (contact.name) parts.push(contact.name);
+    const reach = contact.email || contact.phone;
+    if (reach) parts.push(reach);
+    return parts.join(" · ") || "(без имени)";
+}
+
+// ISO/Postgres timestamp -> "ДД.ММ.ГГГГ ЧЧ:ММ" в локальном времени.
+function formatNotifySentAt(raw) {
+    if (!raw) return "";
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return "";
+    const p = n => String(n).padStart(2, "0");
+    return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderDealNotifyBody(dealId, state) {
+    const section = getDealNotifySection(dealId);
+    const body = section?.querySelector(".deal-notify-body");
+    if (!section || !body) return;
+
+    if (state === "loading" || state === "error" || state === "no-client") {
+        section.classList.remove("is-unset");
+        const cls = state === "error" ? "deal-notify-error" : (state === "no-client" ? "deal-notify-empty" : "deal-notify-loading");
+        const text = state === "error" ? "Не удалось загрузить контакты"
+            : (state === "no-client" ? "Клиент не привязан к сделке" : "Загрузка контактов…");
+        body.innerHTML = `<div class="${cls}">${text}</div>`;
+        return;
+    }
+
+    const data = dealContactsCache.get(String(dealId)) || { selectedContactId: null, notifyDisabled: false, contacts: [], lastSentAt: null, lastSentTo: null };
+    const selectedId = data.selectedContactId;
+    const notifyDisabled = data.notifyDisabled === true;
+    const hasSelection = selectedId != null;
+    const isDecided = hasSelection || notifyDisabled; // выбор сделан: контакт или «не уведомлять»
+    const clientId = section.dataset.clientId;
+
+    const sentAt = formatNotifySentAt(data.lastSentAt);
+    const sentBadge = sentAt
+        ? `<div class="deal-notify-sent" title="Уведомление о готовности уже отправлено">✅ Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}</div>`
+        : "";
+    const sendLabel = sentAt ? "📧 Отправить ещё раз" : "📧 Отправить уведомление о готовности";
+
+    const selectedContact = hasSelection
+        ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId))
+        : null;
+    const canDelete = selectedContact && selectedContact.source === "manual";
+
+    const optionsHtml = data.contacts.map(contact => {
+        const isSel = contact.contactId != null && Number(contact.contactId) === Number(selectedId);
+        return `<option value="${escapeHtml(contact.key)}"${isSel ? " selected" : ""}>${escapeHtml(buildContactLabel(contact))}</option>`;
+    }).join("");
+
+    section.classList.toggle("is-unset", !isDecided);
+
+    body.innerHTML = `
+        ${!isDecided ? `<div class="deal-notify-alert">⚠️ Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
+        <div class="deal-notify-row">
+            <select class="deal-notify-select" onchange="onDealContactSelect(${dealId}, this.value)">
+                <option value=""${!isDecided ? " selected" : ""}>— выберите контакт —</option>
+                <option value="__none__"${notifyDisabled ? " selected" : ""}>🔕 Не уведомлять</option>
+                ${optionsHtml}
+            </select>
+            ${canDelete ? `<button type="button" class="deal-notify-del-btn" onclick="deleteDealContactConfirm(${dealId}, ${selectedContact.contactId})" title="Удалить этот контакт из книги">🗑</button>` : ""}
+            <button type="button" class="deal-notify-add-btn" onclick="toggleDealContactForm(${dealId})">+ Контакт</button>
+            ${clientId ? `<a class="deal-notify-crm-link" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" title="Контакты клиента в CRM">CRM ↗</a>` : ""}
+        </div>
+        ${sentBadge}
+        ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
+        <div class="deal-notify-form" hidden>
+            <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
+            <input type="email" class="deal-notify-input deal-notify-email" placeholder="Email">
+            <input type="text" class="deal-notify-input deal-notify-phone" placeholder="Телефон (необязательно)">
+            <div class="deal-notify-form-actions">
+                <button type="button" class="deal-notify-form-cancel" onclick="toggleDealContactForm(${dealId})">Отмена</button>
+                <button type="button" class="deal-notify-form-save" onclick="submitDealContactForm(${dealId})">Сохранить и выбрать</button>
+            </div>
+        </div>`;
+}
+
+function toggleDealContactForm(dealId) {
+    const section = getDealNotifySection(dealId);
+    const form = section?.querySelector(".deal-notify-form");
+    if (!form) return;
+    form.hidden = !form.hidden;
+    if (!form.hidden) form.querySelector(".deal-notify-name")?.focus();
+}
+
+async function onDealContactSelect(dealId, key) {
+    if (!key) return; // плейсхолдер «— выберите контакт —»
+    if (key === "__none__") {
+        await saveDealContactAndRefresh(dealId, { disable: true });
+        return;
+    }
+    const data = dealContactsCache.get(String(dealId));
+    const contact = data?.contacts.find(c => c.key === key);
+    if (!contact) return;
+
+    let payload;
+    if (contact.contactId != null) {
+        payload = { contactId: Number(contact.contactId) };
+    } else if (contact.source === "crm") {
+        payload = { source: "crm", crmRef: contact.crmRef, name: contact.name, email: contact.email, phone: contact.phone };
+    } else {
+        payload = { source: "manual", name: contact.name, email: contact.email, phone: contact.phone };
+    }
+    await saveDealContactAndRefresh(dealId, payload);
+}
+
+async function sendReadinessNotification(dealId) {
+    const section = getDealNotifySection(dealId);
+    if (!section) return;
+    if (!ensureActiveSession()) return;
+
+    const btn = section.querySelector(".deal-notify-send-btn");
+    const orig = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Отправка…"; }
+
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "sendReadinessNotification",
+                force: true, // ручная кнопка — шлём принудительно, в обход дедупа
+                dealId: Number(dealId),
+                dealNum: section.dataset.dealNum || "",
+                managerId: section.dataset.managerId || "",
+                managerName: section.dataset.managerName || ""
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return;
+        }
+        const payload = response.ok ? await response.json() : null;
+        const result = Array.isArray(payload) ? payload[0] : payload;
+
+        if (result?.ok) {
+            alert("✅ Уведомление отправлено" + (result.to ? `: ${result.to}` : ""));
+            // Обновим плашку «отправлено …»
+            const clientId = section.dataset.clientId;
+            if (clientId) {
+                const fresh = await fetchDealContacts(dealId, clientId);
+                if (fresh) { dealContactsCache.set(String(dealId), fresh); renderDealNotifyBody(dealId, "ready"); }
+            }
+        } else {
+            alert("Не удалось отправить уведомление: " + (result?.message || "неизвестная ошибка"));
+        }
+    } catch (e) {
+        console.error("sendReadinessNotification failed", e);
+        alert("Ошибка отправки: " + (e.message || "неизвестная ошибка"));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = orig || "📧 Отправить уведомление о готовности"; }
+    }
+}
+
+const DEAL_STATUS_READY = 24873; // статус сделки «Заказ готов» — триггер авто-уведомления
+
+// Авто-уведомление при переводе сделки в «Заказ готов».
+// n8n дедупит (не шлёт повторно, если уже слали) и молчит, если контакт не выбран.
+// Тост показываем только при реальной отправке.
+async function maybeAutoNotifyReadiness(dealId) {
+    if (currentUser.role !== "staff") return;
+    const deal = dealsCache.get(String(dealId));
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "sendReadinessNotification",
+                auto: true,
+                dealId: Number(dealId),
+                dealNum: deal?.num != null ? String(deal.num) : "",
+                managerId: deal?.responsible?.id != null ? String(deal.responsible.id) : "",
+                managerName: getDealResponsibleName(deal || {})
+            })
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const result = Array.isArray(payload) ? payload[0] : payload;
+        if (result?.ok && result?.to) {
+            showReadinessToast(`📧 Уведомление о готовности отправлено: ${result.to}`);
+            // Обновим плашку «отправлено …», если карточка сделки открыта.
+            const section = getDealNotifySection(dealId);
+            const clientId = section?.dataset.clientId;
+            if (clientId) {
+                const fresh = await fetchDealContacts(dealId, clientId);
+                if (fresh) { dealContactsCache.set(String(dealId), fresh); renderDealNotifyBody(dealId, "ready"); }
+            }
+        }
+    } catch (e) {
+        console.warn("auto readiness notify failed", e);
+    }
+}
+
+function showReadinessToast(message) {
+    let toast = document.getElementById("readinessToast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "readinessToast";
+        toast.className = "readiness-toast";
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    // reflow для перезапуска анимации
+    void toast.offsetWidth;
+    toast.classList.add("is-visible");
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => toast.classList.remove("is-visible"), 5000);
+}
+
+async function deleteDealContactConfirm(dealId, contactId) {
+    if (!contactId) return;
+    if (!confirm("Удалить этот контакт из книги? Контакты из CRM удалить нельзя.")) return;
+
+    const section = getDealNotifySection(dealId);
+    const clientId = section?.dataset.clientId;
+    section?.classList.add("is-saving");
+
+    const ok = await deleteDealContactRequest(dealId, contactId);
+    if (!ok) {
+        section?.classList.remove("is-saving");
+        alert("Не удалось удалить контакт");
+        return;
+    }
+
+    const data = clientId ? await fetchDealContacts(dealId, clientId) : null;
+    if (data) dealContactsCache.set(String(dealId), data);
+    section?.classList.remove("is-saving");
+    renderDealNotifyBody(dealId, "ready");
+}
+
+async function deleteDealContactRequest(dealId, contactId) {
+    if (!ensureActiveSession({ silent: true })) return false;
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "deleteDealContact",
+                dealId: Number(dealId),
+                contactId: Number(contactId)
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return false;
+        }
+        if (!response.ok) return false;
+        const data = await response.json();
+        const result = Array.isArray(data) ? data[0] : data;
+        return result?.ok === true;
+    } catch (e) {
+        console.warn("deleteDealContact failed", e);
+        return false;
+    }
+}
+
+async function submitDealContactForm(dealId) {
+    const section = getDealNotifySection(dealId);
+    if (!section) return;
+    const name = (section.querySelector(".deal-notify-name")?.value || "").trim();
+    const email = (section.querySelector(".deal-notify-email")?.value || "").trim();
+    const phone = (section.querySelector(".deal-notify-phone")?.value || "").trim();
+
+    if (!email && !phone) {
+        alert("Укажите email или телефон для связи");
+        return;
+    }
+    await saveDealContactAndRefresh(dealId, { source: "manual", name, email, phone });
+}
+
+async function saveDealContactAndRefresh(dealId, payload) {
+    const section = getDealNotifySection(dealId);
+    const clientId = section?.dataset.clientId;
+    if (!clientId) {
+        alert("Клиент не привязан к сделке");
+        return;
+    }
+
+    section?.classList.add("is-saving");
+    const ok = await saveDealContactRequest(dealId, clientId, payload);
+    if (!ok) {
+        section?.classList.remove("is-saving");
+        renderDealNotifyBody(dealId, "ready"); // вернуть прежний выбор в селекте
+        alert("Не удалось сохранить контакт");
+        return;
+    }
+
+    const data = await fetchDealContacts(dealId, clientId);
+    if (data) dealContactsCache.set(String(dealId), data);
+    section?.classList.remove("is-saving");
+    renderDealNotifyBody(dealId, "ready");
+}
+
+async function saveDealContactRequest(dealId, clientId, payload) {
+    if (!ensureActiveSession({ silent: true })) return false;
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "saveDealContact",
+                dealId: Number(dealId),
+                clientId: Number(clientId),
+                ...payload
+            })
+        });
+        if (response.status === 401) {
+            handleUnauthorized();
+            return false;
+        }
+        if (!response.ok) return false;
+        const data = await response.json();
+        const result = Array.isArray(data) ? data[0] : data;
+        return result?.ok === true;
+    } catch (e) {
+        console.warn("saveDealContact failed", e);
+        return false;
+    }
 }
 
 async function showInvoiceRequisitesModal(dealId) {
