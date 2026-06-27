@@ -2832,8 +2832,11 @@ async function fetchDealContacts(dealId, clientId) {
 
 function buildContactLabel(contact) {
     const parts = [];
-    if (contact.name) parts.push(contact.name);
-    const reach = contact.email || contact.phone;
+    const rawName = contact.name != null ? String(contact.name).trim() : "";
+    const name = (rawName && rawName !== "NaN" && rawName !== "null" && rawName !== "undefined") ? rawName : "";
+    if (name) parts.push(name);
+    const tg = contact.telegram ? "@" + String(contact.telegram).replace(/^@/, "") : "";
+    const reach = contact.email || contact.phone || tg;
     if (reach) parts.push(reach);
     return parts.join(" · ") || "(без имени)";
 }
@@ -2877,47 +2880,117 @@ function renderDealNotifyBody(dealId, state) {
     const selectedContact = hasSelection
         ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId))
         : null;
-    const canDelete = selectedContact && selectedContact.source === "manual";
-
-    const optionsHtml = data.contacts.map(contact => {
+    // Пункты кастомного дропдауна. Кнопка удаления — прямо в списке (только у ручных контактов).
+    const ddOptionsHtml = data.contacts.map(contact => {
         const isSel = contact.contactId != null && Number(contact.contactId) === Number(selectedId);
-        return `<option value="${escapeHtml(contact.key)}"${isSel ? " selected" : ""}>${escapeHtml(buildContactLabel(contact))}</option>`;
+        const canDel = contact.source === "manual" && contact.contactId != null;
+        return `<div class="deal-notify-dd-opt-row">
+            <button type="button" class="deal-notify-dd-opt${isSel ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '${escapeHtml(contact.key)}')">${isSel ? "✓ " : ""}${escapeHtml(buildContactLabel(contact))}</button>
+            ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="deleteDealContactConfirm(${dealId}, ${contact.contactId})" title="Удалить этот контакт из книги">🗑</button>` : ""}
+        </div>`;
     }).join("");
+
+    const currentLabel = notifyDisabled
+        ? "🔕 Не уведомлять"
+        : (hasSelection ? escapeHtml(buildContactLabel(selectedContact)) : "— выберите контакт —");
 
     section.classList.toggle("is-unset", !isDecided);
 
     body.innerHTML = `
         ${!isDecided ? `<div class="deal-notify-alert">⚠️ Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
         <div class="deal-notify-row">
-            <select class="deal-notify-select" onchange="onDealContactSelect(${dealId}, this.value)">
-                <option value=""${!isDecided ? " selected" : ""}>— выберите контакт —</option>
-                <option value="__none__"${notifyDisabled ? " selected" : ""}>🔕 Не уведомлять</option>
-                ${optionsHtml}
-            </select>
-            ${canDelete ? `<button type="button" class="deal-notify-del-btn" onclick="deleteDealContactConfirm(${dealId}, ${selectedContact.contactId})" title="Удалить этот контакт из книги">🗑</button>` : ""}
-            <button type="button" class="deal-notify-add-btn" onclick="toggleDealContactForm(${dealId})">+ Контакт</button>
+            <div class="deal-notify-dd">
+                <button type="button" class="deal-notify-dd-toggle${!isDecided ? " is-unset" : ""}" onclick="toggleNotifyDropdown(${dealId}, event)">
+                    <span class="deal-notify-dd-current">${currentLabel}</span>
+                    <span class="deal-notify-dd-caret">▾</span>
+                </button>
+                <div class="deal-notify-dd-menu" hidden>
+                    <button type="button" class="deal-notify-dd-opt${notifyDisabled ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '__none__')">${notifyDisabled ? "✓ " : ""}🔕 Не уведомлять</button>
+                    ${ddOptionsHtml}
+                </div>
+            </div>
+            <button type="button" class="deal-notify-add-btn" onclick="openDealContactForm(${dealId})">+ Контакт</button>
             ${clientId ? `<a class="deal-notify-crm-link" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" title="Контакты клиента в CRM">CRM ↗</a>` : ""}
         </div>
         ${sentBadge}
         ${hasSelection ? renderDealNotifyChannels(selectedContact) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
-        <div class="deal-notify-form" hidden>
-            <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
-            <input type="text" class="deal-notify-input deal-notify-email" placeholder="Email и/или @ник Telegram (напр. mail@ya.ru @paulgt)">
-            <input type="text" class="deal-notify-input deal-notify-phone" placeholder="Телефон (необязательно)">
-            <div class="deal-notify-form-actions">
-                <button type="button" class="deal-notify-form-cancel" onclick="toggleDealContactForm(${dealId})">Отмена</button>
-                <button type="button" class="deal-notify-form-save" onclick="submitDealContactForm(${dealId})">Сохранить и выбрать</button>
+        <div class="deal-notify-modal" hidden onclick="if(event.target===this)closeDealContactForm(${dealId})">
+            <div class="deal-notify-modal-card">
+                <div class="deal-notify-modal-title">Новый контакт</div>
+                <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
+                <input type="text" class="deal-notify-input deal-notify-email" placeholder="Email и/или @ник Telegram (напр. mail@ya.ru @paulgt)">
+                <input type="tel" inputmode="tel" class="deal-notify-input deal-notify-phone" placeholder="+7 (___) ___ __ __" oninput="maskRuPhone(this)">
+                <div class="deal-notify-form-actions">
+                    <button type="button" class="deal-notify-form-cancel" onclick="closeDealContactForm(${dealId})">Отмена</button>
+                    <button type="button" class="deal-notify-form-save" onclick="submitDealContactForm(${dealId})">Сохранить и выбрать</button>
+                </div>
             </div>
         </div>`;
 }
 
-function toggleDealContactForm(dealId) {
+// ── Кастомный дропдаун выбора контакта ────────────────────────────────
+function closeAllNotifyDropdowns() {
+    document.querySelectorAll(".deal-notify-dd-menu").forEach(m => { m.hidden = true; });
+    document.querySelectorAll(".deal-notify-dd.is-open").forEach(d => d.classList.remove("is-open"));
+    document.removeEventListener("click", notifyDropdownOutside);
+}
+
+function notifyDropdownOutside(ev) {
+    if (ev.target.closest(".deal-notify-dd")) return;
+    closeAllNotifyDropdowns();
+}
+
+function toggleNotifyDropdown(dealId, ev) {
+    if (ev) ev.stopPropagation();
     const section = getDealNotifySection(dealId);
-    const form = section?.querySelector(".deal-notify-form");
-    if (!form) return;
-    form.hidden = !form.hidden;
-    if (!form.hidden) form.querySelector(".deal-notify-name")?.focus();
+    const dd = section?.querySelector(".deal-notify-dd");
+    const menu = dd?.querySelector(".deal-notify-dd-menu");
+    if (!menu) return;
+    const willOpen = menu.hidden;
+    closeAllNotifyDropdowns();
+    if (willOpen) {
+        menu.hidden = false;
+        dd.classList.add("is-open");
+        setTimeout(() => document.addEventListener("click", notifyDropdownOutside), 0);
+    }
+}
+
+function onNotifyPick(dealId, key) {
+    closeAllNotifyDropdowns();
+    onDealContactSelect(dealId, key);
+}
+
+// ── Модалка добавления контакта (поверх списка) ───────────────────────
+function openDealContactForm(dealId) {
+    closeAllNotifyDropdowns();
+    const section = getDealNotifySection(dealId);
+    const modal = section?.querySelector(".deal-notify-modal");
+    if (!modal) return;
+    modal.hidden = false;
+    modal.querySelector(".deal-notify-name")?.focus();
+}
+
+function closeDealContactForm(dealId) {
+    const section = getDealNotifySection(dealId);
+    const modal = section?.querySelector(".deal-notify-modal");
+    if (modal) modal.hidden = true;
+}
+
+// Маска российского номера: +7 (XXX) XXX XX XX
+function maskRuPhone(input) {
+    let v = String(input.value || "").replace(/\D/g, "");
+    if (!v) { input.value = ""; return; }
+    if (v[0] === "8") v = "7" + v.slice(1);
+    if (v[0] !== "7") v = "7" + v;
+    v = v.slice(0, 11);
+    const r = v.slice(1); // до 10 цифр после «7»
+    let out = "+7";
+    if (r.length) out += " (" + r.slice(0, 3);
+    if (r.length >= 3) out += ") " + r.slice(3, 6);
+    if (r.length >= 6) out += " " + r.slice(6, 8);
+    if (r.length >= 8) out += " " + r.slice(8, 10);
+    input.value = out;
 }
 
 // Галочки каналов: активны только при наличии адреса (почта/ник).
@@ -3140,6 +3213,7 @@ function showReadinessToast(message) {
 
 async function deleteDealContactConfirm(dealId, contactId) {
     if (!contactId) return;
+    closeAllNotifyDropdowns();
     if (!confirm("Удалить этот контакт из книги? Контакты из CRM удалить нельзя.")) return;
 
     const section = getDealNotifySection(dealId);

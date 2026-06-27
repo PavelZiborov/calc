@@ -745,40 +745,64 @@
         padding: 7px 10px;
         line-height: 1.35;
     }
-    .deal-notify-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .deal-notify-select {
-        flex: 1 1 auto;
-        min-width: 0;
-        height: 34px;
-        margin: 0;
-        border: 1px solid #d5dde6;
-        border-radius: 8px;
-        padding: 6px 10px;
-        font-size: 13px;
-        background: #fff;
-        box-sizing: border-box;
+    .deal-notify-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+    /* Кастомный дропдаун выбора контакта (с кнопкой удаления внутри списка) */
+    .deal-notify-dd { position: relative; flex: 1 1 auto; min-width: 0; }
+    .deal-notify-dd-toggle {
+        display: flex; align-items: center; gap: 6px;
+        width: 100%; height: 34px; margin: 0; padding: 6px 10px;
+        border: 1px solid #d5dde6; border-radius: 8px; background: #fff;
+        font-size: 13px; cursor: pointer; box-sizing: border-box; text-align: left;
     }
-    .deal-notify-select:focus { outline: none; border-color: #2F6BD8; box-shadow: 0 0 0 2px rgba(47,125,246,0.12); }
-    .deal-notify-section.is-unset .deal-notify-select { border-color: #e7b3b3; }
+    .deal-notify-dd-toggle.is-unset { border-color: #e7b3b3; }
+    .deal-notify-dd-current { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2d3d; }
+    .deal-notify-dd-caret { flex: 0 0 auto; color: #8a93a0; font-size: 11px; transition: transform .15s ease; }
+    .deal-notify-dd.is-open .deal-notify-dd-caret { transform: rotate(180deg); }
+    .deal-notify-dd-menu {
+        position: absolute; z-index: 50; top: calc(100% + 4px); left: 0; right: 0;
+        max-height: 280px; overflow-y: auto;
+        background: #fff; border: 1px solid #d5dde6; border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(20,30,50,0.16); padding: 4px;
+    }
+    .deal-notify-dd-menu[hidden] { display: none; }
+    .deal-notify-dd-opt-row { display: flex; align-items: center; gap: 2px; }
+    .deal-notify-dd-opt {
+        flex: 1 1 auto; min-width: 0; margin: 0; text-align: left;
+        padding: 8px 10px; border: none; border-radius: 6px; background: transparent;
+        font-size: 13px; color: #1f2d3d; cursor: pointer;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .deal-notify-dd-opt:hover { background: #eef4ff; }
+    .deal-notify-dd-opt.is-sel { background: #e8f0fe; font-weight: 600; }
+    .deal-notify-dd-del {
+        flex: 0 0 auto; width: 30px; height: 30px; margin: 0; padding: 0;
+        border: none; border-radius: 6px; background: transparent; color: #b03434;
+        font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .deal-notify-dd-del:hover { background: #fbe3e3; }
     .deal-notify-add-btn {
         margin: 0; width: auto; flex: 0 0 auto;
-        padding: 7px 12px; border-radius: 8px;
+        padding: 7px 10px; border-radius: 8px;
         border: 1px dashed #b8c4d4; background: #fff; color: #2F6BD8;
-        font-size: 13px; cursor: pointer; white-space: nowrap;
+        font-size: 12px; cursor: pointer; white-space: nowrap;
     }
     .deal-notify-add-btn:hover { background: #eef4ff; }
-    .deal-notify-del-btn {
-        margin: 0; flex: 0 0 auto;
-        width: 34px; height: 34px; min-width: 34px; padding: 0;
-        border-radius: 8px; border: 1px solid #f0c2c2; background: #fff;
-        color: #b03434; font-size: 14px; line-height: 1; cursor: pointer;
-        display: inline-flex; align-items: center; justify-content: center;
-    }
-    .deal-notify-del-btn:hover { background: #fbe3e3; }
     .deal-notify-crm-link { flex: 0 0 auto; font-size: 12px; color: #2F6BD8; text-decoration: none; white-space: nowrap; }
     .deal-notify-crm-link:hover { text-decoration: underline; }
-    .deal-notify-form { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
-    .deal-notify-form[hidden] { display: none; }
+    /* Модалка добавления контакта — поверх списка */
+    .deal-notify-modal {
+        position: fixed; inset: 0; z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(20,30,50,0.45); padding: 16px;
+    }
+    .deal-notify-modal[hidden] { display: none; }
+    .deal-notify-modal-card {
+        width: 100%; max-width: 380px;
+        display: flex; flex-direction: column; gap: 8px;
+        background: #fff; border-radius: 12px; padding: 16px;
+        box-shadow: 0 16px 48px rgba(20,30,50,0.3);
+    }
+    .deal-notify-modal-title { font-size: 15px; font-weight: 700; color: #1f2d3d; }
     .deal-notify-input {
         height: 34px; margin: 0; box-sizing: border-box;
         border: 1px solid #d5dde6; border-radius: 8px;
@@ -799,18 +823,22 @@
     .deal-notify-channels {
         display: flex;
         align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
-        font-size: 13px;
+        gap: 10px;
+        flex-wrap: nowrap;
+        font-size: 11.5px;
+        white-space: nowrap;
     }
-    .deal-notify-channels-label { color: #555; font-weight: 600; }
+    .deal-notify-channels-label { color: #555; font-weight: 600; white-space: nowrap; }
     .deal-notify-ch-label {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
+        gap: 4px;
         cursor: pointer;
         color: #1f2d3d;
         user-select: none;
+        text-transform: none;
+        white-space: nowrap;
+        letter-spacing: 0;
     }
     .deal-notify-ch-label input { margin: 0; width: auto; cursor: pointer; }
     .deal-notify-ch-label.is-disabled { color: #aab2bd; cursor: not-allowed; }
