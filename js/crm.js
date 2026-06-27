@@ -2899,10 +2899,11 @@ function renderDealNotifyBody(dealId, state) {
             ${clientId ? `<a class="deal-notify-crm-link" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" title="Контакты клиента в CRM">CRM ↗</a>` : ""}
         </div>
         ${sentBadge}
+        ${hasSelection ? renderDealNotifyChannels(selectedContact) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
         <div class="deal-notify-form" hidden>
             <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
-            <input type="email" class="deal-notify-input deal-notify-email" placeholder="Email">
+            <input type="text" class="deal-notify-input deal-notify-email" placeholder="Email и/или @ник Telegram (напр. mail@ya.ru @paulgt)">
             <input type="text" class="deal-notify-input deal-notify-phone" placeholder="Телефон (необязательно)">
             <div class="deal-notify-form-actions">
                 <button type="button" class="deal-notify-form-cancel" onclick="toggleDealContactForm(${dealId})">Отмена</button>
@@ -2919,6 +2920,25 @@ function toggleDealContactForm(dealId) {
     if (!form.hidden) form.querySelector(".deal-notify-name")?.focus();
 }
 
+// Галочки каналов: активны только при наличии адреса (почта/ник).
+function renderDealNotifyChannels(contact) {
+    const hasEmail = !!(contact && contact.email);
+    const tg = contact && contact.telegram ? String(contact.telegram).replace(/^@/, "") : "";
+    const hasTg = !!tg;
+    const emailLabel = hasEmail ? escapeHtml(contact.email) : "нет почты";
+    const tgLabel = hasTg ? `@${escapeHtml(tg)}` : "нет ника";
+    return `
+        <div class="deal-notify-channels">
+            <span class="deal-notify-channels-label">Куда слать:</span>
+            <label class="deal-notify-ch-label${hasEmail ? "" : " is-disabled"}" title="${emailLabel}">
+                <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "checked" : "disabled"}> ✉️ Email
+            </label>
+            <label class="deal-notify-ch-label${hasTg ? "" : " is-disabled"}" title="${tgLabel}">
+                <input type="checkbox" class="deal-notify-ch" value="telegram" ${hasTg ? "checked" : "disabled"}> ✈️ Telegram
+            </label>
+        </div>`;
+}
+
 async function onDealContactSelect(dealId, key) {
     if (!key) return; // плейсхолдер «— выберите контакт —»
     if (key === "__none__") {
@@ -2933,57 +2953,106 @@ async function onDealContactSelect(dealId, key) {
     if (contact.contactId != null) {
         payload = { contactId: Number(contact.contactId) };
     } else if (contact.source === "crm") {
-        payload = { source: "crm", crmRef: contact.crmRef, name: contact.name, email: contact.email, phone: contact.phone };
+        payload = { source: "crm", crmRef: contact.crmRef, name: contact.name, email: contact.email, phone: contact.phone, telegram: contact.telegram || "" };
     } else {
-        payload = { source: "manual", name: contact.name, email: contact.email, phone: contact.phone };
+        payload = { source: "manual", name: contact.name, email: contact.email, phone: contact.phone, telegram: contact.telegram || "" };
     }
     await saveDealContactAndRefresh(dealId, payload);
 }
 
+// «zzipp@inbox.ru @paulgt» → { email, telegram }. Любое одно тоже ок.
+function parseContactReach(raw) {
+    const str = String(raw || "").trim();
+    let email = "";
+    let telegram = "";
+    const em = str.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/);
+    if (em) email = em[0];
+    const rest = email ? str.replace(email, " ") : str;
+    const tg = rest.match(/@([A-Za-z][A-Za-z0-9_]{3,31})/);
+    if (tg) telegram = tg[1];
+    else if (!email) {
+        const bare = rest.trim().replace(/^@/, "");
+        if (/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(bare)) telegram = bare;
+    }
+    return { email, telegram };
+}
+
+function getSelectedDealContact(dealId) {
+    const data = dealContactsCache.get(String(dealId));
+    if (!data || data.selectedContactId == null) return null;
+    return data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(data.selectedContactId)) || null;
+}
+
+function getCheckedChannels(section) {
+    return Array.from(section.querySelectorAll(".deal-notify-ch:checked")).map(c => c.value);
+}
+
+// Тело запроса отправки (общее для ручной и авто). Один запрос = один канал.
+function buildReadinessSendBody(dealId, channel, opts = {}) {
+    const deal = dealsCache.get(String(dealId));
+    const selected = getSelectedDealContact(dealId);
+    const body = {
+        action: "sendReadinessNotification",
+        channel,
+        dealId: Number(dealId),
+        dealNum: deal?.num != null ? String(deal.num) : "",
+        managerId: deal?.responsible?.id != null ? String(deal.responsible.id) : "",
+        managerName: getDealResponsibleName(deal || {}),
+        // ник передаём с фронта (свежий из CRM) — для Telegram-отправки, чтобы не зависеть от книги
+        telegram: selected?.telegram || "",
+        elements: collectDealElementsForEmail(dealId)
+    };
+    if (opts.force) body.force = true;
+    if (opts.auto) body.auto = true;
+    return body;
+}
+
+async function sendReadinessChannel(dealId, channel, opts = {}) {
+    if (!ensureActiveSession({ silent: true })) return { ok: false };
+    try {
+        const response = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify(buildReadinessSendBody(dealId, channel, opts))
+        });
+        if (response.status === 401) { handleUnauthorized(); return { ok: false, auth: true }; }
+        const payload = response.ok ? await response.json() : null;
+        const result = Array.isArray(payload) ? payload[0] : payload;
+        return result || { ok: false };
+    } catch (e) {
+        console.warn("sendReadinessChannel failed", channel, e);
+        return { ok: false, message: e.message };
+    }
+}
+
+// Ручная отправка — по отмеченным галочкам каналам (force).
 async function sendReadinessNotification(dealId) {
     const section = getDealNotifySection(dealId);
-    if (!section) return;
-    if (!ensureActiveSession()) return;
+    if (!section || !ensureActiveSession()) return;
+
+    const channels = getCheckedChannels(section);
+    if (!channels.length) { alert("Отметьте хотя бы один канал (Email / Telegram)"); return; }
 
     const btn = section.querySelector(".deal-notify-send-btn");
     const orig = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Отправка…"; }
 
     try {
-        const response = await fetchWithTimeout(N8N_URL, {
-            method: "POST",
-            headers: authHeaders(),
-            body: JSON.stringify({
-                action: "sendReadinessNotification",
-                force: true, // ручная кнопка — шлём принудительно, в обход дедупа
-                dealId: Number(dealId),
-                dealNum: section.dataset.dealNum || "",
-                managerId: section.dataset.managerId || "",
-                managerName: section.dataset.managerName || "",
-                elements: collectDealElementsForEmail(dealId)
-            })
-        });
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
+        const lines = [];
+        for (const ch of channels) {
+            const r = await sendReadinessChannel(dealId, ch, { force: true });
+            const label = ch === "email" ? "Email" : "Telegram";
+            lines.push(r?.ok
+                ? `✅ ${label}: отправлено${r.to ? ` (${r.to})` : ""}`
+                : `⚠️ ${label}: ${r?.message || "не отправлено"}`);
         }
-        const payload = response.ok ? await response.json() : null;
-        const result = Array.isArray(payload) ? payload[0] : payload;
+        alert(lines.join("\n"));
 
-        if (result?.ok) {
-            alert("✅ Уведомление отправлено" + (result.to ? `: ${result.to}` : ""));
-            // Обновим плашку «отправлено …»
-            const clientId = section.dataset.clientId;
-            if (clientId) {
-                const fresh = await fetchDealContacts(dealId, clientId);
-                if (fresh) { dealContactsCache.set(String(dealId), fresh); renderDealNotifyBody(dealId, "ready"); }
-            }
-        } else {
-            alert("Не удалось отправить уведомление: " + (result?.message || "неизвестная ошибка"));
+        const clientId = section.dataset.clientId;
+        if (clientId) {
+            const fresh = await fetchDealContacts(dealId, clientId);
+            if (fresh) { dealContactsCache.set(String(dealId), fresh); renderDealNotifyBody(dealId, "ready"); }
         }
-    } catch (e) {
-        console.error("sendReadinessNotification failed", e);
-        alert("Ошибка отправки: " + (e.message || "неизвестная ошибка"));
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = orig || "📧 Отправить уведомление о готовности"; }
     }
@@ -3019,27 +3088,28 @@ function collectDealElementsForEmail(dealId) {
 // Тост показываем только при реальной отправке.
 async function maybeAutoNotifyReadiness(dealId) {
     if (currentUser.role !== "staff") return;
-    const deal = dealsCache.get(String(dealId));
+
+    // Каналы — по доступности у выбранного контакта (если знаем); иначе пробуем оба,
+    // n8n отсеет недоступные. Дедуп на стороне n8n не даст повтора.
+    const selected = getSelectedDealContact(dealId);
+    let channels;
+    if (selected) {
+        channels = [];
+        if (selected.email) channels.push("email");
+        if (selected.telegram) channels.push("telegram");
+    } else {
+        channels = ["email", "telegram"];
+    }
+    if (!channels.length) return;
+
     try {
-        const response = await fetchWithTimeout(N8N_URL, {
-            method: "POST",
-            headers: authHeaders(),
-            body: JSON.stringify({
-                action: "sendReadinessNotification",
-                auto: true,
-                dealId: Number(dealId),
-                dealNum: deal?.num != null ? String(deal.num) : "",
-                managerId: deal?.responsible?.id != null ? String(deal.responsible.id) : "",
-                managerName: getDealResponsibleName(deal || {}),
-                elements: collectDealElementsForEmail(dealId)
-            })
-        });
-        if (!response.ok) return;
-        const payload = await response.json();
-        const result = Array.isArray(payload) ? payload[0] : payload;
-        if (result?.ok && result?.to) {
-            showReadinessToast(`📧 Уведомление о готовности отправлено: ${result.to}`);
-            // Обновим плашку «отправлено …», если карточка сделки открыта.
+        const sent = [];
+        for (const ch of channels) {
+            const r = await sendReadinessChannel(dealId, ch, { auto: true });
+            if (r?.ok && r?.to) sent.push(`${ch === "email" ? "Email" : "Telegram"}: ${r.to}`);
+        }
+        if (sent.length) {
+            showReadinessToast(`📨 Уведомление о готовности отправлено — ${sent.join(", ")}`);
             const section = getDealNotifySection(dealId);
             const clientId = section?.dataset.clientId;
             if (clientId) {
@@ -3119,14 +3189,17 @@ async function submitDealContactForm(dealId) {
     const section = getDealNotifySection(dealId);
     if (!section) return;
     const name = (section.querySelector(".deal-notify-name")?.value || "").trim();
-    const email = (section.querySelector(".deal-notify-email")?.value || "").trim();
+    const reachRaw = (section.querySelector(".deal-notify-email")?.value || "").trim();
     const phone = (section.querySelector(".deal-notify-phone")?.value || "").trim();
 
-    if (!email && !phone) {
-        alert("Укажите email или телефон для связи");
+    // В одно поле можно вписать почту и/или ник: «zzipp@inbox.ru @paulgt»
+    const { email, telegram } = parseContactReach(reachRaw);
+
+    if (!email && !telegram && !phone) {
+        alert("Укажите email, Telegram-ник (@ник) или телефон");
         return;
     }
-    await saveDealContactAndRefresh(dealId, { source: "manual", name, email, phone });
+    await saveDealContactAndRefresh(dealId, { source: "manual", name, email, phone, telegram });
 }
 
 async function saveDealContactAndRefresh(dealId, payload) {

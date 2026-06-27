@@ -796,6 +796,25 @@
     .deal-notify-form-save:hover { background: #2459B8; }
     .deal-notify-loading, .deal-notify-empty, .deal-notify-error { font-size: 12px; color: #8a93a0; font-style: italic; }
     .deal-notify-error { color: #c0392b; }
+    .deal-notify-channels {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 13px;
+    }
+    .deal-notify-channels-label { color: #555; font-weight: 600; }
+    .deal-notify-ch-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        color: #1f2d3d;
+        user-select: none;
+    }
+    .deal-notify-ch-label input { margin: 0; width: auto; cursor: pointer; }
+    .deal-notify-ch-label.is-disabled { color: #aab2bd; cursor: not-allowed; }
+    .deal-notify-ch-label.is-disabled input { cursor: not-allowed; }
     .deal-notify-send-btn {
         margin: 2px 0 0; width: auto; align-self: flex-start;
         padding: 8px 14px; border-radius: 8px; border: none;
