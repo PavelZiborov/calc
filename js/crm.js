@@ -2971,13 +2971,15 @@ function renderDealNotifyBody(dealId, state) {
                 <div class="deal-notify-dd-menu" hidden>
                     <button type="button" class="deal-notify-dd-opt${notifyDisabled ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '__none__')">${notifyDisabled ? "✓ " : ""}${icon("bellOff")} Не уведомлять</button>
                     ${ddOptionsHtml}
+                    <div class="deal-notify-dd-foot">
+                        <button type="button" class="deal-notify-dd-add" onclick="openDealContactForm(${dealId})">+ Добавить</button>
+                        ${clientId ? `<a class="deal-notify-dd-crm" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" onclick="closeAllNotifyDropdowns()" title="Добавить контакт в карточке клиента в CRM">Добавить в CRM ↗</a>` : ""}
+                    </div>
+                    <button type="button" class="deal-notify-dd-tg" onclick="copyTelegramSubscribeLink(${dealId})" title="Скопировать ссылку: клиент перейдёт, нажмёт «Старт» и подпишется на Telegram-уведомления">${icon("telegram")} Ссылка для подписки клиента в Telegram</button>
                 </div>
             </div>
-            <button type="button" class="deal-notify-add-btn" onclick="openDealContactForm(${dealId})">+ Контакт</button>
-            ${clientId ? `<a class="deal-notify-crm-link" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" title="Контакты клиента в CRM">CRM ↗</a>` : ""}
         </div>
         ${sentBadge}
-        <button type="button" class="deal-notify-sublink" onclick="copyTelegramSubscribeLink(${dealId})" title="Скопировать ссылку: клиент перейдёт, нажмёт «Старт» и подпишется на Telegram-уведомления">${icon("telegram")} Ссылка для подписки клиента в Telegram</button>
         ${hasSelection ? renderDealNotifyChannels(selectedContact) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
         <div class="deal-notify-modal" hidden onclick="if(event.target===this)closeDealContactForm(${dealId})">
@@ -3066,7 +3068,8 @@ function openEditContactForm(dealId, contactId) {
     const reach = [email, tgNick ? "@" + tgNick : ""].filter(Boolean).join(" ");
     // Не подставляем авто-фолбэк (email/@ник/телефон) в поле «Имя» — пусть будет пустым.
     const rawName = contact.name != null ? String(contact.name).trim() : "";
-    const nameIsAuto = !rawName || rawName === reach || rawName === email
+    const nameIsAuto = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined"
+        || rawName === reach || rawName === email
         || rawName === (tgNick ? "@" + tgNick : "\0") || rawName === (contact.phone || "\0") || rawName === "Контакт";
     const nameInp = modal.querySelector(".deal-notify-name");
     const reachInp = modal.querySelector(".deal-notify-email");

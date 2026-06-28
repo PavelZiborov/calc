@@ -871,6 +871,25 @@
         font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
     }
     .deal-notify-dd-edit:hover { background: var(--accent-tint); }
+    /* Подвал дропдауна: «Добавить» / «Добавить в CRM» в одну строку + ТГ-ссылка ниже */
+    .deal-notify-dd-foot {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        margin-top: 4px; padding: 6px 6px 2px; border-top: 1px solid var(--border);
+    }
+    .deal-notify-dd-add {
+        margin: 0; width: auto; padding: 6px 10px; border-radius: var(--r-sm);
+        border: 1px dashed #b8c4d4; background: #fff; color: var(--accent);
+        font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .deal-notify-dd-add:hover { background: var(--accent-tint); }
+    .deal-notify-dd-crm { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+    .deal-notify-dd-crm:hover { text-decoration: underline; }
+    .deal-notify-dd-tg {
+        margin: 2px 0 0; width: 100%; display: inline-flex; align-items: center; gap: 6px;
+        padding: 7px 10px; border: none; border-radius: var(--r-sm); background: var(--accent-tint);
+        color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; text-align: left;
+    }
+    .deal-notify-dd-tg:hover { background: #e3ecfb; }
     .deal-notify-add-btn {
         margin: 0; width: auto; flex: 0 0 auto;
         padding: 7px 10px; border-radius: 8px;
