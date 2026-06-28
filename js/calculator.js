@@ -141,6 +141,14 @@ async function calc() {
                 lastCalcData.costBreakdownHtml = formatCostBreakdown(result.costDetails, result.costBreakdown);
                 lastCalcData.costTotal = toFiniteNumber(result.cost, result.lastCalc?.costTotal);
                 lastCalcData.costHQ = toFiniteNumber(result.costHQ ?? result.lastCalc?.costHQ);
+                // Наглядная сводка себестоимости (листы / себест. / себест. HQ) для проверки
+                const scs = document.getElementById("staffCostSummary");
+                if (scs) {
+                    const fmt = v => Number.isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString('ru-RU') : "—";
+                    const sheets = lastCalcData.sra3Sheets != null ? lastCalcData.sra3Sheets : "—";
+                    scs.innerHTML = `Листов SRA3: <b>${sheets}</b> · Себестоимость: <b>${fmt(lastCalcData.costTotal)} ₽</b> · Себест. HQ: <b>${fmt(lastCalcData.costHQ)} ₽</b>`;
+                    scs.style.display = "block";
+                }
                 // Инициализируем цену для блока "для заказчика" (и для CRM при сохранении)
                 lastCalcData.total = result.total;
                 lastCalcData.pricePerOne = result.priceOne;
@@ -153,6 +161,8 @@ async function calc() {
             if (costDetailDiv) costDetailDiv.style.display = "none";
         } else {
             if (markupSelectContainer) markupSelectContainer.style.display = "none";
+            const scs = document.getElementById("staffCostSummary");
+            if (scs) scs.style.display = "none";
         }
 
         // Показываем результат с анимацией

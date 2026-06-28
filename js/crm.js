@@ -2877,13 +2877,28 @@ async function fetchDealContacts(dealId, clientId) {
     }
 }
 
+// Telegram-ник контакта: из явного поля telegram, иначе парсим email/имя
+// (ник мог быть вписан в поле email по конвенции «mail@ya.ru @nick»).
+function contactTelegramNick(contact) {
+    if (!contact) return "";
+    if (contact.telegram) return String(contact.telegram).replace(/^@/, "");
+    return parseContactReach(contact.email).telegram || parseContactReach(contact.name).telegram || "";
+}
+// Чистый email контакта (поле email может содержать «email @nick»).
+function contactEmailAddr(contact) {
+    if (!contact) return "";
+    return parseContactReach(contact.email).email || "";
+}
+
 function buildContactLabel(contact) {
-    const parts = [];
+    const email = contactEmailAddr(contact);
+    const tgNick = contactTelegramNick(contact);
+    const reach = email || contact.phone || (tgNick ? "@" + tgNick : "");
     const rawName = contact.name != null ? String(contact.name).trim() : "";
-    const name = (rawName && rawName !== "NaN" && rawName !== "null" && rawName !== "undefined") ? rawName : "";
+    const invalid = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined" || rawName === reach;
+    const name = invalid ? "" : rawName;
+    const parts = [];
     if (name) parts.push(name);
-    const tg = contact.telegram ? "@" + String(contact.telegram).replace(/^@/, "") : "";
-    const reach = contact.email || contact.phone || tg;
     if (reach) parts.push(reach);
     return parts.join(" · ") || "(без имени)";
 }
@@ -2960,6 +2975,7 @@ function renderDealNotifyBody(dealId, state) {
             ${clientId ? `<a class="deal-notify-crm-link" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" title="Контакты клиента в CRM">CRM ↗</a>` : ""}
         </div>
         ${sentBadge}
+        <button type="button" class="deal-notify-sublink" onclick="copyTelegramSubscribeLink(${dealId})" title="Скопировать ссылку: клиент перейдёт, нажмёт «Старт» и подпишется на Telegram-уведомления">${icon("telegram")} Ссылка для подписки клиента в Telegram</button>
         ${hasSelection ? renderDealNotifyChannels(selectedContact) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
         <div class="deal-notify-modal" hidden onclick="if(event.target===this)closeDealContactForm(${dealId})">
@@ -2979,7 +2995,7 @@ function renderDealNotifyBody(dealId, state) {
 // ── Кастомный дропдаун выбора контакта ────────────────────────────────
 function closeAllNotifyDropdowns() {
     document.querySelectorAll(".deal-notify-dd-menu").forEach(m => { m.hidden = true; });
-    document.querySelectorAll(".deal-notify-dd.is-open").forEach(d => d.classList.remove("is-open"));
+    document.querySelectorAll(".deal-notify-dd.is-open").forEach(d => d.classList.remove("is-open", "is-up"));
     document.removeEventListener("click", notifyDropdownOutside);
 }
 
@@ -2999,6 +3015,14 @@ function toggleNotifyDropdown(dealId, ev) {
     if (willOpen) {
         menu.hidden = false;
         dd.classList.add("is-open");
+        // Если снизу не хватает места (мобила/конец страницы) — открываем вверх,
+        // и подскролливаем, чтобы список был виден целиком.
+        requestAnimationFrame(() => {
+            const menuH = menu.getBoundingClientRect().height;
+            const spaceBelow = window.innerHeight - dd.getBoundingClientRect().bottom;
+            if (menuH > spaceBelow - 8) dd.classList.add("is-up");
+            menu.scrollIntoView({ block: "nearest" });
+        });
         setTimeout(() => document.addEventListener("click", notifyDropdownOutside), 0);
     }
 }
@@ -3040,12 +3064,32 @@ function maskRuPhone(input) {
     input.value = out;
 }
 
+// Бот для уведомлений о готовности.
+const TELEGRAM_BOT_USERNAME = "HeavenPrint_bot";
+
+// Ссылка-приглашение: клиент переходит, жмёт «Старт» (deep-link ?start=…) и бот
+// ловит его username→chat_id (ветка /start в боте). Дальше менеджер выбирает контакт
+// по нику и шлёт уведомление. Кнопка просто копирует ссылку для ручной отправки.
+function copyTelegramSubscribeLink(dealId) {
+    const link = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=deal${Number(dealId) || ""}`;
+    const ok = () => {
+        if (typeof showReadinessToast === "function") showReadinessToast("Ссылка для подписки скопирована — отправьте её клиенту");
+        else alert("Ссылка скопирована:\n" + link);
+    };
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(link).then(ok, () => prompt("Скопируйте ссылку для клиента:", link));
+    } else {
+        prompt("Скопируйте ссылку для клиента:", link);
+    }
+}
+
 // Галочки каналов: активны только при наличии адреса (почта/ник).
 function renderDealNotifyChannels(contact) {
-    const hasEmail = !!(contact && contact.email);
-    const tg = contact && contact.telegram ? String(contact.telegram).replace(/^@/, "") : "";
+    const email = contactEmailAddr(contact);
+    const tg = contactTelegramNick(contact);
+    const hasEmail = !!email;
     const hasTg = !!tg;
-    const emailLabel = hasEmail ? escapeHtml(contact.email) : "нет почты";
+    const emailLabel = hasEmail ? escapeHtml(email) : "нет почты";
     const tgLabel = hasTg ? `@${escapeHtml(tg)}` : "нет ника";
     return `
         <div class="deal-notify-channels">
@@ -3119,7 +3163,7 @@ function buildReadinessSendBody(dealId, channel, opts = {}) {
         managerId: deal?.responsible?.id != null ? String(deal.responsible.id) : "",
         managerName: getDealResponsibleName(deal || {}),
         // ник передаём с фронта (свежий из CRM) — для Telegram-отправки, чтобы не зависеть от книги
-        telegram: selected?.telegram || "",
+        telegram: contactTelegramNick(selected),
         elements: collectDealElementsForEmail(dealId)
     };
     if (opts.force) body.force = true;
@@ -3320,7 +3364,12 @@ async function submitDealContactForm(dealId) {
         alert("Укажите email, Telegram-ник (@ник) или телефон");
         return;
     }
-    await saveDealContactAndRefresh(dealId, { source: "manual", name, email, phone, telegram });
+    // Ник кладём в email-поле по конвенции «mail@ya.ru @nick» — так он переживает
+    // round-trip даже без отдельной колонки telegram в БД (фронт парсит email обратно).
+    const emailField = email && telegram ? `${email} @${telegram}` : (email || (telegram ? `@${telegram}` : ""));
+    // Имя по умолчанию, чтобы контакт не отображался как «(без имени)».
+    const displayName = name || (telegram ? `@${telegram}` : (email || phone || "Контакт"));
+    await saveDealContactAndRefresh(dealId, { source: "manual", name: displayName, email: emailField, phone, telegram });
 }
 
 async function saveDealContactAndRefresh(dealId, payload) {
@@ -3684,11 +3733,11 @@ function renderDealListSearchFooter(deal, isClosed, isDetailMode) {
     const manager = escapeHtml(getDealResponsibleName(deal));
 
     return `
+        <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
+            <button onclick="saveDeal(${deal.id}, this)">${icon("save")} Сохранить</button>
+        </div>
         <div class="crm-footer crm-list-footer">
             <div class="deal-footer-left">
-                <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
-                    <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">${icon("save")} Сохранить</button>
-                </div>
                 <div class="deal-footer-meta deal-footer-meta--mobile">
                     ${date ? `<div>Дата заказа: <b>${escapeHtml(date)}</b></div>` : ""}
                     <div>Менеджер: <b>${manager}</b></div>
@@ -4329,11 +4378,11 @@ function renderDealsList(deals, targetDiv, options = {}) {
                 <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
                 ${addBtnHtml}
             </div>
+            <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
+                <button onclick="saveDeal(${deal.id}, this)">${icon("save")} Сохранить</button>
+            </div>
             <div class="crm-footer">
                 <div class="deal-footer-left">
-                    <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
-                        <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">${icon("save")} Сохранить</button>
-                    </div>
                     ${renderDealFooterMeta(deal)}
                 </div>
                 ${renderPaymentSummary(deal, isClosed)}
@@ -4386,11 +4435,11 @@ function createDealCardById(id) {
                 <button class="add-btn" onclick="addToDeal(${id}, this)">+ Добавить расчет</button>
             </div>
         </div>
+        <div class="deal-save-area" data-deal-id="${id}" style="display: none;">
+            <button onclick="saveDeal(${id}, this)">${icon("save")} Сохранить</button>
+        </div>
         <div class="crm-footer">
             <div class="deal-footer-left">
-                <div class="deal-save-area" data-deal-id="${id}" style="display: none;">
-                    <button onclick="saveDeal(${id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">${icon("save")} Сохранить</button>
-                </div>
                 ${renderDealFooterMeta(deal)}
             </div>
             ${renderDealTotalOnly(deal)}
@@ -4498,9 +4547,17 @@ function addToDeal(id, trigger = null) {
     row.setAttribute('data-category-id', categoryId != null ? String(categoryId) : "");
     row.setAttribute('data-units', "шт");
 
+    // Разбивка себестоимости для наглядности/проверки (только staff).
+    const _sheets = Number(lastCalcData.sra3Sheets ?? 0);
+    const _cost = Math.round(Number(lastCalcData.costTotal ?? s?.totalCost ?? 0));
+    const _costHQ = Math.round(Number(lastCalcData.costHQ ?? lastCalcData.costTotal ?? s?.totalCost ?? 0));
+    const _costLine = currentUser.role === "staff"
+        ? `<small class="new-row-costs">Листов SRA3: <b>${_sheets}</b> · Себест.: <b>${_cost.toLocaleString('ru-RU')} ₽</b> · HQ: <b>${_costHQ.toLocaleString('ru-RU')} ₽</b></small>`
+        : "";
+
     // Стилизуется через CSS (.element-row.new-row) — без инлайн-стилей и side-stripe.
     row.innerHTML = `
-        <span class="element-row-text">${escapeHtml(fullName)}, ${lastCalcData.qty} шт</span>
+        <span class="element-row-text">${escapeHtml(fullName)}, ${lastCalcData.qty} шт${_costLine}</span>
         <span class="element-row-total">${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽</span>
         <button type="button" class="element-row-delete-btn" onclick="var l=this.closest('.deal-elements-list');this.closest('.new-row').remove();updateDealTotal(l);" title="Удалить" aria-label="Удалить">×</button>
     `;
