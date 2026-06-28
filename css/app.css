@@ -58,8 +58,9 @@
     select:focus,input:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(47,107,216,0.12); }
     .row{ display:flex; gap:20px; }
     .col{ flex:1; }
-    button{ margin-top:25px; padding:15px; width:100%; background:#1C1B19; border:none; color:#fff; font-size:16px; letter-spacing:0.02em; border-radius:12px; cursor:pointer; font-weight:bold; transition:0.2s; }
+    button{ margin-top:25px; padding:15px; width:100%; background:#1C1B19; border:none; color:#fff; font-size:16px; letter-spacing:0.02em; border-radius:12px; cursor:pointer; font-weight:bold; transition:background 0.2s, transform 0.06s ease; }
     button:hover { background:#34332F; }
+    button:active { transform: translateY(1px); }
 
     .app-top-bar {
         position: sticky;
@@ -138,9 +139,12 @@
     .tab-content.active { display: block; }
 
     .result-main { margin-top: 20px; display: none; }
-    .rec-price-box { background:#1C1B19; padding:26px 26px; border-radius:16px; border:none; text-align:left; margin-bottom:12px; }
-    .rec-price-label { color:#8A887F; font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; }
+    .rec-price-box { background:var(--accent-strong); padding:26px 26px; border-radius:16px; border:none; text-align:left; margin-bottom:12px; box-shadow:0 10px 30px rgba(36,89,184,0.22); }
+    .rec-price-label { color:rgba(255,255,255,0.72); font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; }
     .rec-price-val { font-size:42px; color:#fff; font-weight:700; letter-spacing:-0.025em; display:block; margin-top:10px; line-height:1; font-variant-numeric:tabular-nums; }
+    .rec-price-val small { color:rgba(255,255,255,0.82); font-weight:600; }
+    #roundPriceControls button { margin:0; background:rgba(255,255,255,0.14); color:#fff; border:1px solid rgba(255,255,255,0.26); font-weight:600; }
+    #roundPriceControls button:hover { background:rgba(255,255,255,0.24); }
     details { background:#F2F0EA; border-radius:12px; padding:12px; margin-bottom:15px; }
     details summary { cursor: pointer; font-weight: bold; color: #6b675e; outline: none; }
     .price-list-hidden { margin-top: 10px; font-size: 15px; border-top: 1px solid #d3cdc0; padding-top: 10px; }
