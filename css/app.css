@@ -730,6 +730,19 @@
         text-align: center;
     }
     .element-row-delete-btn:hover { background: #ff4d4d; color: #fff; border-color: #ff4d4d; }
+    /* Строка просчёта, вставленного из калькулятора (до сохранения): самостоятельная
+       раскладка, не зависящая от адаптивных колонок .element-row (иначе на мобиле
+       текст скрывался и кнопка × пропадала). Полная рамка вместо side-stripe. */
+    .element-row.new-row {
+        display: flex !important; align-items: center; gap: 8px;
+        padding: 8px 10px; margin: 6px 0;
+        background: #f6f9ff; border: 1px solid #d4e1f5; border-radius: var(--r-sm);
+    }
+    .element-row.new-row > .element-row-text { display: block !important; flex: 1 1 auto; min-width: 0; padding-right: 4px; }
+    .element-row.new-row > .element-row-total { display: block !important; flex: 0 0 auto; margin-left: 0; }
+    .element-row.new-row > .element-row-delete-btn { display: inline-flex !important; align-items: center; justify-content: center; }
+    /* Кнопка сохранения заказа: компактная, иконка + текст в одну строку */
+    .deal-save-area button { width: auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
     .deal-element-delete-banner {
         display: flex;
         flex-wrap: wrap;

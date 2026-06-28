@@ -180,8 +180,12 @@ function isSessionExpired(session = currentUser) {
 
 function validateStoredSessionOnLoad() {
     if (currentUser.role !== "staff" && currentUser.role !== "client") return;
-    if (!extractSessionToken(currentUser)) {
+    // Жёсткий выход при обновлении страницы: нет токена ИЛИ сессия просрочена
+    // (по серверному expiresAt или 3-дневному TTL). Чтобы не было «полу-входа»,
+    // когда поиск идёт, а статусы/вставка из калькулятора молча падают.
+    if (!extractSessionToken(currentUser) || isSessionExpired(currentUser)) {
         resetAuthToGuest();
+        if (typeof toggleAuthModal === "function") toggleAuthModal(true);
     }
 }
 
@@ -204,7 +208,7 @@ function ensureActiveSession(options = {}) {
         return false;
     }
 
-    if (!extractSessionToken(currentUser)) {
+    if (!extractSessionToken(currentUser) || isSessionExpired(currentUser)) {
         resetAuthToGuest();
         if (!options.silent) alert("Сессия истекла. Войдите снова.");
         toggleAuthModal(true);
@@ -298,15 +302,19 @@ function parseAuthResponse(data) {
     return session;
 }
 
+// Время жизни сессии по умолчанию, если сервер не прислал свой expiresAt: 3 суток.
+const SESSION_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+
 function buildUserSession(session, fallbackLogin = "") {
     const token = extractSessionToken(session);
+    const hasServerExpiry = session.expiresAt != null && session.expiresAt !== "";
     return {
         role: session.role,
         login: session.name || session.login || fallbackLogin,
         token,
         crmId: session.crmId,
         clientName: session.name || session.clientName || "",
-        expiresAt: session.expiresAt,
+        expiresAt: hasServerExpiry ? session.expiresAt : (Date.now() + SESSION_TTL_MS),
         statuses: normalizeStatuses(session.dealStatuses || session.statuses),
         paymentMethods: normalizePaymentMethods(session.paymentMethods),
         elementStatuses: normalizeElementStatuses(session.elementStatuses),

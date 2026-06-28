@@ -4498,11 +4498,11 @@ function addToDeal(id, trigger = null) {
     row.setAttribute('data-category-id', categoryId != null ? String(categoryId) : "");
     row.setAttribute('data-units', "шт");
 
-    row.style.cssText = "padding:6px 8px; border-left:3px solid #8ab8ff; background:#f6f9ff; border-bottom:1px solid #e3ebf7; border-radius:4px; margin:4px 0;";
+    // Стилизуется через CSS (.element-row.new-row) — без инлайн-стилей и side-stripe.
     row.innerHTML = `
-        <span class="element-row-text" style="padding-right:8px;">${escapeHtml(fullName)}, ${lastCalcData.qty} шт</span>
+        <span class="element-row-text">${escapeHtml(fullName)}, ${lastCalcData.qty} шт</span>
         <span class="element-row-total">${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽</span>
-        <button type="button" class="element-row-delete-btn" onclick="this.parentElement.remove(); updateDealTotal(this.closest('.deal-elements-list'));" title="Удалить" aria-label="Удалить">×</button>
+        <button type="button" class="element-row-delete-btn" onclick="var l=this.closest('.deal-elements-list');this.closest('.new-row').remove();updateDealTotal(l);" title="Удалить" aria-label="Удалить">×</button>
     `;
     
     list.appendChild(row);
