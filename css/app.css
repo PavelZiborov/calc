@@ -865,6 +865,12 @@
         font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
     }
     .deal-notify-dd-del:hover { background: #fbe3e3; }
+    .deal-notify-dd-edit {
+        flex: 0 0 auto; width: 30px; height: 30px; margin: 0; padding: 0;
+        border: none; border-radius: 6px; background: transparent; color: var(--accent);
+        font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .deal-notify-dd-edit:hover { background: var(--accent-tint); }
     .deal-notify-add-btn {
         margin: 0; width: auto; flex: 0 0 auto;
         padding: 7px 10px; border-radius: 8px;

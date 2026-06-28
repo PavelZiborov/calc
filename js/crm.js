@@ -2893,7 +2893,8 @@ function contactEmailAddr(contact) {
 function buildContactLabel(contact) {
     const email = contactEmailAddr(contact);
     const tgNick = contactTelegramNick(contact);
-    const reach = email || contact.phone || (tgNick ? "@" + tgNick : "");
+    // Имя — главное. Доп. адрес для различения: email → @ник → телефон (телефон последним).
+    const reach = email || (tgNick ? "@" + tgNick : "") || contact.phone || "";
     const rawName = contact.name != null ? String(contact.name).trim() : "";
     const invalid = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined" || rawName === reach;
     const name = invalid ? "" : rawName;
@@ -2948,7 +2949,8 @@ function renderDealNotifyBody(dealId, state) {
         const canDel = contact.source === "manual" && contact.contactId != null;
         return `<div class="deal-notify-dd-opt-row">
             <button type="button" class="deal-notify-dd-opt${isSel ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '${escapeHtml(contact.key)}')">${isSel ? "✓ " : ""}${escapeHtml(buildContactLabel(contact))}</button>
-            ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="deleteDealContactConfirm(${dealId}, ${contact.contactId})" title="Удалить этот контакт из книги">${icon("trash")}</button>` : ""}
+            ${canDel ? `<button type="button" class="deal-notify-dd-edit" onclick="event.stopPropagation(); openEditContactForm(${dealId}, ${contact.contactId})" title="Редактировать контакт">${icon("edit")}</button>` : ""}
+            ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="event.stopPropagation(); deleteDealContactConfirm(${dealId}, ${contact.contactId})" title="Удалить этот контакт из книги">${icon("trash")}</button>` : ""}
         </div>`;
     }).join("");
 
@@ -3038,8 +3040,48 @@ function openDealContactForm(dealId) {
     const section = getDealNotifySection(dealId);
     const modal = section?.querySelector(".deal-notify-modal");
     if (!modal) return;
+    // Режим «новый контакт»: чистим поля и метку редактирования.
+    delete modal.dataset.editId;
+    modal.querySelectorAll(".deal-notify-input").forEach(i => { i.value = ""; });
+    const title = modal.querySelector(".deal-notify-modal-title");
+    if (title) title.textContent = "Новый контакт";
+    const save = modal.querySelector(".deal-notify-form-save");
+    if (save) save.textContent = "Сохранить и выбрать";
     modal.hidden = false;
     modal.querySelector(".deal-notify-name")?.focus();
+}
+
+// Редактирование ручного контакта: открываем ту же модалку, пред-заполнив поля.
+function openEditContactForm(dealId, contactId) {
+    closeAllNotifyDropdowns();
+    const data = dealContactsCache.get(String(dealId));
+    const contact = data?.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(contactId));
+    if (!contact) return;
+    const section = getDealNotifySection(dealId);
+    const modal = section?.querySelector(".deal-notify-modal");
+    if (!modal) return;
+
+    const email = contactEmailAddr(contact);
+    const tgNick = contactTelegramNick(contact);
+    const reach = [email, tgNick ? "@" + tgNick : ""].filter(Boolean).join(" ");
+    // Не подставляем авто-фолбэк (email/@ник/телефон) в поле «Имя» — пусть будет пустым.
+    const rawName = contact.name != null ? String(contact.name).trim() : "";
+    const nameIsAuto = !rawName || rawName === reach || rawName === email
+        || rawName === (tgNick ? "@" + tgNick : "\0") || rawName === (contact.phone || "\0") || rawName === "Контакт";
+    const nameInp = modal.querySelector(".deal-notify-name");
+    const reachInp = modal.querySelector(".deal-notify-email");
+    const phoneInp = modal.querySelector(".deal-notify-phone");
+    if (nameInp) nameInp.value = nameIsAuto ? "" : rawName;
+    if (reachInp) reachInp.value = reach;
+    if (phoneInp) phoneInp.value = contact.phone || "";
+
+    modal.dataset.editId = String(contactId);
+    const title = modal.querySelector(".deal-notify-modal-title");
+    if (title) title.textContent = "Редактировать контакт";
+    const save = modal.querySelector(".deal-notify-form-save");
+    if (save) save.textContent = "Сохранить";
+    modal.hidden = false;
+    nameInp?.focus();
 }
 
 function closeDealContactForm(dealId) {
@@ -3369,7 +3411,11 @@ async function submitDealContactForm(dealId) {
     const emailField = email && telegram ? `${email} @${telegram}` : (email || (telegram ? `@${telegram}` : ""));
     // Имя по умолчанию, чтобы контакт не отображался как «(без имени)».
     const displayName = name || (telegram ? `@${telegram}` : (email || phone || "Контакт"));
-    await saveDealContactAndRefresh(dealId, { source: "manual", name: displayName, email: emailField, phone, telegram });
+    const payload = { source: "manual", name: displayName, email: emailField, phone, telegram };
+    // Режим редактирования: передаём contactId → backend обновит существующий контакт.
+    const editId = section.querySelector(".deal-notify-modal")?.dataset.editId;
+    if (editId) payload.contactId = Number(editId);
+    await saveDealContactAndRefresh(dealId, payload);
 }
 
 async function saveDealContactAndRefresh(dealId, payload) {
