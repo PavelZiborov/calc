@@ -1,4 +1,49 @@
 // --- CRM ЛОГИКА ---
+
+// Единый набор иконок (Tabler Icons, outline 2px). Inline-SVG через currentColor —
+// иконки наследуют цвет и размер текста, единый стиль вместо разнородных эмодзи.
+const ICONS = {
+  search: '<path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" />',
+  refresh: '<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />',
+  x: '<path d="M18 6l-12 12" /><path d="M6 6l12 12" />',
+  user: '<path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />',
+  copy: '<path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666" /><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />',
+  edit: '<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" />',
+  eye: '<path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />',
+  trash: '<path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />',
+  link: '<path d="M9 15l6 -6" /><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" /><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />',
+  clip: '<path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5" />',
+  mail: '<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10" /><path d="M3 7l9 6l9 -6" />',
+  telegram: '<path d="M15 10l-4 4l6 6l4 -16l-18 7l4 2l2 6l3 -4" />',
+  bellOff: '<path d="M9.346 5.353c.21 -.129 .428 -.246 .654 -.353a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3m-1 3h-13a4 4 0 0 0 2 -3v-3a6.996 6.996 0 0 1 1.273 -3.707" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /><path d="M3 3l18 18" />',
+  alert: '<path d="M12 9v4" /><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" /><path d="M12 16h.01" />',
+  check: '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" />',
+  box: '<path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" />',
+  photo: '<path d="M15 8h.01" /><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12" /><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5" /><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3" />',
+  loader: '<path d="M12 3a9 9 0 1 0 9 9" />',
+  send: '<path d="M10 14l11 -11" /><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5" />',
+  filter: '<path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227" />',
+  list: '<path d="M9 6l11 0" /><path d="M9 12l11 0" /><path d="M9 18l11 0" /><path d="M5 6l0 .01" /><path d="M5 12l0 .01" /><path d="M5 18l0 .01" />',
+  kanban: '<path d="M4 4l6 0" /><path d="M14 4l6 0" /><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8" /><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2" />',
+  printer: '<path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" /><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" /><path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />',
+  scissors: '<path d="M3 7a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 17a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M8.6 8.6l10.4 10.4" /><path d="M8.6 15.4l10.4 -10.4" />',
+  circle: '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />',
+  eyeOff: '<path d="M10.585 10.587a2 2 0 0 0 2.829 2.828" /><path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87" /><path d="M3 3l18 18" />',
+  file: '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />',
+  phone: '<path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2" />',
+  save: '<path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" />',
+  camera: '<path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2" /><path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />'
+};
+
+// Возвращает inline-SVG иконки. opts: { cls, spin, size } (size в px переопределяет 1.1em).
+function icon(name, opts = {}) {
+  const paths = ICONS[name];
+  if (!paths) return '';
+  const cls = 'icn' + (opts.spin ? ' icn-spin' : '') + (opts.cls ? ' ' + opts.cls : '');
+  const sizeStyle = opts.size ? ` style="width:${opts.size}px;height:${opts.size}px"` : '';
+  return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${sizeStyle}>${paths}</svg>`;
+}
+
 function collectAdvSearchParams() {
     const input = document.getElementById("advSearchInput");
     const q = input ? input.value : "";
@@ -238,7 +283,7 @@ async function searchCRM(mode, triggerEvent, options = {}) {
     const evt = triggerEvent ?? (typeof event !== "undefined" ? event : null);
     const btn = evt?.target?.tagName === 'BUTTON' ? evt.target : document.querySelector(`button[onclick="searchCRM('${mode}')"]`);
     if (btn && btn.disabled) return;
-    const originalBtnText = btn ? btn.innerText : "";
+    const originalBtnText = btn ? btn.innerHTML : "";
 
     let q = "";
     let advFilters = {};
@@ -268,7 +313,7 @@ async function searchCRM(mode, triggerEvent, options = {}) {
     
     if (btn) {
         btn.disabled = true;
-        btn.innerText = "⌛...";
+        btn.innerHTML = icon("loader", { spin: true });
     }
 
     try {
@@ -347,7 +392,7 @@ async function searchCRM(mode, triggerEvent, options = {}) {
         if (btn) {
             setTimeout(() => {
                 btn.disabled = false;
-                btn.innerText = originalBtnText || "Найти";
+                btn.innerHTML = originalBtnText || icon("search");
             }, 1000);
         }
     }
@@ -516,14 +561,16 @@ function renderDealStatusControl(dealId, statusMeta, isLocked = false) {
 }
 
 function renderElementStatusControl(dealId, element, elementIndex, statusMeta, isLocked = false) {
-    const icon = statusMeta.icon || getStatusIcon(statusMeta.name).icon;
+    const fallback = getStatusIcon(statusMeta.name);
+    const statusIcon = statusMeta.icon || fallback.icon;
+    const statusColor = statusMeta.color || fallback.color || "#3a3833";
     const elementId = getElementId(element);
 
     if (currentUser.role !== 'staff' || isLocked) {
-        return `<span class="element-status-cell" title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center;">${icon}</span>`;
+        return `<span class="element-status-cell" title="${escapeHtml(statusMeta.name)}" style="cursor: help; margin-right: 12px; font-size: 18px; min-width: 24px; text-align: center; color:${statusColor};">${statusIcon}</span>`;
     }
 
-    return `<button type="button" class="item-status-control element-status-cell" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}">${icon}</button>`;
+    return `<button type="button" class="item-status-control element-status-cell" data-status-scope="element" data-deal-id="${dealId}" data-element-id="${escapeHtml(elementId)}" data-element-index="${elementIndex}" onclick="showStatusMenu(event, this)" title="${escapeHtml(statusMeta.name)}" style="color:${statusColor};">${statusIcon}</button>`;
 }
 
 function showStatusMenu(event, trigger) {
@@ -1174,11 +1221,11 @@ function clearMainSearch() {
 // Функция для определения иконок и цветов статуса
 function getStatusIcon(statusName) {
     const name = (statusName || "").toLowerCase().trim();
-    if (!name || name === "без статуса") return { icon: "⚪", color: "#95a5a6", label: "Без статуса" };
-    if (name === "печать") return { icon: "🖨️", color: "#3498db", label: "Печать" };
-    if (name === "постпечать") return { icon: "✂️", color: "#e67e22", label: "Постпечать" };
-    if (name === "завершено") return { icon: "✅", color: "#27ae60", label: "Завершено" };
-    return { icon: "📦", color: "#9b59b6", label: statusName || "Статус" };
+    if (!name || name === "без статуса") return { icon: icon("circle"), color: "#95a5a6", label: "Без статуса" };
+    if (name === "печать") return { icon: icon("printer"), color: "#2F6BD8", label: "Печать" };
+    if (name === "постпечать") return { icon: icon("scissors"), color: "#b06a1f", label: "Постпечать" };
+    if (name === "завершено") return { icon: icon("check"), color: "#1F9D55", label: "Завершено" };
+    return { icon: icon("box"), color: "#7a766c", label: statusName || "Статус" };
 }
 
 function getElementStatuses(options = {}) {
@@ -1292,7 +1339,7 @@ function applyDealCostsVisibility() {
         el.classList.toggle("costs-hidden", !dealCostsVisible);
     });
     document.querySelectorAll(".cost-eye-btn").forEach(btn => {
-        btn.textContent = dealCostsVisible ? "🙈" : "👁️";
+        btn.innerHTML = dealCostsVisible ? icon("eyeOff") : icon("eye");
         btn.setAttribute("aria-pressed", dealCostsVisible ? "true" : "false");
         btn.title = dealCostsVisible ? "Скрыть себестоимость" : "Показать себестоимость";
     });
@@ -1310,7 +1357,7 @@ function toggleDealCosts(event) {
 function renderElementColsHeader(options = {}) {
     const isStaff = currentUser.role === "staff";
     const hasDeleteCol = isStaff && !options.isClosed;
-    const eyeIcon = dealCostsVisible ? "🙈" : "👁️";
+    const eyeIcon = dealCostsVisible ? icon("eyeOff") : icon("eye");
     const eyeTitle = dealCostsVisible ? "Скрыть себестоимость" : "Показать себестоимость";
     const costHead = isStaff
         ? `<span class="ecol ecol-cost">Себес.<button type="button" class="cost-eye-btn" onclick="toggleDealCosts(event)" title="${eyeTitle}" aria-pressed="${dealCostsVisible ? "true" : "false"}" aria-label="${eyeTitle}">${eyeIcon}</button></span>`
@@ -1320,7 +1367,7 @@ function renderElementColsHeader(options = {}) {
     return `
         <div class="element-cols-head">
             <span class="ecol ecol-status" title="Статус">Статус</span>
-            <span class="ecol ecol-thumb" title="Превью">🖼</span>
+            <span class="ecol ecol-thumb" title="Превью">${icon("photo")}</span>
             <span class="ecol ecol-name">Название</span>
             <span class="ecol ecol-qty">Кол-во</span>
             ${costHead}
@@ -2481,8 +2528,8 @@ function renderInvoiceCardMarkup(dealId, invoice) {
 
     const actionsHtml = (hasOnline || hasEdit) ? `
             <div class="deal-invoice-actions">
-                ${hasOnline ? `<button type="button" class="deal-invoice-link deal-invoice-copy" onclick="copyInvoiceLink(event, ${dealId})">📋 Скопировать ссылку на счёт</button>` : ""}
-                ${hasEdit ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.editLink)}" target="_blank" rel="noopener">✏️ Редактировать</a>` : ""}
+                ${hasOnline ? `<button type="button" class="deal-invoice-link deal-invoice-copy" onclick="copyInvoiceLink(event, ${dealId})">${icon("copy")} Скопировать ссылку на счёт</button>` : ""}
+                ${hasEdit ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.editLink)}" target="_blank" rel="noopener">${icon("edit")} Редактировать</a>` : ""}
             </div>` : "";
 
     return `
@@ -2504,12 +2551,12 @@ function copyInvoiceLink(event, dealId) {
     const btn = event?.currentTarget;
     const showOk = () => {
         if (!btn) return;
-        if (!btn.dataset.label) btn.dataset.label = btn.textContent;
-        btn.textContent = "✓ Скопировано";
+        if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
+        btn.innerHTML = icon("check") + " Скопировано";
         btn.classList.add("is-copied");
         clearTimeout(btn._copyTimer);
         btn._copyTimer = setTimeout(() => {
-            btn.textContent = btn.dataset.label || "📋 Скопировать ссылку на счёт";
+            btn.innerHTML = btn.dataset.label || (icon("copy") + " Скопировать ссылку на счёт");
             btn.classList.remove("is-copied");
         }, 1600);
     };
@@ -2873,9 +2920,9 @@ function renderDealNotifyBody(dealId, state) {
 
     const sentAt = formatNotifySentAt(data.lastSentAt);
     const sentBadge = sentAt
-        ? `<div class="deal-notify-sent" title="Уведомление о готовности уже отправлено">✅ Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}</div>`
+        ? `<div class="deal-notify-sent" title="Уведомление о готовности уже отправлено">${icon("check")} Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}</div>`
         : "";
-    const sendLabel = sentAt ? "📧 Отправить ещё раз" : "📧 Отправить уведомление о готовности";
+    const sendLabel = sentAt ? (icon("mail") + " Отправить ещё раз") : (icon("mail") + " Отправить уведомление о готовности");
 
     const selectedContact = hasSelection
         ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId))
@@ -2886,18 +2933,18 @@ function renderDealNotifyBody(dealId, state) {
         const canDel = contact.source === "manual" && contact.contactId != null;
         return `<div class="deal-notify-dd-opt-row">
             <button type="button" class="deal-notify-dd-opt${isSel ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '${escapeHtml(contact.key)}')">${isSel ? "✓ " : ""}${escapeHtml(buildContactLabel(contact))}</button>
-            ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="deleteDealContactConfirm(${dealId}, ${contact.contactId})" title="Удалить этот контакт из книги">🗑</button>` : ""}
+            ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="deleteDealContactConfirm(${dealId}, ${contact.contactId})" title="Удалить этот контакт из книги">${icon("trash")}</button>` : ""}
         </div>`;
     }).join("");
 
     const currentLabel = notifyDisabled
-        ? "🔕 Не уведомлять"
+        ? (icon("bellOff") + " Не уведомлять")
         : (hasSelection ? escapeHtml(buildContactLabel(selectedContact)) : "— выберите контакт —");
 
     section.classList.toggle("is-unset", !isDecided);
 
     body.innerHTML = `
-        ${!isDecided ? `<div class="deal-notify-alert">⚠️ Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
+        ${!isDecided ? `<div class="deal-notify-alert">${icon("alert")} Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
         <div class="deal-notify-row">
             <div class="deal-notify-dd">
                 <button type="button" class="deal-notify-dd-toggle${!isDecided ? " is-unset" : ""}" onclick="toggleNotifyDropdown(${dealId}, event)">
@@ -2905,7 +2952,7 @@ function renderDealNotifyBody(dealId, state) {
                     <span class="deal-notify-dd-caret">▾</span>
                 </button>
                 <div class="deal-notify-dd-menu" hidden>
-                    <button type="button" class="deal-notify-dd-opt${notifyDisabled ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '__none__')">${notifyDisabled ? "✓ " : ""}🔕 Не уведомлять</button>
+                    <button type="button" class="deal-notify-dd-opt${notifyDisabled ? " is-sel" : ""}" onclick="onNotifyPick(${dealId}, '__none__')">${notifyDisabled ? "✓ " : ""}${icon("bellOff")} Не уведомлять</button>
                     ${ddOptionsHtml}
                 </div>
             </div>
@@ -3004,10 +3051,10 @@ function renderDealNotifyChannels(contact) {
         <div class="deal-notify-channels">
             <span class="deal-notify-channels-label">Куда слать:</span>
             <label class="deal-notify-ch-label${hasEmail ? "" : " is-disabled"}" title="${emailLabel}">
-                <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "checked" : "disabled"}> ✉️ Email
+                <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "checked" : "disabled"}> ${icon("mail")} Email
             </label>
             <label class="deal-notify-ch-label${hasTg ? "" : " is-disabled"}" title="${tgLabel}">
-                <input type="checkbox" class="deal-notify-ch" value="telegram" ${hasTg ? "checked" : "disabled"}> ✈️ Telegram
+                <input type="checkbox" class="deal-notify-ch" value="telegram" ${hasTg ? "checked" : "disabled"}> ${icon("telegram")} Telegram
             </label>
         </div>`;
 }
@@ -3107,7 +3154,7 @@ async function sendReadinessNotification(dealId) {
     if (!channels.length) { alert("Отметьте хотя бы один канал (Email / Telegram)"); return; }
 
     const btn = section.querySelector(".deal-notify-send-btn");
-    const orig = btn ? btn.textContent : "";
+    const orig = btn ? btn.innerHTML : "";
     if (btn) { btn.disabled = true; btn.textContent = "Отправка…"; }
 
     try {
@@ -3127,7 +3174,7 @@ async function sendReadinessNotification(dealId) {
             if (fresh) { dealContactsCache.set(String(dealId), fresh); renderDealNotifyBody(dealId, "ready"); }
         }
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = orig || "📧 Отправить уведомление о готовности"; }
+        if (btn) { btn.disabled = false; btn.innerHTML = orig || (icon("mail") + " Отправить уведомление о готовности"); }
     }
 }
 
@@ -3182,7 +3229,7 @@ async function maybeAutoNotifyReadiness(dealId) {
             if (r?.ok && r?.to) sent.push(`${ch === "email" ? "Email" : "Telegram"}: ${r.to}`);
         }
         if (sent.length) {
-            showReadinessToast(`📨 Уведомление о готовности отправлено — ${sent.join(", ")}`);
+            showReadinessToast(`Уведомление о готовности отправлено — ${sent.join(", ")}`);
             const section = getDealNotifySection(dealId);
             const clientId = section?.dataset.clientId;
             if (clientId) {
@@ -3376,7 +3423,7 @@ async function showInvoiceRequisitesModal(dealId) {
                     <h3>${requisites.length ? "Выберите реквизиты для счёта" : "Реквизиты клиента"}</h3>
                     <div class="invoice-modal-header-actions">
                         ${addBtn}
-                        <button type="button" class="invoice-modal-close" onclick="closeInvoiceModal()">✕</button>
+                        <button type="button" class="invoice-modal-close" onclick="closeInvoiceModal()">${icon("x")}</button>
                     </div>
                 </div>
                 <div class="invoice-modal-body">
@@ -3622,14 +3669,14 @@ function renderDealListSearchHeader(deal, dealLink, dealActionButtons, statusCon
             <div class="crm-list-header-main">
                 <div class="deal-num">${dealLink}${dealActionButtons}</div>
                 <div class="crm-list-header-meta">
-                    <span class="crm-list-client">👤 ${client}</span>
+                    <span class="crm-list-client">${icon("user")} ${client}</span>
                     ${date ? `<span class="crm-list-date">${escapeHtml(date)}</span>` : ""}
                     <span class="crm-list-manager">${manager}</span>
                 </div>
             </div>
             <div class="crm-list-header-status">${statusControl}</div>
         </div>
-        <div class="client-name client-name--mobile">👤 ${client}</div>`;
+        <div class="client-name client-name--mobile">${icon("user")} ${client}</div>`;
 }
 
 function renderDealListSearchFooter(deal, isClosed, isDetailMode) {
@@ -3640,7 +3687,7 @@ function renderDealListSearchFooter(deal, isClosed, isDetailMode) {
         <div class="crm-footer crm-list-footer">
             <div class="deal-footer-left">
                 <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
-                    <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                    <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">${icon("save")} Сохранить</button>
                 </div>
                 <div class="deal-footer-meta deal-footer-meta--mobile">
                     ${date ? `<div>Дата заказа: <b>${escapeHtml(date)}</b></div>` : ""}
@@ -3933,7 +3980,7 @@ function renderDealActionButtonsLeft(deal) {
     const contact = deal.client_contact_person || {};
     const hasContact = contact.telephone || contact.email || contact.name;
     const contactBtn = hasContact
-        ? `<button type="button" class="deal-action-btn" onclick="event.stopPropagation(); showDealContactInfo(${deal.id}, this)" title="Контакты клиента" aria-label="Контакты клиента">👤</button>`
+        ? `<button type="button" class="deal-action-btn" onclick="event.stopPropagation(); showDealContactInfo(${deal.id}, this)" title="Контакты клиента" aria-label="Контакты клиента">${icon("user")}</button>`
         : "";
     const createBtn = `<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`;
 
@@ -3996,8 +4043,8 @@ function showDealContactInfo(dealId, btn) {
     popover.innerHTML = `
         ${name ? `<div><b>${escapeHtml(name)}</b></div>` : ""}
         ${position ? `<div style="color:#888; font-size:12px; margin-top:2px;">${escapeHtml(position)}</div>` : ""}
-        ${phone ? `<div style="margin-top:8px;">📞 <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></div>` : ""}
-        ${email ? `<div style="margin-top:4px;">✉️ <a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></div>` : ""}`;
+        ${phone ? `<div style="margin-top:8px;">${icon("phone")} <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></div>` : ""}
+        ${email ? `<div style="margin-top:4px;">${icon("mail")} <a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></div>` : ""}`;
 
     document.body.appendChild(popover);
 
@@ -4276,7 +4323,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
 
         card.innerHTML = isDetailMode ? `
             ${dealHeaderHtml}
-            <div class="client-name">👤 ${escapeHtml(deal.client?.name || deal.client_name || 'Клиент не указан')}</div>
+            <div class="client-name">${icon("user")} ${escapeHtml(deal.client?.name || deal.client_name || 'Клиент не указан')}</div>
             <div class="elements-list${dealCostsVisible ? "" : " costs-hidden"}">
                 ${Array.isArray(deal.elements) && deal.elements.length ? renderElementColsHeader({ isClosed }) : ""}
                 <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
@@ -4285,7 +4332,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
             <div class="crm-footer">
                 <div class="deal-footer-left">
                     <div class="deal-save-area" data-deal-id="${deal.id}" style="display: none;">
-                        <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                        <button onclick="saveDeal(${deal.id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">${icon("save")} Сохранить</button>
                     </div>
                     ${renderDealFooterMeta(deal)}
                 </div>
@@ -4327,12 +4374,12 @@ function createDealCardById(id) {
     card.innerHTML = `
         <div class="crm-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
             <div class="deal-num" style="font-weight: bold; font-size: 16px;">
-                <a href="https://crm.heavendevelop.ru/editDeal/${id}" target="_blank" style="color: #2f7df6; text-decoration: none;">№ ${id} 🔗</a>
+                <a href="https://crm.heavendevelop.ru/editDeal/${id}" target="_blank" style="color: var(--accent); text-decoration: none;">№ ${id} ${icon("link")}</a>
                 <small style="font-weight:normal; color:#888; margin-left:8px;">новая сделка</small>
             </div>
             <div class="status-badge" style="background:#eaf3ff; color:#2f7df6;">Новая</div>
         </div>
-        <div class="client-name">👤 Новая сделка создана</div>
+        <div class="client-name">${icon("user")} Новая сделка создана</div>
         <div class="elements-list">
             <div class="deal-elements-list" data-deal-id="${id}"></div>
             <div class="add-btn-container" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; text-align: left;">
@@ -4342,7 +4389,7 @@ function createDealCardById(id) {
         <div class="crm-footer">
             <div class="deal-footer-left">
                 <div class="deal-save-area" data-deal-id="${id}" style="display: none;">
-                    <button onclick="saveDeal(${id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">💾 Сохранить</button>
+                    <button onclick="saveDeal(${id}, this)" style="margin:0; background:#2f7df6; color:white; padding:6px 12px; border-radius:4px; font-size:13px;">${icon("save")} Сохранить</button>
                 </div>
                 ${renderDealFooterMeta(deal)}
             </div>
@@ -4474,7 +4521,7 @@ async function saveDeal(id, trigger = null) {
     
     if (rows.length === 0) return;
     
-    btn.innerText = "⏳ Сохранение...";
+    btn.innerHTML = icon("loader", { spin: true }) + " Сохранение...";
     btn.disabled = true;
 
     try {
@@ -4535,7 +4582,7 @@ async function saveDeal(id, trigger = null) {
         console.error(e);
     } finally { 
         if (btn) {
-            btn.innerText = "💾 Сохранить"; 
+            btn.innerHTML = icon("save") + " Сохранить";
             btn.disabled = false;
         }
     }

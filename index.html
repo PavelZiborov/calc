@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=867a10e">
+<link rel="stylesheet" href="css/app.css?v=1483d08">
 </head>
 <body>
 
@@ -150,8 +150,8 @@
         <label>Поиск заказов</label>
         <div class="advanced-search-row">
             <input type="text" id="crmSearchInput" placeholder="">
-            <button onclick="searchCRM('main')" style="background:#27ae60;" title="Найти" aria-label="Найти">🔍</button>
-            <button onclick="clearMainSearch()" style="background:#2f7df6;" title="Очистить поиск" aria-label="Очистить поиск">🔄</button>
+            <button onclick="searchCRM('main')" style="background:#27ae60;" title="Найти" aria-label="Найти"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg></button>
+            <button onclick="clearMainSearch()" style="background:#2f7df6;" title="Очистить поиск" aria-label="Очистить поиск"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></button>
         </div>
         <div id="crmLoader" class="loader">Синхронизация с сервером...</div>
         <div id="crmResults"></div>
@@ -164,12 +164,12 @@
             <div class="adv-toolbar-line">
                 <div class="adv-search-input-wrap">
                     <input type="text" id="advSearchInput" class="adv-search-input" placeholder="Поиск…" oninput="updateAdvSearchClearBtn()">
-                    <button type="button" class="adv-search-clear-btn" id="advSearchClearBtn" onclick="clearAdvSearchText()" title="Очистить поле поиска" aria-label="Очистить поле поиска" hidden>✕</button>
+                    <button type="button" class="adv-search-clear-btn" id="advSearchClearBtn" onclick="clearAdvSearchText()" title="Очистить поле поиска" aria-label="Очистить поле поиска" hidden><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button>
                 </div>
-                <button type="button" class="adv-toolbar-icon-btn adv-search-submit" onclick="searchCRM('adv')" title="Найти" aria-label="Найти">🔍</button>
+                <button type="button" class="adv-toolbar-icon-btn adv-search-submit" onclick="searchCRM('adv')" title="Найти" aria-label="Найти"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg></button>
                 <div class="adv-toolbar-actions">
                     <div class="adv-filters-popover-wrap" id="advFiltersPopoverWrap">
-                        <button type="button" class="adv-toolbar-icon-btn adv-filters-btn" id="advFiltersBtn" onclick="toggleAdvFiltersPopover(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false">⚙</button>
+                        <button type="button" class="adv-toolbar-icon-btn adv-filters-btn" id="advFiltersBtn" onclick="toggleAdvFiltersPopover(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"/></svg></button>
                         <div class="adv-filters-popover" id="advFiltersPopover" onclick="onAdvFiltersPopoverClick(event)">
                             <div class="adv-filters-popover-section">
                                 <label class="adv-filter-label" onclick="closeAdvFilterDropdowns()">Статус</label>
@@ -213,10 +213,10 @@
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="adv-toolbar-icon-btn clear-filters-btn" onclick="clearAdvFilters()" title="Сбросить фильтры" aria-label="Сбросить фильтры">🔄</button>
+                    <button type="button" class="adv-toolbar-icon-btn clear-filters-btn" onclick="clearAdvFilters()" title="Сбросить фильтры" aria-label="Сбросить фильтры"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></button>
                     <div class="crm-view-toggle" role="group" aria-label="Вид списка заказов">
-                        <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список">☰</button>
-                        <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска">▦</button>
+                        <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg></button>
+                        <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg></button>
                     </div>
                 </div>
             </div>
@@ -226,13 +226,13 @@
     </div>
 </div>
 
-<script src="js/config.js?v=867a10e"></script>
-<script src="js/calculator-data.js?v=867a10e"></script>
-<script src="js/utils.js?v=867a10e"></script>
-<script src="js/auth.js?v=867a10e"></script>
-<script src="js/calculator.js?v=867a10e"></script>
-<script src="js/crm.js?v=867a10e"></script>
-<script src="js/element-editor.js?v=867a10e"></script>
-<script src="js/main.js?v=867a10e"></script>
+<script src="js/config.js?v=1483d08"></script>
+<script src="js/calculator-data.js?v=1483d08"></script>
+<script src="js/utils.js?v=1483d08"></script>
+<script src="js/auth.js?v=1483d08"></script>
+<script src="js/calculator.js?v=1483d08"></script>
+<script src="js/crm.js?v=1483d08"></script>
+<script src="js/element-editor.js?v=1483d08"></script>
+<script src="js/main.js?v=1483d08"></script>
 </body>
 </html>

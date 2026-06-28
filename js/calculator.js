@@ -30,7 +30,7 @@ async function calc() {
     const originalText = btn.innerText;
     btn.disabled = true;
     btn.style.opacity = "0.7";
-    btn.innerText = "⏳ Считаем...";
+    btn.innerHTML = (typeof icon === "function" ? icon("loader", { spin: true }) + " " : "") + "Считаем...";
 
     const calcData = {
         action: 'calculate',

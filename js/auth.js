@@ -124,8 +124,8 @@ function applyPermissions() {
         if (currentUser.role === "client" && searchRow) {
             searchRow.innerHTML = `
                 <div class="col">
-                    <button onclick="searchCRM('main')" style="margin-top:0; background: #27ae60;">
-                        🔄 Загрузить список моих заказов
+                    <button onclick="searchCRM('main')" style="margin-top:0; background: var(--accent);">
+                        ${typeof icon === "function" ? icon("refresh") : ""} Загрузить список моих заказов
                     </button>
                 </div>`;
         }

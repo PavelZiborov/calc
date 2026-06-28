@@ -1814,7 +1814,7 @@ function getElementEditorModal() {
                         <div id="elementEditorPreviewUploadOverlay" class="element-editor-preview-upload-overlay" hidden></div>
                         <div class="element-editor-preview-actions staff-only-fields">
                             <label class="element-editor-mini-btn" title="Загрузить превью">
-                                📷
+                                ${typeof icon === "function" ? icon("camera") : ""}
                                 <input id="elementEditorPreviewFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
                             </label>
                             <button type="button" id="elementEditorPreviewDelete" class="element-editor-mini-btn danger" title="Удалить превью" style="display:none;">×</button>
@@ -1831,7 +1831,7 @@ function getElementEditorModal() {
                     <input id="elementEditorLinkInput" type="url" placeholder="Ссылка на макет" class="element-editor-input">
                     <button type="button" id="elementEditorAddLink" class="element-editor-mini-btn primary" title="Добавить ссылку">+</button>
                     <label class="element-editor-mini-btn" title="Загрузить файлы">
-                        📎
+                        ${typeof icon === "function" ? icon("clip") : ""}
                         <input id="elementEditorLayoutFile" type="file" multiple hidden>
                     </label>
                 </div>
@@ -2101,7 +2101,7 @@ function renderElementEditorAssets() {
         if (cached.layouts?.length) {
             layoutsHtml = cached.layouts.map(layout => {
                 const size = layout.size ? `<span class="element-layout-size">${escapeHtml(formatFileSize(layout.size))}</span>` : "";
-                const icon = layout.type === "link" ? "🔗" : "📄";
+                const typeIcon = (typeof icon === "function") ? (layout.type === "link" ? icon("link") : icon("file")) : "";
                 const isDeleting = layoutBusy
                     && uploadState?.type === "layout-delete"
                     && String(uploadState.layoutId) === String(layout.id);
@@ -2111,7 +2111,7 @@ function renderElementEditorAssets() {
 
                 return `
                     <div class="element-layout-item${isDeleting ? " is-deleting" : ""}">
-                        <a href="${escapeHtml(layout.url)}" target="_blank" rel="noopener" class="element-layout-link">${icon} ${escapeHtml(layout.name)}</a>
+                        <a href="${escapeHtml(layout.url)}" target="_blank" rel="noopener" class="element-layout-link">${typeIcon} ${escapeHtml(layout.name)}</a>
                         ${size}
                         ${deleteBtnHtml}
                         ${isDeleting ? `<div class="element-layout-item-progress">${renderEditorProgressBlock(uploadState.label, uploadState.progress)}</div>` : ""}
