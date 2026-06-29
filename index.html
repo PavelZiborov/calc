@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=a684931">
+<link rel="stylesheet" href="css/app.css?v=d425210">
 </head>
 <body>
 
@@ -20,7 +20,7 @@
     </nav>
 </header>
 
-<div id="auth-modal" onclick="if (event.target === this) toggleAuthModal()">
+<div id="auth-modal" onmousedown="overlayDown(event)" onclick="if (overlayClickedSelf(event)) toggleAuthModal()">
     <div class="container auth-box" onclick="event.stopPropagation()">
         <span class="auth-modal-close" onclick="toggleAuthModal()" aria-label="Закрыть">&times;</span>
 
@@ -227,13 +227,13 @@
     </div>
 </div>
 
-<script src="js/config.js?v=a684931"></script>
-<script src="js/calculator-data.js?v=a684931"></script>
-<script src="js/utils.js?v=a684931"></script>
-<script src="js/auth.js?v=a684931"></script>
-<script src="js/calculator.js?v=a684931"></script>
-<script src="js/crm.js?v=a684931"></script>
-<script src="js/element-editor.js?v=a684931"></script>
-<script src="js/main.js?v=a684931"></script>
+<script src="js/config.js?v=d425210"></script>
+<script src="js/calculator-data.js?v=d425210"></script>
+<script src="js/utils.js?v=d425210"></script>
+<script src="js/auth.js?v=d425210"></script>
+<script src="js/calculator.js?v=d425210"></script>
+<script src="js/crm.js?v=d425210"></script>
+<script src="js/element-editor.js?v=d425210"></script>
+<script src="js/main.js?v=d425210"></script>
 </body>
 </html>

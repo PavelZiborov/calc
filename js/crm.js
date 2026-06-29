@@ -44,6 +44,19 @@ function icon(name, opts = {}) {
   return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${sizeStyle}>${paths}</svg>`;
 }
 
+// Закрытие модалок по клику на фон — но НЕ когда выделяешь текст в поле и
+// случайно отпускаешь мышь за пределами окна (drag-out). Закрываем только если
+// И нажатие (mousedown), И клик пришлись на сам оверлей (фон), а не на содержимое.
+// Использование: на оверлее onmousedown="overlayDown(event)"
+//                          onclick="if(overlayClickedSelf(event)) closeX()"
+let _overlayDownTarget = null;
+function overlayDown(event) { _overlayDownTarget = event.target; }
+function overlayClickedSelf(event) {
+    const onSelf = event.target === event.currentTarget && _overlayDownTarget === event.currentTarget;
+    _overlayDownTarget = null;
+    return onSelf;
+}
+
 function collectAdvSearchParams() {
     const input = document.getElementById("advSearchInput");
     const q = input ? input.value : "";
@@ -3045,7 +3058,7 @@ function renderDealNotifyBody(dealId, state) {
         ${sentBadge}
         ${hasSelection ? renderDealNotifyChannels(selectedContact) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
-        <div class="deal-notify-modal" hidden onclick="if(event.target===this)closeDealContactForm(${dealId})">
+        <div class="deal-notify-modal" hidden onmousedown="overlayDown(event)" onclick="if(overlayClickedSelf(event))closeDealContactForm(${dealId})">
             <div class="deal-notify-modal-card">
                 <div class="deal-notify-modal-title">Новый контакт</div>
                 <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
@@ -3578,7 +3591,7 @@ async function showInvoiceRequisitesModal(dealId) {
         : `<button type="button" class="btn-secondary" onclick="closeInvoiceModal()">Закрыть</button>`;
 
     const modalHtml = `
-        <div class="invoice-modal-overlay" onclick="if(event.target===this) closeInvoiceModal()">
+        <div class="invoice-modal-overlay" onmousedown="overlayDown(event)" onclick="if(overlayClickedSelf(event)) closeInvoiceModal()">
             <div class="invoice-modal">
                 <div class="invoice-modal-header">
                     <h3>${requisites.length ? "Выберите реквизиты для счёта" : "Реквизиты клиента"}</h3>
@@ -4038,7 +4051,8 @@ function openPaymentModal(dealId, mode = "partial") {
             </div>
         </div>`;
 
-    modal.onclick = closePaymentModal;
+    modal.addEventListener('mousedown', overlayDown);
+    modal.onclick = (e) => { if (overlayClickedSelf(e)) closePaymentModal(); };
     document.body.appendChild(modal);
     document.getElementById('paymentAmountInput')?.focus();
 }

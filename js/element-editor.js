@@ -1844,7 +1844,8 @@ function getElementEditorModal() {
             </div>
         </div>`;
 
-    modal.addEventListener("click", closeElementEditor);
+    modal.addEventListener("mousedown", overlayDown);
+    modal.addEventListener("click", (e) => { if (overlayClickedSelf(e)) closeElementEditor(); });
     document.body.appendChild(modal);
     bindElementEditorEvents(modal);
     return modal;
