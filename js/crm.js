@@ -732,8 +732,10 @@ function refreshStatusControls(trigger, status) {
             control.style.background = status.bk_color;
             control.style.color = status.text_color;
         } else {
-            const icon = status.icon || getStatusIcon(status.name).icon;
-            control.innerText = icon;
+            const meta = getStatusIcon(status.name);
+            // иконка статуса — SVG-разметка → innerHTML (НЕ innerText, иначе виден «<svg…»).
+            control.innerHTML = status.icon || meta.icon;
+            control.style.color = status.color || meta.color || "#3a3833";
             control.title = status.name;
         }
     });
@@ -2526,11 +2528,13 @@ function renderInvoiceCardMarkup(dealId, invoice) {
         ? `<span class="deal-invoice-nopreview" title="Для этого счёта недоступно встроенное превью">превью недоступно</span>`
         : "";
 
-    const actionsHtml = (hasOnline || hasEdit) ? `
+    const actionsHtml = `
             <div class="deal-invoice-actions">
                 ${hasOnline ? `<button type="button" class="deal-invoice-link deal-invoice-copy" onclick="copyInvoiceLink(event, ${dealId})">${icon("copy")} Скопировать ссылку на счёт</button>` : ""}
                 ${hasEdit ? `<a class="deal-invoice-link" href="${escapeHtml(invoice.editLink)}" target="_blank" rel="noopener">${icon("edit")} Редактировать</a>` : ""}
-            </div>` : "";
+                <button type="button" class="deal-invoice-link deal-invoice-pdf" onclick="downloadInvoicePdf(event, ${dealId})">${icon("file")} Скачать PDF с печатью</button>
+                <button type="button" class="deal-invoice-link deal-invoice-unlink" onclick="deleteInvoiceBinding(event, ${dealId})">${icon("trash")} Удалить привязку счёта</button>
+            </div>`;
 
     return `
         <div class="deal-invoice-card${canEmbed ? " is-expandable" : ""} is-fresh">
@@ -2565,6 +2569,65 @@ function copyInvoiceLink(event, dealId) {
         navigator.clipboard.writeText(url).then(showOk).catch(() => fallbackCopyText(url, showOk));
     } else {
         fallbackCopyText(url, showOk);
+    }
+}
+
+// Скачать PDF счёта с печатью и подписью. PDF рендерит CRM на стороне сервера,
+// поэтому идём через n8n-экшен getInvoicePdf, который дёргает соответствующий
+// эндпоинт CRM и возвращает ссылку на готовый PDF (или сам файл base64).
+async function downloadInvoicePdf(event, dealId) {
+    event?.stopPropagation();
+    if (!ensureActiveSession()) return;
+    const btn = event?.currentTarget;
+    const orig = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.innerHTML = icon("loader", { spin: true }) + " Готовлю PDF…"; }
+    try {
+        const resp = await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ action: "getInvoicePdf", dealId: Number(dealId) })
+        }, 60000);
+        if (resp.status === 401) { handleUnauthorized(); return; }
+        const payload = await resp.json().catch(() => null);
+        const d = Array.isArray(payload) ? payload[0] : (payload?.data || payload);
+        const url = d?.url || d?.pdfUrl || d?.link;
+        if (isHttpUrl(url)) {
+            window.open(url, "_blank", "noopener");
+        } else if (typeof d?.base64 === "string" && d.base64) {
+            const a = document.createElement("a");
+            a.href = (d.base64.startsWith("data:") ? d.base64 : `data:application/pdf;base64,${d.base64}`);
+            a.download = d.filename || `Счёт.pdf`;
+            document.body.appendChild(a); a.click(); a.remove();
+        } else {
+            alert("PDF с печатью пока недоступен: не настроен n8n-экшен getInvoicePdf (нужен эндпоинт CRM).");
+        }
+    } catch (e) {
+        alert("Не удалось скачать PDF: " + (e.message || "ошибка"));
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = orig || (icon("file") + " Скачать PDF с печатью"); }
+    }
+}
+
+// Удалить привязку счёта: очищаем доп.поля CRM (номер, дата, ссылка, превью).
+// Сам счёт-документ в CRM не удаляется — только отвязка от сделки в нашем UI.
+async function deleteInvoiceBinding(event, dealId) {
+    event?.stopPropagation();
+    if (!confirm("Удалить привязку счёта? В CRM очистятся номер, дата и ссылки счёта (сам счёт-документ не удаляется).")) return;
+    if (!ensureActiveSession()) return;
+    const btn = event?.currentTarget;
+    const orig = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.innerHTML = icon("loader", { spin: true }) + " Удаляю…"; }
+    const fields = [DEAL_FIELD_INVOICE_NUMBER, DEAL_FIELD_INVOICE_DATE, DEAL_FIELD_INVOICE_LINK, DEAL_FIELD_INVOICE_PREVIEW];
+    try {
+        const results = await Promise.all(fields.map(f => pushDealAdditionalField(dealId, f, "")));
+        if (results.some(r => !r)) { alert("Не удалось очистить часть полей счёта — обновите страницу и повторите."); }
+        const map = dealAdditionalFieldsCache.get(String(dealId)) || {};
+        fields.forEach(f => { map[f] = ""; });
+        dealAdditionalFieldsCache.set(String(dealId), map);
+        dealInvoiceCache.delete(String(dealId));
+        renderInvoiceDisplay(dealId);
+    } finally {
+        if (btn) { btn.disabled = false; if (orig) btn.innerHTML = orig; }
     }
 }
 
