@@ -688,7 +688,7 @@ async function updateDealStatusById(dealId, status) {
         refreshDealStatusControls(dealId, status);
 
         if (Number(status.id) === DEAL_STATUS_READY) {
-            maybeAutoNotifyReadiness(dealId);
+            markAllElementsCompleted(dealId);
         }
         return true;
     } catch (e) {
@@ -798,7 +798,7 @@ async function updateCrmStatus(trigger, status, menu) {
 
         // Авто-уведомление о готовности при переводе СДЕЛКИ в «Заказ готов».
         if (scope === "deal" && Number(status.id) === DEAL_STATUS_READY) {
-            maybeAutoNotifyReadiness(dealId);
+            markAllElementsCompleted(dealId);
         }
     } catch (e) {
         alert("Не удалось обновить статус");
@@ -3225,7 +3225,23 @@ function saveNotifyChannels(dealId, channels) {
 }
 function onNotifyChannelToggle(dealId) {
     const section = getDealNotifySection(dealId);
-    if (section) saveNotifyChannels(dealId, getCheckedChannels(section));
+    if (!section) return;
+    const channels = getCheckedChannels(section);
+    saveNotifyChannels(dealId, channels);          // localStorage — мгновенно для UI/ручной отправки
+    saveNotifyChannelsToServer(dealId, channels);  // в БД — чтобы КРОН слал в выбранные каналы
+}
+
+// Сохраняем выбор каналов в БД (deal_contacts.notify_channels), чтобы серверный
+// крон авто-отправки шёл ровно в отмеченные каналы.
+async function saveNotifyChannelsToServer(dealId, channels) {
+    if (!ensureActiveSession({ silent: true })) return;
+    try {
+        await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ action: "saveNotifyChannels", dealId: Number(dealId), channels: channels.join(",") })
+        });
+    } catch (e) { console.warn("saveNotifyChannels failed", e); }
 }
 
 // Галочки каналов: активны только при наличии адреса (почта/ник); состояние
@@ -3371,7 +3387,48 @@ async function sendReadinessNotification(dealId) {
     }
 }
 
-const DEAL_STATUS_READY = 24873; // статус сделки «Заказ готов» — триггер авто-уведомления
+const DEAL_STATUS_READY = 24873; // статус сделки «Заказ готов»
+const ELEMENT_STATUS_COMPLETED_ID = 13953;        // статус позиции «Завершено»
+const ELEMENT_STATUS_COMPLETED_NAME = "Завершено";
+
+// При переводе сделки в «Заказ готов» проставляем ВСЕМ позициям статус «Завершено»
+// (id 13953) — менеджеры иногда забывают отметить услуги/дизайн. Само уведомление
+// потом отправит КРОН (раз в 15 мин), увидев, что все позиции завершены. Прямой
+// авто-отправки на фронте больше нет (это и убирает лишние повторы при смене статуса).
+async function markAllElementsCompleted(dealId) {
+    if (currentUser.role !== "staff") return;
+    const deal = dealsCache.get(String(dealId));
+    const elements = Array.isArray(deal?.elements) ? deal.elements : [];
+    if (!elements.length) return;
+    let changed = false;
+    for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        const curId = getElementStatusInfo(el).statusObj?.id;
+        if (Number(curId) === ELEMENT_STATUS_COMPLETED_ID) continue; // уже завершено
+        try {
+            const resp = await fetchWithTimeout(N8N_URL, {
+                method: "POST",
+                headers: authHeaders(),
+                body: JSON.stringify({
+                    action: "updateStatus", entity: "element", dealId: Number(dealId),
+                    statusId: ELEMENT_STATUS_COMPLETED_ID, statusName: ELEMENT_STATUS_COMPLETED_NAME,
+                    elementId: getElementId(el), elementIndex: i
+                })
+            });
+            if (resp.status === 401) { handleUnauthorized(); return; }
+            if (resp.ok) {
+                el.status = { id: ELEMENT_STATUS_COMPLETED_ID, name: ELEMENT_STATUS_COMPLETED_NAME };
+                el.status_id = ELEMENT_STATUS_COMPLETED_ID;
+                el.status_name = ELEMENT_STATUS_COMPLETED_NAME;
+                changed = true;
+            }
+        } catch (e) { console.warn("markAllElementsCompleted: позиция не обновилась", getElementId(el), e); }
+    }
+    if (changed) {
+        dealsCache.set(String(dealId), deal);
+        if (document.getElementById("deal-tab")) openDealInTab(Number(dealId), { preserveScroll: true });
+    }
+}
 
 // Собираем позиции заказа для письма: название, кол-во, статус, превью (без цен).
 // Превью берём из уже загруженного кэша элементов (временные ссылки Яндекса).
