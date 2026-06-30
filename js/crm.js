@@ -2969,10 +2969,16 @@ function contactEmailAddr(contact) {
 function buildContactLabel(contact) {
     const email = contactEmailAddr(contact);
     const tgNick = contactTelegramNick(contact);
-    // Имя — главное. Доп. адрес для различения: email → @ник → телефон (телефон последним).
-    const reach = email || (tgNick ? "@" + tgNick : "") || contact.phone || "";
+    // Имя — главное; показываем И email, И @ник (видно сразу, без редактирования).
+    // Телефон — только если ни email, ни ника нет.
+    const bits = [];
+    if (email) bits.push(email);
+    if (tgNick) bits.push("@" + tgNick);
+    if (!bits.length && contact.phone) bits.push(contact.phone);
+    const reach = bits.join(" · ");
     const rawName = contact.name != null ? String(contact.name).trim() : "";
-    const invalid = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined" || rawName === reach;
+    const invalid = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined"
+        || rawName === reach || rawName === email || rawName === (tgNick ? "@" + tgNick : "\0") || rawName === contact.phone;
     const name = invalid ? "" : rawName;
     const parts = [];
     if (name) parts.push(name);
@@ -3056,13 +3062,14 @@ function renderDealNotifyBody(dealId, state) {
             </div>
         </div>
         ${sentBadge}
-        ${hasSelection ? renderDealNotifyChannels(selectedContact) : ""}
+        ${hasSelection ? renderDealNotifyChannels(selectedContact, dealId) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" onclick="sendReadinessNotification(${dealId})">${sendLabel}</button>` : ""}
         <div class="deal-notify-modal" hidden onmousedown="overlayDown(event)" onclick="if(overlayClickedSelf(event))closeDealContactForm(${dealId})">
             <div class="deal-notify-modal-card">
                 <div class="deal-notify-modal-title">Новый контакт</div>
                 <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
-                <input type="text" class="deal-notify-input deal-notify-email" placeholder="Email и/или @ник Telegram (напр. mail@ya.ru @paulgt)">
+                <input type="text" class="deal-notify-input deal-notify-email" placeholder="Email">
+                <input type="text" class="deal-notify-input deal-notify-telegram" placeholder="@ник в Telegram (необязательно)">
                 <input type="tel" inputmode="tel" class="deal-notify-input deal-notify-phone" placeholder="+7 (___) ___ __ __" oninput="maskRuPhone(this)">
                 <div class="deal-notify-form-actions">
                     <button type="button" class="deal-notify-form-cancel" onclick="closeDealContactForm(${dealId})">Отмена</button>
@@ -3141,17 +3148,18 @@ function openEditContactForm(dealId, contactId) {
 
     const email = contactEmailAddr(contact);
     const tgNick = contactTelegramNick(contact);
-    const reach = [email, tgNick ? "@" + tgNick : ""].filter(Boolean).join(" ");
     // Не подставляем авто-фолбэк (email/@ник/телефон) в поле «Имя» — пусть будет пустым.
     const rawName = contact.name != null ? String(contact.name).trim() : "";
     const nameIsAuto = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined"
-        || rawName === reach || rawName === email
-        || rawName === (tgNick ? "@" + tgNick : "\0") || rawName === (contact.phone || "\0") || rawName === "Контакт";
+        || rawName === email || rawName === (tgNick ? "@" + tgNick : "\0")
+        || rawName === (contact.phone || "\0") || rawName === "Контакт";
     const nameInp = modal.querySelector(".deal-notify-name");
-    const reachInp = modal.querySelector(".deal-notify-email");
+    const emailInp = modal.querySelector(".deal-notify-email");
+    const tgInp = modal.querySelector(".deal-notify-telegram");
     const phoneInp = modal.querySelector(".deal-notify-phone");
     if (nameInp) nameInp.value = nameIsAuto ? "" : rawName;
-    if (reachInp) reachInp.value = reach;
+    if (emailInp) emailInp.value = email;
+    if (tgInp) tgInp.value = tgNick ? "@" + tgNick : "";
     if (phoneInp) phoneInp.value = contact.phone || "";
 
     modal.dataset.editId = String(contactId);
@@ -3192,7 +3200,8 @@ const TELEGRAM_BOT_USERNAME = "HeavenPrint_bot";
 // ловит его username→chat_id (ветка /start в боте). Дальше менеджер выбирает контакт
 // по нику и шлёт уведомление. Кнопка просто копирует ссылку для ручной отправки.
 function copyTelegramSubscribeLink(dealId) {
-    const link = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=deal${Number(dealId) || ""}`;
+    // Без payload: клиенту нужен только «Старт» для подписки; id сделки боту не нужен.
+    const link = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
     const ok = () => {
         if (typeof showReadinessToast === "function") showReadinessToast("Ссылка для подписки скопирована — отправьте её клиенту");
         else alert("Ссылка скопирована:\n" + link);
@@ -3204,22 +3213,41 @@ function copyTelegramSubscribeLink(dealId) {
     }
 }
 
-// Галочки каналов: активны только при наличии адреса (почта/ник).
-function renderDealNotifyChannels(contact) {
+// Сохранение выбора каналов отправки по сделке (переживает перезагрузку страницы).
+function getStoredNotifyChannels(dealId) {
+    try {
+        const raw = localStorage.getItem(`calc_notify_ch_${dealId}`);
+        return raw ? JSON.parse(raw) : null; // массив ["email","telegram"] или null (нет настройки)
+    } catch { return null; }
+}
+function saveNotifyChannels(dealId, channels) {
+    try { localStorage.setItem(`calc_notify_ch_${dealId}`, JSON.stringify(channels)); } catch (_) {}
+}
+function onNotifyChannelToggle(dealId) {
+    const section = getDealNotifySection(dealId);
+    if (section) saveNotifyChannels(dealId, getCheckedChannels(section));
+}
+
+// Галочки каналов: активны только при наличии адреса (почта/ник); состояние
+// восстанавливается из сохранённого выбора (по умолчанию — все доступные отмечены).
+function renderDealNotifyChannels(contact, dealId) {
     const email = contactEmailAddr(contact);
     const tg = contactTelegramNick(contact);
     const hasEmail = !!email;
     const hasTg = !!tg;
     const emailLabel = hasEmail ? escapeHtml(email) : "нет почты";
     const tgLabel = hasTg ? `@${escapeHtml(tg)}` : "нет ника";
+    const stored = getStoredNotifyChannels(dealId);
+    const emailChecked = hasEmail && (stored ? stored.includes("email") : true);
+    const tgChecked = hasTg && (stored ? stored.includes("telegram") : true);
     return `
         <div class="deal-notify-channels">
             <span class="deal-notify-channels-label">Куда слать:</span>
             <label class="deal-notify-ch-label${hasEmail ? "" : " is-disabled"}" title="${emailLabel}">
-                <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "checked" : "disabled"}> ${icon("mail")} Email
+                <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "" : "disabled"} ${emailChecked ? "checked" : ""} onchange="onNotifyChannelToggle(${dealId})"> ${icon("mail")} Email
             </label>
             <label class="deal-notify-ch-label${hasTg ? "" : " is-disabled"}" title="${tgLabel}">
-                <input type="checkbox" class="deal-notify-ch" value="telegram" ${hasTg ? "checked" : "disabled"}> ${icon("telegram")} Telegram
+                <input type="checkbox" class="deal-notify-ch" value="telegram" ${hasTg ? "" : "disabled"} ${tgChecked ? "checked" : ""} onchange="onNotifyChannelToggle(${dealId})"> ${icon("telegram")} Telegram
             </label>
         </div>`;
 }
@@ -3374,17 +3402,18 @@ function collectDealElementsForEmail(dealId) {
 async function maybeAutoNotifyReadiness(dealId) {
     if (currentUser.role !== "staff") return;
 
-    // Каналы — по доступности у выбранного контакта (если знаем); иначе пробуем оба,
-    // n8n отсеет недоступные. Дедуп на стороне n8n не даст повтора.
+    // Каналы — по СОХРАНЁННОМУ выбору галочек (пересечённому с доступностью), как при
+    // ручной отправке. Если выбор не сохранён — все доступные. n8n дедупит повтор.
     const selected = getSelectedDealContact(dealId);
-    let channels;
+    const available = [];
     if (selected) {
-        channels = [];
-        if (selected.email) channels.push("email");
-        if (selected.telegram) channels.push("telegram");
+        if (contactEmailAddr(selected)) available.push("email");
+        if (contactTelegramNick(selected)) available.push("telegram");
     } else {
-        channels = ["email", "telegram"];
+        available.push("email", "telegram");
     }
+    const stored = getStoredNotifyChannels(dealId);
+    const channels = stored ? available.filter(c => stored.includes(c)) : available;
     if (!channels.length) return;
 
     try {
@@ -3475,22 +3504,24 @@ async function submitDealContactForm(dealId) {
     const section = getDealNotifySection(dealId);
     if (!section) return;
     const name = (section.querySelector(".deal-notify-name")?.value || "").trim();
-    const reachRaw = (section.querySelector(".deal-notify-email")?.value || "").trim();
+    const emailRaw = (section.querySelector(".deal-notify-email")?.value || "").trim();
+    const tgRaw = (section.querySelector(".deal-notify-telegram")?.value || "").trim();
     const phone = (section.querySelector(".deal-notify-phone")?.value || "").trim();
 
-    // В одно поле можно вписать почту и/или ник: «zzipp@inbox.ru @paulgt»
-    const { email, telegram } = parseContactReach(reachRaw);
+    // Отдельные поля: email — чисто почта, telegram — ник. На всякий случай парсим
+    // email (если по привычке вписали «mail @nick») и берём ник из telegram-поля или оттуда.
+    const emailParsed = parseContactReach(emailRaw);
+    const email = emailParsed.email;
+    const telegram = (tgRaw.replace(/^@+/, "").trim()) || emailParsed.telegram || "";
 
     if (!email && !telegram && !phone) {
-        alert("Укажите email, Telegram-ник (@ник) или телефон");
+        alert("Укажите email, Telegram-ник или телефон");
         return;
     }
-    // Ник кладём в email-поле по конвенции «mail@ya.ru @nick» — так он переживает
-    // round-trip даже без отдельной колонки telegram в БД (фронт парсит email обратно).
-    const emailField = email && telegram ? `${email} @${telegram}` : (email || (telegram ? `@${telegram}` : ""));
     // Имя по умолчанию, чтобы контакт не отображался как «(без имени)».
-    const displayName = name || (telegram ? `@${telegram}` : (email || phone || "Контакт"));
-    const payload = { source: "manual", name: displayName, email: emailField, phone, telegram };
+    const displayName = name || email || (telegram ? `@${telegram}` : (phone || "Контакт"));
+    // email и telegram — РАЗДЕЛЬНО (в CRM/книге email = только почта, ник в своей колонке).
+    const payload = { source: "manual", name: displayName, email, phone, telegram };
     // Режим редактирования: передаём contactId → backend обновит существующий контакт.
     const editId = section.querySelector(".deal-notify-modal")?.dataset.editId;
     if (editId) payload.contactId = Number(editId);
