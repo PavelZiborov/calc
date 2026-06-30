@@ -838,6 +838,8 @@
         border: 1px solid #dedbd2; border-radius: 8px; background: #fff;
         font-size: 13px; cursor: pointer; box-sizing: border-box; text-align: left;
     }
+    .deal-notify-dd-toggle:hover, .deal-notify-dd-toggle:focus { background: #fff; }
+    .deal-notify-dd.is-open .deal-notify-dd-toggle { background: #fff; border-color: var(--accent); }
     .deal-notify-dd-toggle.is-unset { border-color: #e7b3b3; }
     .deal-notify-dd-current { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1c1b19; }
     .deal-notify-dd-caret { flex: 0 0 auto; color: #9a988f; font-size: 11px; transition: transform .15s ease; }
