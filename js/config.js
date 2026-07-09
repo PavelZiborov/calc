@@ -26,7 +26,8 @@ function extractSessionToken(session) {
 
 function readSessionMeta() {
     try {
-        const raw = sessionStorage.getItem("calc_session_meta");
+        // localStorage (не sessionStorage) — иначе iOS PWA теряет метаданные при каждом запуске
+        const raw = localStorage.getItem("calc_session_meta");
         if (!raw) return null;
         return JSON.parse(raw);
     } catch (e) {
@@ -37,7 +38,7 @@ function readSessionMeta() {
 
 function persistSessionMeta(user = currentUser) {
     try {
-        sessionStorage.setItem("calc_session_meta", JSON.stringify({
+        localStorage.setItem("calc_session_meta", JSON.stringify({
             statuses: user.statuses || [],
             paymentMethods: user.paymentMethods || [],
             elementStatuses: user.elementStatuses || [],
@@ -191,7 +192,8 @@ function validateStoredSessionOnLoad() {
 
 function resetAuthToGuest() {
     localStorage.removeItem("calc_session");
-    sessionStorage.removeItem("calc_session_meta");
+    localStorage.removeItem("calc_session_meta");
+    sessionStorage.removeItem("calc_session_meta"); // на случай старых записей
     currentUser = { role: "guest", login: "", token: "" };
 
     const crmContainer = document.getElementById('crm-search-container');

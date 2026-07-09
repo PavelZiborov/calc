@@ -928,16 +928,27 @@ function positionAdvFiltersPopover() {
 
     const pad = 12;
     const gap = 6;
-    const top = Math.round(header.getBoundingClientRect().bottom + gap);
+    const headerRect = header.getBoundingClientRect();
+    const isBottomBar = document.body.classList.contains("crm-kanban-active")
+        && window.matchMedia("(max-width: 875px)").matches;
 
     popover.style.position = "fixed";
     popover.style.left = `${pad}px`;
     popover.style.right = `${pad}px`;
     popover.style.width = "auto";
-    popover.style.top = `${top}px`;
-    popover.style.bottom = "auto";
-    popover.style.maxHeight = `calc(100dvh - ${top + pad}px)`;
     popover.style.overflowY = "auto";
+
+    if (isBottomBar) {
+        const bottom = Math.round(window.innerHeight - headerRect.top + gap);
+        popover.style.top = "auto";
+        popover.style.bottom = `${bottom}px`;
+        popover.style.maxHeight = `calc(${headerRect.top - pad}px)`;
+    } else {
+        const top = Math.round(headerRect.bottom + gap);
+        popover.style.top = `${top}px`;
+        popover.style.bottom = "auto";
+        popover.style.maxHeight = `calc(100dvh - ${top + pad}px)`;
+    }
 }
 
 function toggleAdvFiltersPopover(event) {
@@ -1751,24 +1762,8 @@ function bindKanbanBoardPan(board) {
         panState.moved = false;
     }, true);
 
-    board.addEventListener("touchstart", (event) => {
-        if (event.touches.length !== 1 || !isKanbanPanTarget(event.target)) return;
-        panState.active = true;
-        panState.moved = false;
-        panState.startX = event.touches[0].pageX;
-        panState.scrollLeft = board.scrollLeft;
-        board.classList.add("is-panning");
-    }, { passive: true });
-
-    board.addEventListener("touchmove", (event) => {
-        if (!panState.active || event.touches.length !== 1) return;
-        const delta = event.touches[0].pageX - panState.startX;
-        if (Math.abs(delta) > 2) panState.moved = true;
-        board.scrollLeft = panState.scrollLeft - delta;
-    }, { passive: true });
-
-    board.addEventListener("touchend", finishPan);
-    board.addEventListener("touchcancel", finishPan);
+    // Touch scrolling is handled natively by the browser via overflow-x + CSS scroll-snap.
+    // Custom touch handlers caused jitter competing with iOS momentum scroll.
 }
 
 function sortKanbanColumnsBySavedOrder(columns) {
@@ -2099,6 +2094,17 @@ function applyCrmViewLayoutClass() {
     if (!isKanban) {
         closeAdvFiltersPopover();
     }
+    const zoomed = localStorage.getItem("kanban_zoom_out") === "1";
+    const zoomBtn = document.getElementById("kanbanZoomBtn");
+    if (zoomBtn) zoomBtn.classList.toggle("is-active", isKanban && zoomed);
+}
+
+function toggleKanbanZoom() {
+    const board = document.querySelector(".crm-kanban-board");
+    const zoomed = board ? board.classList.toggle("kanban-board--zoomed") : false;
+    const zoomBtn = document.getElementById("kanbanZoomBtn");
+    if (zoomBtn) zoomBtn.classList.toggle("is-active", zoomed);
+    try { localStorage.setItem("kanban_zoom_out", zoomed ? "1" : "0"); } catch (_) {}
 }
 
 function rerenderCrmResultsFromCache(mode, options = {}) {
@@ -2178,6 +2184,8 @@ function buildKanbanColumns(deals) {
         return columnMap.get(col.key);
     };
 
+    ensureColumn({ key: '_null', id: null, name: 'Статус не установлен', bk_color: '#dfdfdf', text_color: '#555', deals: [] });
+
     getCrmStatuses().forEach(status => {
         ensureColumn({
             key: String(status.id),
@@ -2222,11 +2230,23 @@ function renderKanbanCard(deal, index) {
     const manager = getDealResponsibleName(deal);
     const num = deal.num || deal.id;
 
+    const elements = Array.isArray(deal.elements) ? deal.elements
+        : (Array.isArray(deal.items) ? deal.items : (Array.isArray(deal.positions) ? deal.positions : []));
+    const descWords = elements
+        .map(el => (el?.name || el?.title || "").trim().split(/\s+/)[0])
+        .filter(Boolean);
+    const descHtml = descWords.length
+        ? `<div class="kanban-card-desc">${escapeHtml(descWords.join(", "))}</div>`
+        : "";
+
     return `
         <article class="kanban-card" data-deal-id="${deal.id}" style="--card-index:${index}" tabindex="0" role="button" aria-label="Открыть заказ № ${escapeHtml(num)}">
-            <div class="kanban-card-num">№ ${escapeHtml(num)}</div>
+            <div class="kanban-card-top-row">
+                <span class="kanban-card-num">№ ${escapeHtml(num)}</span>
+                <span class="kanban-card-manager">${escapeHtml(manager)}</span>
+            </div>
             <div class="kanban-card-client">${escapeHtml(client)}</div>
-            <div class="kanban-card-manager">${escapeHtml(manager)}</div>
+            ${descHtml}
             <div class="kanban-card-amount ${amountClass}">${formatMoney(f.total)} ₽</div>
         </article>`;
 }
@@ -2243,6 +2263,7 @@ function renderDealsKanban(deals, targetDiv) {
     const columns = sortKanbanColumnsBySavedOrder(buildKanbanColumns(validDeals));
     const board = document.createElement("div");
     board.className = "crm-kanban-board";
+    if (localStorage.getItem("kanban_zoom_out") === "1") board.classList.add("kanban-board--zoomed");
 
     columns.forEach(col => {
         const columnEl = document.createElement("section");
@@ -3244,8 +3265,12 @@ async function saveNotifyChannelsToServer(dealId, channels) {
     } catch (e) { console.warn("saveNotifyChannels failed", e); }
 }
 
+// Set сделок, каналы которых уже синхронизированы с БД в этой сессии.
+const _notifyChannelSynced = new Set();
+
 // Галочки каналов: активны только при наличии адреса (почта/ник); состояние
 // восстанавливается из сохранённого выбора (по умолчанию — все доступные отмечены).
+// При первом показе блока пушим localStorage → БД, чтобы крон видел актуальный выбор.
 function renderDealNotifyChannels(contact, dealId) {
     const email = contactEmailAddr(contact);
     const tg = contactTelegramNick(contact);
@@ -3256,6 +3281,17 @@ function renderDealNotifyChannels(contact, dealId) {
     const stored = getStoredNotifyChannels(dealId);
     const emailChecked = hasEmail && (stored ? stored.includes("email") : true);
     const tgChecked = hasTg && (stored ? stored.includes("telegram") : true);
+
+    // Один раз за сессию синхронизируем состояние чекбоксов с БД.
+    // Без этого крон читает дефолт «email,telegram» даже если пользователь убрал галочку.
+    if (!_notifyChannelSynced.has(dealId)) {
+        _notifyChannelSynced.add(dealId);
+        const activeChannels = [];
+        if (emailChecked) activeChannels.push("email");
+        if (tgChecked) activeChannels.push("telegram");
+        setTimeout(() => saveNotifyChannelsToServer(dealId, activeChannels), 300);
+    }
+
     return `
         <div class="deal-notify-channels">
             <span class="deal-notify-channels-label">Куда слать:</span>

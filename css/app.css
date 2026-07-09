@@ -1701,6 +1701,8 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .status-dropdown-btn:hover,
+    .status-dropdown-btn:focus { background: white; color: #3a3833; }
     .status-dropdown-btn::after,
     .date-range-btn::after {
         content: "⌄";
@@ -1828,6 +1830,8 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .date-range-btn:hover,
+    .date-range-btn:focus { background: white; color: #3a3833; }
     .date-range-panel {
         display: none;
         position: absolute;
@@ -2514,6 +2518,10 @@
         cursor: grabbing;
         user-select: none;
     }
+    .crm-kanban-board.kanban-board--zoomed .crm-kanban-column { zoom: 0.6; }
+    #kanbanZoomBtn { display: none; }
+    .kanban-zoom-btn.is-active { background: var(--accent) !important; color: white !important; }
+    .kanban-zoom-btn.is-active:hover { background: #1a6fe8 !important; }
     .crm-kanban-board .kanban-card {
         cursor: pointer;
     }
@@ -2680,11 +2688,19 @@
         transform: translateY(0);
         box-shadow: 0 2px 6px rgba(28, 27, 25, 0.1);
     }
+    .kanban-card-top-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px;
+        min-width: 0;
+    }
     .kanban-card-num {
         font-size: 14px;
         font-weight: 700;
         color: var(--accent);
         line-height: 1.2;
+        flex-shrink: 0;
     }
     .kanban-card-client {
         font-size: 13px;
@@ -2697,9 +2713,18 @@
         overflow: hidden;
     }
     .kanban-card-manager {
-        font-size: 12px;
+        font-size: 11px;
         color: #8c887e;
         line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+    .kanban-card-desc {
+        font-size: 11px;
+        color: #a09b93;
+        line-height: 1.3;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -2721,4 +2746,30 @@
             width: 248px;
             max-height: calc(100vh - 210px);
         }
+        /* Native touch scroll with column snap */
+        .crm-kanban-board {
+            scroll-snap-type: x mandatory;
+            overscroll-behavior-x: contain;
+        }
+        .crm-kanban-column {
+            scroll-snap-align: start;
+        }
+        /* Fixed bottom toolbar in kanban mode */
+        body.crm-kanban-active .adv-search-header {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: white;
+            border-top: 1px solid #e5e0d8;
+            padding: 8px 12px;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            margin-bottom: 0;
+            box-shadow: 0 -2px 12px rgba(28, 27, 25, 0.1);
+        }
+        body.crm-kanban-active .crm-kanban-column-body {
+            padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+        }
+        body.crm-kanban-active #kanbanZoomBtn { display: inline-flex; }
     }
