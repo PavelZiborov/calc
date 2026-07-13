@@ -2221,6 +2221,9 @@
         max-width: 34px;
         height: 34px;
         padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 8px;
         background: #f1efe9;
         color: #5f5c54;
@@ -2785,7 +2788,9 @@
             z-index: 200;
             background: white;
             border-top: 1px solid #e5e0d8;
-            padding: 9px max(20px, env(safe-area-inset-right, 20px));
+            padding-top: 9px;
+            padding-left: max(22px, env(safe-area-inset-left, 0px));
+            padding-right: max(22px, env(safe-area-inset-right, 0px));
             padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
             margin-bottom: 0;
             box-shadow: 0 -2px 12px rgba(28, 27, 25, 0.1);
