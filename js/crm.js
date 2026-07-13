@@ -1228,7 +1228,6 @@ function clearAdvSearchText() {
     input.value = "";
     updateAdvSearchClearBtn();
     saveAdvSearchUiState();
-    input.focus();
 }
 
 // Показываем крестик, только когда в поле есть текст.

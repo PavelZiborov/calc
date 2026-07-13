@@ -2035,8 +2035,26 @@
         }
         #adv-search-container .adv-search-input {
             height: 36px;
+            min-height: 0;
             font-size: 16px;
-            padding: 6px 30px 6px 8px;
+            padding: 6px 40px 6px 8px;
+        }
+        #adv-search-container .adv-search-clear-btn {
+            width: 38px;
+            min-width: 38px;
+            height: auto;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            transform: none;
+            border-radius: 0 8px 8px 0;
+            background: transparent;
+            font-size: 15px;
+        }
+        #adv-search-container .adv-search-clear-btn:hover,
+        #adv-search-container .adv-search-clear-btn:active {
+            background: rgba(58, 56, 51, 0.06);
+            color: #3a3833;
         }
         .adv-search-header {
             position: relative;
@@ -2485,15 +2503,17 @@
         min-height: 0;
     }
     body.crm-kanban-active .adv-toolbar-icon-btn,
-    body.crm-kanban-active #adv-search-container .adv-search-submit {
-        width: 32px;
-        min-width: 32px;
-        max-width: 32px;
-        height: 32px;
+    body.crm-kanban-active #adv-search-container .adv-search-submit,
+    body.crm-kanban-active #adv-search-container .adv-toolbar-icon-btn {
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+        height: 36px;
         font-size: 15px;
     }
-    body.crm-kanban-active .adv-search-input {
-        height: 32px;
+    body.crm-kanban-active #adv-search-container .adv-search-input {
+        height: 36px;
+        min-height: 0;
     }
     body.crm-kanban-active .crm-view-btn {
         width: 26px;
@@ -2763,8 +2783,8 @@
             z-index: 200;
             background: white;
             border-top: 1px solid #e5e0d8;
-            padding: 8px 12px;
-            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            padding: 9px 16px;
+            padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
             margin-bottom: 0;
             box-shadow: 0 -2px 12px rgba(28, 27, 25, 0.1);
         }
