@@ -1,5 +1,26 @@
+// --- Мобильное меню разделов (дропдаун в шапке) ---
+function toggleNavMenu(force) {
+    const nav = document.getElementById("tabsNav");
+    const toggle = document.getElementById("navMenuToggle");
+    if (!nav) return;
+    const open = typeof force === "boolean" ? force : !nav.classList.contains("is-open");
+    nav.classList.toggle("is-open", open);
+    if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function closeNavMenu() {
+    toggleNavMenu(false);
+}
+// Клик вне шапки — закрываем меню
+document.addEventListener("click", (event) => {
+    const nav = document.getElementById("tabsNav");
+    if (!nav || !nav.classList.contains("is-open")) return;
+    if (event.target.closest("#tabsNav") || event.target.closest("#navMenuToggle")) return;
+    closeNavMenu();
+});
+
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 function switchTab(id, trigger = null) {
+    closeNavMenu();
     const target = document.getElementById(id);
     if (!target) return;
 
@@ -40,7 +61,10 @@ function restoreAppUiState() {
     const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || "main-tab";
 
     if (savedTab === "search-tab" && currentUser.role === "staff") {
-        const btn = document.getElementById("adv-tab-btn");
+        // активной делаем вкладку под текущий режим: Канбан → доска, Заказы → список
+        const isKanban = typeof getCrmViewMode === "function" && getCrmViewMode() === "kanban";
+        const btn = document.getElementById(isKanban ? "kanban-nav-btn" : "adv-tab-btn")
+            || document.getElementById("adv-tab-btn");
         if (btn) {
             switchTab("search-tab", btn);
             return;
@@ -61,50 +85,105 @@ function setFormat() { let f = document.getElementById("format").value, p = docu
 function customFormat() { document.getElementById("format").value = "custom"; calcLayout(); }
 function calcLayout() {
     let w = Number(document.getElementById("width").value), h = Number(document.getElementById("height").value);
-    let p = document.getElementById("product").value, m = (p === "Наклейка" && document.getElementById("cutMethod").value === "plotter") ? 15 : 5, g = 2;
-    let ww = SRA3_W - (m * 2), wh = SRA3_H - (m * 2);
+    const sp = (typeof getSheetParams === "function") ? getSheetParams() : { width: SRA3_W, height: SRA3_H, gap: 2, margin: 5, marginPlotter: 15 };
+    let p = document.getElementById("product").value;
+    let m = (p === "Наклейка" && document.getElementById("cutMethod").value === "plotter") ? sp.marginPlotter : sp.margin, g = sp.gap;
+    let ww = sp.width - (m * 2), wh = sp.height - (m * 2);
     let r1 = Math.floor((ww + g) / (w + g)) * Math.floor((wh + g) / (h + g));
     let r2 = Math.floor((ww + g) / (h + g)) * Math.floor((wh + g) / (w + g));
     document.getElementById("layout").value = Math.max(r1, r2) || 0;
+    updateSchematic();
+}
+
+// Интерактивная схема-превью: пропорции прямоугольника = ширина/высота изделия
+function updateSchematic() {
+    const rect = document.getElementById("previewRect");
+    if (!rect) return;
+    const w = parseFloat(document.getElementById("width")?.value) || 0;
+    const h = parseFloat(document.getElementById("height")?.value) || 0;
+    const wl = document.getElementById("previewWidthLabel");
+    const hl = document.getElementById("previewHeightLabel");
+    if (wl) wl.textContent = w ? `${w} мм` : "—";
+    if (hl) hl.textContent = h ? `${h} мм` : "—";
+    if (w > 0 && h > 0) {
+        const maxDim = 150; // макс. сторона прямоугольника в px
+        const ratio = w / h;
+        let rw, rh;
+        if (ratio >= 1) { rw = maxDim; rh = maxDim / ratio; }
+        else { rh = maxDim; rw = maxDim * ratio; }
+        rect.style.width = `${Math.round(rw)}px`;
+        rect.style.height = `${Math.round(rh)}px`;
+    }
 }
 function updateType() {
     let t = document.getElementById("type").value, p = document.getElementById("product"); p.innerHTML = "";
+    const sheetProducts = (typeof CALC_SHEET_PRODUCTS !== "undefined") ? CALC_SHEET_PRODUCTS : ["Визитка", "Листовка", "Открытка", "Наклейка", "Стикерпак", "Буклет", "Карточка", "Меню"];
+    const catalogProducts = (typeof CALC_CATALOG_PRODUCTS !== "undefined") ? CALC_CATALOG_PRODUCTS : ["Каталог", "Презентация"];
     if(t === "sheet"){
-        ["Визитка", "Листовка", "Открытка", "Наклейка", "Стикерпак", "Буклет", "Карточка", "Меню"].forEach(x => p.add(new Option(x, x)));
+        sheetProducts.forEach(x => p.add(new Option(x, x)));
         document.getElementById("catalogFields").style.display = "none"; document.getElementById("catalogPaper").style.display = "none";
         document.getElementById("sheetBlock").style.display = "block"; document.getElementById("layoutContainer").style.display = "block";
         document.getElementById("processOptions").style.display = "block";
         handleProductChange();
     } else {
-        ["Каталог", "Презентация"].forEach(x => p.add(new Option(x, x)));
+        catalogProducts.forEach(x => p.add(new Option(x, x)));
         document.getElementById("catalogFields").style.display = "block"; document.getElementById("catalogPaper").style.display = "block";
         document.getElementById("sheetBlock").style.display = "none"; document.getElementById("layoutContainer").style.display = "none";
         document.getElementById("processOptions").style.display = "none";
-        fillOptions("paperCover", papersFull, "Бумага 300 гр."); fillOptions("paperBlock", papersFull, "Бумага 150 гр.");
+        // бумаги обложки/блока — из правила для каталога
+        if (typeof getProductRule === "function") {
+            const rule = getProductRule(catalogProducts[0]);
+            const paperPairs = materialOptionsFor("papers", rule.papers);
+            fillMaterialSelect("paperCover", paperPairs, preferredOrFirst(rule.papers, "paper_300"));
+            fillMaterialSelect("paperBlock", paperPairs, preferredOrFirst(rule.papers, "paper_150"));
+        } else {
+            fillOptions("paperCover", papersFull, "Бумага 300 гр."); fillOptions("paperBlock", papersFull, "Бумага 150 гр.");
+        }
         fillFormatOptions("default"); document.getElementById("format").value = "A4"; setFormat();
     }
 }
 
+// Заполнить <select> парами [название, id], выбрать по id
+function fillMaterialSelect(id, pairs, selectedId) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = "";
+    (pairs || []).forEach(([name, val]) => {
+        const o = document.createElement("option");
+        o.value = val; o.text = name;
+        if (val === selectedId) o.selected = true;
+        el.appendChild(o);
+    });
+}
+
 function handleProductChange() {
     let p = document.getElementById("product").value, t = document.getElementById("type").value;
-    if (t === "sheet") {
-        document.getElementById("roundingContainer").style.display = (p === "Наклейка" || p === "Стикерпак") ? "none" : "flex";
-        if (p === "Наклейка" || p === "Стикерпак") {
-            fillOptions("paper", stickerPapers, "Самоклейка бумажная"); fillOptions("colorSheet", stickerColorOptions, "4+0"); fillFormatOptions(p);
-                // Для наклеек оставляем только 32 мкм 1+0 и "Без ламинации"
-                fillOptions("lamSheet", stickerLamOptions, "Без ламинации");
-            document.getElementById("format").value = (p === "Наклейка" ? "A5" : "A4");
-            document.getElementById("stickerCutGroup").style.display = (p === "Наклейка") ? "block" : "none";
-            document.getElementById("simpleCutGroup").style.display = (p === "Стикерпак") ? "none" : (p === "Наклейка" ? "none" : "block");
-        } else {
-            fillOptions("paper", papersFull, "Бумага 300 гр."); fillOptions("colorSheet", colorOptions, "4+0"); fillFormatOptions(p);
-            // Возвращаем полный список ламинаций для обычных изделий
-            fillOptions("lamSheet", lamOptions, "Без ламинации");
-            document.getElementById("simpleCutGroup").style.display = "block"; document.getElementById("stickerCutGroup").style.display = "none";
-            document.getElementById("format").value = (p === "Визитка" ? "90x50" : "A5");
-        }
-        setFormat();
+    if (t !== "sheet") return;
+    const isSticker = (p === "Наклейка" || p === "Стикерпак");
+    document.getElementById("roundingContainer").style.display = isSticker ? "none" : "flex";
+
+    // Списки материалов берём из настроек калькулятора (правила по типу продукции)
+    if (typeof getProductRule === "function") {
+        const rule = getProductRule(p);
+        fillMaterialSelect("paper", materialOptionsFor("papers", rule.papers), preferredOrFirst(rule.papers, isSticker ? "sticker_paper" : "paper_300"));
+        fillMaterialSelect("colorSheet", materialOptionsFor("colors", rule.colors), preferredOrFirst(rule.colors, "color_4_0"));
+        fillMaterialSelect("lamSheet", materialOptionsFor("laminations", rule.laminations), preferredOrFirst(rule.laminations, "lam_none"));
+    } else {
+        // fallback на статические массивы
+        if (isSticker) { fillOptions("paper", stickerPapers, "Самоклейка бумажная"); fillOptions("colorSheet", stickerColorOptions, "4+0"); fillOptions("lamSheet", stickerLamOptions, "Без ламинации"); }
+        else { fillOptions("paper", papersFull, "Бумага 300 гр."); fillOptions("colorSheet", colorOptions, "4+0"); fillOptions("lamSheet", lamOptions, "Без ламинации"); }
     }
+    fillFormatOptions(p);
+
+    if (isSticker) {
+        document.getElementById("format").value = (p === "Наклейка" ? "A5" : "A4");
+        document.getElementById("stickerCutGroup").style.display = (p === "Наклейка") ? "block" : "none";
+        document.getElementById("simpleCutGroup").style.display = (p === "Стикерпак") ? "none" : (p === "Наклейка" ? "none" : "block");
+    } else {
+        document.getElementById("simpleCutGroup").style.display = "block"; document.getElementById("stickerCutGroup").style.display = "none";
+        document.getElementById("format").value = (p === "Визитка" ? "90x50" : "A5");
+    }
+    setFormat();
 }
 
 function validatePages() { if (document.getElementById("binding").value === "staple") { let p = document.getElementById("pages"); p.value = Math.ceil(p.value / 4) * 4; } }
@@ -378,35 +457,120 @@ function roundSelectedPrice(decimals) {
     syncStaffTechAndCopyUI();
 }
 
+// Наценка теперь — ряд кнопок-коэффициентов внутри синего блока (x1.6, x1.7, …).
 function renderMarkupSelect(markupList, costTotal, selectedMultiplier) {
-    const container = document.getElementById("markupSelectContainer");
-    const select = document.getElementById("markupSelect");
-    if (!container || !select) return;
-
     window.currentMarkupList = Array.isArray(markupList) ? markupList : [];
-    select.innerHTML = "";
+    window.currentCostTotal = Number(costTotal) || 0;
 
+    const wrap = document.getElementById("markupCoefBtns");
+    const row = document.getElementById("markupCoefRow");
+    if (!wrap) return;
+
+    wrap.innerHTML = "";
     window.currentMarkupList.forEach((m, idx) => {
-        const o = document.createElement("option");
-        o.value = String(idx);
-        o.text = `Наценка x${m.multiplier} — ${Number(m.total).toLocaleString('ru-RU')} ₽ (${Number(m.perOne).toFixed(2)} ₽/шт) при себестоимости ${Number(costTotal).toLocaleString('ru-RU')} ₽`;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "rec-coef-btn";
+        b.textContent = `x${m.multiplier}`;
+        b.dataset.idx = String(idx);
+        b.dataset.mult = String(m.multiplier);
+        b.title = `${Number(m.total).toLocaleString('ru-RU')} ₽ (${Number(m.perOne).toFixed(2)} ₽/шт)`;
         if (selectedMultiplier != null && Number(m.multiplier) === Number(selectedMultiplier)) {
-            o.selected = true;
+            b.classList.add("is-active");
         }
-        select.appendChild(o);
+        b.onclick = () => selectMarkupByIndex(idx);
+        wrap.appendChild(b);
     });
 
-    container.style.display = window.currentMarkupList.length ? "block" : "none";
+    if (row) row.style.display = window.currentMarkupList.length ? "" : "none";
 }
 
-function handleMarkupSelectChange() {
-    const select = document.getElementById("markupSelect");
-    if (!select || !window.currentMarkupList) return;
+function selectMarkupByIndex(idx) {
+    const m = window.currentMarkupList && window.currentMarkupList[idx];
+    if (!m) return;
+    updateSelectedPrice(m.perOne, m.total, m.multiplier);
+    highlightActiveCoef(m.multiplier);
+    syncPriceSettingsInputs();
+}
 
-    const item = window.currentMarkupList[Number(select.value)];
-    if (!item) return;
+function highlightActiveCoef(mult) {
+    document.querySelectorAll("#markupCoefBtns .rec-coef-btn").forEach(b => {
+        b.classList.toggle("is-active", mult != null && Number(b.dataset.mult) === Number(mult));
+    });
+}
 
-    updateSelectedPrice(item.perOne, item.total, item.multiplier);
+// Совместимость: старый обработчик дропдауна больше не используется.
+function handleMarkupSelectChange() {}
+
+// --- Ручная настройка цены (шестерёнка) ---
+function getCalcQty() {
+    return Number(lastCalcData?.qty ?? document.getElementById("tirazh")?.value ?? 0) || 0;
+}
+
+function openPriceSettings(event) {
+    if (event) event.stopPropagation();
+    if (currentUser.role !== "staff" || !lastCalcData) return;
+    const pop = document.getElementById("priceSettingsPopover");
+    if (!pop) return;
+    syncPriceSettingsInputs();
+    pop.hidden = false;
+    setTimeout(() => document.addEventListener("click", priceSettingsOutside, true), 0);
+}
+
+function closePriceSettings() {
+    const pop = document.getElementById("priceSettingsPopover");
+    if (pop) pop.hidden = true;
+    document.removeEventListener("click", priceSettingsOutside, true);
+}
+
+function priceSettingsOutside(e) {
+    const pop = document.getElementById("priceSettingsPopover");
+    const gear = document.getElementById("recPriceGear");
+    if (!pop || pop.hidden) return;
+    if (pop.contains(e.target) || (gear && gear.contains(e.target))) return;
+    closePriceSettings();
+}
+
+function syncPriceSettingsInputs() {
+    const pOne = Number(lastCalcData?.pricePerOne ?? lastCalcData?.priceOne ?? 0);
+    const total = Number(lastCalcData?.total ?? 0);
+    const perEl = document.getElementById("psPerOne");
+    const totEl = document.getElementById("psTotal");
+    const coefEl = document.getElementById("psCoef");
+    if (perEl) perEl.value = pOne ? pOne.toFixed(2) : "";
+    if (totEl) totEl.value = total ? total.toFixed(2) : "";
+    if (coefEl) coefEl.value = (lastCalcData?.selectedMultiplier != null) ? lastCalcData.selectedMultiplier : "";
+}
+
+function applyManualPerOne() {
+    const v = parseFloat(document.getElementById("psPerOne")?.value);
+    if (!lastCalcData || !(v > 0)) return;
+    const qty = getCalcQty();
+    updateSelectedPrice(v, Number((v * qty).toFixed(2)), null);
+    highlightActiveCoef(null);
+    syncPriceSettingsInputs();
+}
+
+function applyManualTotal() {
+    const v = parseFloat(document.getElementById("psTotal")?.value);
+    if (!lastCalcData || !(v > 0)) return;
+    const qty = getCalcQty();
+    const pOne = qty ? v / qty : 0;
+    updateSelectedPrice(pOne, Number(v.toFixed(2)), null);
+    highlightActiveCoef(null);
+    syncPriceSettingsInputs();
+}
+
+function applyManualCoef() {
+    const c = parseFloat(document.getElementById("psCoef")?.value);
+    const cost = Number(lastCalcData?.costTotal ?? window.currentCostTotal ?? 0);
+    if (!lastCalcData || !(c > 0) || !(cost > 0)) return;
+    const qty = getCalcQty();
+    const total = Number((cost * c).toFixed(2));
+    const pOne = qty ? total / qty : 0;
+    updateSelectedPrice(pOne, total, c);
+    highlightActiveCoef(c);
+    syncPriceSettingsInputs();
 }
 
 function enableFullNameEdit() {

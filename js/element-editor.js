@@ -1044,6 +1044,8 @@ async function prefetchElementFieldsBatch(dealId, elementIds) {
     if (!batch) return;
 
     applyElementFieldsToDeal(dealId, batch);
+    // дорисовать «Себ. HQ · Листов SRA3» под позициями в открытой карточке
+    if (typeof refreshElementRowMetas === "function") refreshElementRowMetas(dealId);
 
     if (currentElementEditor && String(currentElementEditor.dealId) === String(dealId)) {
         const element = findDealElement(
@@ -1069,6 +1071,7 @@ async function ensureElementFieldsLoaded(dealId, elementId) {
         const deal = dealsCache.get(String(dealId));
         if (deal) saveOpenDealState(deal);
     }
+    if (typeof refreshElementRowMetas === "function") refreshElementRowMetas(dealId);
 
     return element;
 }
@@ -2620,6 +2623,7 @@ async function saveElementEditor() {
             updateDealTotal(document.querySelector(
                 `.deal-elements-list[data-deal-id="${currentElementEditor.dealId}"]`
             ));
+            if (typeof refreshElementRowMetas === "function") refreshElementRowMetas(currentElementEditor.dealId);
         }
 
         if (saveResult?.nameNote) {

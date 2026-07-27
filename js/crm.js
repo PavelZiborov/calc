@@ -235,7 +235,8 @@ function runAdvSearchOnTabOpen() {
 
     searchCRM("adv", null, {
         kanbanMode: viewMode === "kanban",
-        page: viewMode === "kanban" ? 1 : advSearchListPage
+        page: viewMode === "kanban" ? 1 : advSearchListPage,
+        silentBtn: true
     });
 }
 
@@ -294,7 +295,12 @@ async function searchCRM(mode, triggerEvent, options = {}) {
     const load = document.getElementById(loadId);
     
     const evt = triggerEvent ?? (typeof event !== "undefined" ? event : null);
-    const btn = evt?.target?.tagName === 'BUTTON' ? evt.target : document.querySelector(`button[onclick="searchCRM('${mode}')"]`);
+    // silentBtn: программный вызов (переключение вкладок/вида) — не трогаем кнопку
+    // поиска и НЕ блокируемся её кулдауном (после поиска она disabled ~1 сек;
+    // ранний return здесь оставлял на экране старый вид — список вместо канбана).
+    const btn = options.silentBtn
+        ? null
+        : (evt?.target?.tagName === 'BUTTON' ? evt.target : document.querySelector(`button[onclick="searchCRM('${mode}')"]`));
     if (btn && btn.disabled) return;
     const originalBtnText = btn ? btn.innerHTML : "";
 
@@ -665,6 +671,13 @@ function refreshDealStatusControls(dealId, status) {
 async function updateDealStatusById(dealId, status) {
     if (!ensureActiveSession() || !dealId || status?.id == null) return false;
 
+    // Завершение сделки (в т.ч. перетаскиванием в канбане) — подтверждаем.
+    // false → канбан вернёт карточку в исходную колонку.
+    if (isCompletedCrmDealStatus(status)) {
+        const confirmed = await confirmDealCompletion(dealId);
+        if (!confirmed) return false;
+    }
+
     try {
         const response = await fetch(N8N_URL, {
             method: "POST",
@@ -764,8 +777,15 @@ async function updateCrmStatus(trigger, status, menu) {
 
     if (!dealId || status?.id == null) return;
 
-    trigger.disabled = true;
     if (menu) menu.remove();
+
+    // Завершение сделки — спрашиваем подтверждение, чтобы не закрыть заказ случайно
+    if (scope === "deal" && isCompletedCrmDealStatus(status)) {
+        const confirmed = await confirmDealCompletion(dealId, trigger);
+        if (!confirmed) return;
+    }
+
+    trigger.disabled = true;
 
     try {
         const payload = {
@@ -1147,7 +1167,8 @@ document.addEventListener('click', (event) => {
     if (managerDropdown && !managerDropdown.contains(event.target)) managerDropdown.classList.remove('open');
     if (dateDropdown && !dateDropdown.contains(event.target)) dateDropdown.classList.remove('open');
     if (filtersWrap && !filtersWrap.contains(event.target)) closeAdvFiltersPopover();
-    if (confirmPopover && !confirmPopover.contains(event.target) && !event.target.closest('.deal-create-btn')) {
+    if (confirmPopover && !confirmPopover.classList.contains('deal-confirm-popover--await')
+        && !confirmPopover.contains(event.target) && !event.target.closest('.deal-create-btn')) {
         confirmPopover.remove();
     }
     if (statusMenu && !statusMenu.contains(event.target) && !event.target.closest('.editable-status, .item-status-control')) {
@@ -1333,6 +1354,10 @@ function createRowHtml(name, qty, price, statusName, isNew = false, options = {}
             ${costColHtml}`;
     }
 
+    // Второстепенные данные под строкой позиции (только карточка заказа, staff):
+    // «Себ. HQ» и «Листов SRA3» — показываем только те, что реально заполнены.
+    const metaHtml = renderElementRowMeta(options.element || {}, isDetailMode, isNew);
+
     return `
         <div class="element-row ${isNew ? 'new-row' : ''}" data-price="${rowTotal}"${rowAttrs}>
             ${statusControl}
@@ -1341,7 +1366,58 @@ function createRowHtml(name, qty, price, statusName, isNew = false, options = {}
             ${desktopColsHtml}
             <span class="element-row-total">${rowTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2})}<span class="rub-suffix"> руб.</span></span>
             ${deleteBtnHtml}
-        </div>`;
+        </div>${metaHtml}`;
+}
+
+// Доп.поля позиций (Себ. HQ / SRA3) приезжают батчем ПОСЛЕ рендера карточки
+// (prefetchElementFieldsBatch → applyElementFieldsToDeal). Этот хелпер дорисовывает
+// мета-строки в уже отрисованной карточке, когда данные появились в dealsCache.
+function refreshElementRowMetas(dealId) {
+    const deal = dealsCache.get(String(dealId));
+    if (!deal || !Array.isArray(deal.elements)) return;
+
+    // На странице может быть несколько .deal-elements-list с этим data-deal-id
+    // (карточка в результатах поиска И открытая деталь). Мета-строки живут только
+    // в detail-режиме (там у строк есть data-element-id), поэтому обходим ВСЕ списки.
+    document.querySelectorAll(`.deal-elements-list[data-deal-id="${CSS.escape(String(dealId))}"]`).forEach(list => {
+        list.querySelectorAll('.element-row[data-element-id]').forEach(row => {
+            const element = deal.elements.find(el => String(getElementId(el)) === String(row.dataset.elementId));
+            if (!element) return;
+
+            const html = renderElementRowMeta(element, true, false);
+            const next = row.nextElementSibling;
+            const existing = (next && next.classList.contains("element-row-meta")) ? next : null;
+            if (html) {
+                if (existing) existing.outerHTML = html;
+                else row.insertAdjacentHTML("afterend", html);
+            } else if (existing) {
+                existing.remove();
+            }
+        });
+    });
+}
+
+// Мелкая строка под позицией: Листов SRA3 · Себ. HQ. Пусто, если данных нет.
+// «Себ. HQ» — денежное значение, скрыто под маской (тот же глазик, что и у
+// себестоимости): раскрывается классом .costs-hidden на .elements-list.
+// «Листов SRA3» — не чувствительно, видно всегда.
+function renderElementRowMeta(element, isDetailMode, isNew) {
+    if (!isDetailMode || isNew || currentUser.role !== "staff") return "";
+
+    const costHq = typeof getElementCostHq === "function" ? getElementCostHq(element) : null;
+    const sheets = typeof getElementSra3Sheets === "function" ? getElementSra3Sheets(element) : null;
+
+    const parts = [];
+    if (sheets != null) {
+        parts.push(`Листов SRA3: <b>${sheets}</b>`);
+    }
+    if (costHq != null) {
+        const num = Math.round(costHq).toLocaleString('ru-RU');
+        parts.push(`Себ. HQ: <b class="meta-hq"><span class="cost-val">${num} ₽</span><span class="cost-mask">•••••</span></b>`);
+    }
+    if (!parts.length) return "";
+
+    return `<div class="element-row-meta">${parts.join(" · ")}</div>`;
 }
 
 // Ячейка себестоимости (десктоп): значение под маской (скрыто по умолчанию) либо явный
@@ -2124,6 +2200,17 @@ function rerenderCrmResultsFromCache(mode, options = {}) {
     }
 }
 
+// Навигация в шапке: «Заказы» всегда открывает список, «Канбан» — доску.
+// Режим задаётся до switchTab, поэтому вкладка сразу рендерится в нужном виде.
+function openOrdersView(mode, triggerBtn) {
+    if (!isKanbanAvailable()) return;
+    const nextMode = mode === "kanban" ? "kanban" : "list";
+    localStorage.setItem(CRM_VIEW_STORAGE_KEY, nextMode);
+    if (typeof saveAdvSearchUiState === "function") saveAdvSearchUiState();
+    syncCrmViewToggleButtons();
+    switchTab("search-tab", triggerBtn);
+}
+
 function toggleCrmView(mode) {
     if (!isKanbanAvailable()) return;
 
@@ -2148,7 +2235,8 @@ function toggleCrmView(mode) {
     searchCRM("adv", null, {
         kanbanMode: nextMode === "kanban",
         page: nextMode === "kanban" ? 1 : advSearchListPage,
-        keepKanbanScroll: nextMode === "kanban"
+        keepKanbanScroll: nextMode === "kanban",
+        silentBtn: true
     });
 }
 
@@ -2269,6 +2357,9 @@ function renderDealsKanban(deals, targetDiv) {
         columnEl.className = "crm-kanban-column";
         columnEl.dataset.statusKey = col.key;
         if (col.id != null) columnEl.dataset.statusId = String(col.id);
+        // прокидываем цвет статуса на столбец, чтобы карточки унаследовали --col-bg
+        columnEl.style.setProperty("--col-bg", col.bk_color);
+        columnEl.style.setProperty("--col-text", col.text_color);
 
         const cardsHtml = col.deals.map((deal, idx) => renderKanbanCard(deal, idx)).join("");
         const emptyHtml = col.deals.length
@@ -4100,6 +4191,66 @@ function renderDealTotalOnly(deal) {
     return `<div class="deal-total-only ${totalClass}" data-deal-id="${deal.id}">Итого: ${formatMoney(f.total)} ₽</div>`;
 }
 
+// --- Прибыль по сделке (staff, карточка заказа) ---
+// Грязная = доход − себестоимость. Чистая = доход − налог 10% − себестоимость.
+const DEAL_PROFIT_TAX_RATE = 0.10;
+
+function computeDealProfit(deal) {
+    const revenue = Number(getDealFinancials(deal).total) || 0;
+    const elements = Array.isArray(deal?.elements) ? deal.elements : [];
+
+    let cost = 0;
+    let filled = 0;
+    elements.forEach(el => {
+        const c = typeof getElementCost === "function" ? getElementCost(el) : null;
+        if (c != null) { cost += c; filled++; }
+    });
+
+    return {
+        revenue,
+        cost,
+        gross: revenue - cost,
+        net: revenue - (revenue * DEAL_PROFIT_TAX_RATE) - cost,
+        hasCost: filled > 0,
+        partial: filled > 0 && filled < elements.length
+    };
+}
+
+function renderDealProfitBtn(dealId) {
+    return `<button type="button" class="deal-profit-btn" onclick="toggleDealProfit(${dealId})" title="Показать прибыль по сделке">Прибыль</button>`;
+}
+
+function renderDealProfitBlock(deal) {
+    return `<div class="deal-profit-block" data-deal-id="${deal.id}" data-open="0">${renderDealProfitBtn(deal.id)}</div>`;
+}
+
+function renderDealProfitData(deal) {
+    const p = computeDealProfit(deal);
+    if (!p.hasCost) return `<div class="deal-profit-empty">Себестоимость не заполнена</div>`;
+
+    const money = v => `${Math.round(v).toLocaleString('ru-RU')} ₽`;
+    const cls = v => (v >= 0 ? "is-plus" : "is-minus");
+    return `
+        <div class="deal-profit-row"><span>Грязная</span><b class="${cls(p.gross)}">${money(p.gross)}</b></div>
+        <div class="deal-profit-row"><span>Чистая (−10%)</span><b class="${cls(p.net)}">${money(p.net)}</b></div>
+        ${p.partial ? `<div class="deal-profit-note">не у всех позиций указана себестоимость</div>` : ""}`;
+}
+
+function toggleDealProfit(dealId) {
+    const block = document.querySelector(`.deal-profit-block[data-deal-id="${CSS.escape(String(dealId))}"]`);
+    if (!block) return;
+
+    if (block.dataset.open === "1") {
+        block.dataset.open = "0";
+        block.innerHTML = renderDealProfitBtn(dealId);
+        return;
+    }
+
+    const deal = dealsCache.get(String(dealId));
+    block.dataset.open = "1";
+    block.innerHTML = `<div class="deal-profit-data" onclick="toggleDealProfit(${dealId})" title="Скрыть">${renderDealProfitData(deal)}</div>`;
+}
+
 function getDealCard(dealId, trigger = null) {
     if (trigger) {
         const card = trigger.closest('.crm-item');
@@ -4371,7 +4522,7 @@ async function openDealInTab(dealId, options = {}) {
 
     if (!tabBtn) {
         tabBtn = document.createElement('button');
-        tabBtn.className = 'tab-btn';
+        tabBtn.className = 'nav-tab tab-btn nav-tab--deal';
         tabBtn.dataset.tabTarget = tabId;
         tabBtn.onclick = () => switchTab(tabId, tabBtn);
         document.querySelector('.tabs-nav')?.appendChild(tabBtn);
@@ -4444,6 +4595,75 @@ function closeDealTab() {
             || document.querySelector(`.tab-btn[onclick*="${fallbackTabId}"]`);
         switchTab(fallbackTabId, fallbackBtn);
     }
+}
+
+// Промис-подтверждение в стиле .deal-confirm-popover → resolve(true/false).
+// Отмена: кнопка, клик вне попапа, Esc, либо если попап снесли извне.
+function confirmActionPopover({ message, confirmText = "Да", cancelText = "Отмена", anchor = null, danger = false } = {}) {
+    return new Promise(resolve => {
+        document.querySelectorAll('.deal-confirm-popover').forEach(el => el.remove());
+
+        const popover = document.createElement('div');
+        // --await: глобальный document-click НЕ сносит этот попап (иначе клик,
+        // из которого он создан — например по пункту статус-меню, — всплывёт
+        // до document и убьёт его в тот же тик). Закрытие по клику вне делает
+        // собственный отложенный mousedown-обработчик ниже.
+        popover.className = 'deal-confirm-popover deal-confirm-popover--await';
+        popover.innerHTML = `
+            <div style="margin-bottom:10px;">${message}</div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button type="button" class="confirm-no" style="background:#eef1f5; color:#555;">${escapeHtml(cancelText)}</button>
+                <button type="button" class="confirm-yes" style="background:${danger ? '#c0392b' : '#27ae60'}; color:white;">${escapeHtml(confirmText)}</button>
+            </div>`;
+        document.body.appendChild(popover);
+
+        if (anchor && typeof anchor.getBoundingClientRect === "function") {
+            const rect = anchor.getBoundingClientRect();
+            const left = Math.min(rect.left, window.innerWidth - popover.offsetWidth - 12);
+            popover.style.left = `${Math.max(12, left)}px`;
+            popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - popover.offsetHeight - 12)}px`;
+        } else {
+            popover.style.left = `${Math.max(12, (window.innerWidth - popover.offsetWidth) / 2)}px`;
+            popover.style.top = `${Math.max(12, (window.innerHeight - popover.offsetHeight) / 2)}px`;
+        }
+
+        let done = false;
+        const observer = new MutationObserver(() => {
+            if (!document.body.contains(popover)) finish(false);
+        });
+        function finish(value) {
+            if (done) return;
+            done = true;
+            observer.disconnect();
+            document.removeEventListener('keydown', onKey, true);
+            document.removeEventListener('mousedown', onOutside, true);
+            popover.remove();
+            resolve(value);
+        }
+        function onKey(e) { if (e.key === 'Escape') finish(false); }
+        function onOutside(e) { if (!popover.contains(e.target)) finish(false); }
+
+        observer.observe(document.body, { childList: true });
+        popover.querySelector('.confirm-no').onclick = () => finish(false);
+        popover.querySelector('.confirm-yes').onclick = () => finish(true);
+        setTimeout(() => {
+            document.addEventListener('keydown', onKey, true);
+            document.addEventListener('mousedown', onOutside, true);
+        }, 0);
+    });
+}
+
+// Подтверждение завершения сделки (статус «Завершено») — чтобы не закрыть заказ случайно.
+function confirmDealCompletion(dealId, anchor = null) {
+    const deal = dealsCache.get(String(dealId));
+    const num = deal?.num ?? deal?.id ?? dealId;
+    return confirmActionPopover({
+        message: `Завершить сделку <b>№ ${escapeHtml(String(num))}</b>?<br><span style="color:#8c887e;">Заказ будет закрыт.</span>`,
+        confirmText: "Завершить",
+        cancelText: "Отмена",
+        anchor,
+        danger: true
+    });
 }
 
 function showCreateDealConfirm(sourceDealId, btn) {
@@ -4634,6 +4854,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
                 <div class="deal-footer-left">
                     ${renderDealFooterMeta(deal)}
                 </div>
+                ${currentUser.role === "staff" ? renderDealProfitBlock(deal) : ""}
                 ${renderPaymentSummary(deal, isClosed)}
             </div>
             ${renderDealExtraPanel(deal)}` : `

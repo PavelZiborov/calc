@@ -1,5 +1,5 @@
 // --- КОНФИГУРАЦИЯ И СЕССИЯ ---
-const SRA3_W = 320, SRA3_H = 450;
+let SRA3_W = 320, SRA3_H = 450; // могут переопределяться настройками калькулятора (calc-settings.js)
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
@@ -197,11 +197,10 @@ function resetAuthToGuest() {
     currentUser = { role: "guest", login: "", token: "" };
 
     const crmContainer = document.getElementById('crm-search-container');
-    const advTabBtn = document.getElementById('adv-tab-btn');
 
     if (typeof updateAuthModalUi === "function") updateAuthModalUi();
     if (crmContainer) crmContainer.style.display = 'none';
-    if (advTabBtn) advTabBtn.style.display = 'none';
+    document.querySelectorAll('.gated-nav').forEach(el => { el.style.display = 'none'; });
 }
 
 function ensureActiveSession(options = {}) {

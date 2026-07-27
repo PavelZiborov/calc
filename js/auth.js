@@ -131,7 +131,7 @@ function applyPermissions() {
         }
 
         if (currentUser.role === "staff") {
-            document.getElementById("adv-tab-btn").style.display = "block";
+            document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = ""; });
             fillStatusFilter();
             fillManagerFilter();
         } else {

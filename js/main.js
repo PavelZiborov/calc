@@ -3,8 +3,11 @@ window.onload = () => {
     // Важно: после загрузки всех скриптов (getStatusIcon и др.)
     hydrateCurrentUserFromStorage();
 
+    // Настройки калькулятора (размер листа, списки материалов, правила) — до расчётов
+    if (typeof applyCalcSettings === "function") applyCalcSettings();
+
     // Инициализация списков с использованием строковых ID
-    fillOptions("paper", papersFull, "Бумага 300 гр."); 
+    fillOptions("paper", papersFull, "Бумага 300 гр.");
     fillOptions("paperCover", papersFull, "Бумага 300 гр."); 
     fillOptions("paperBlock", papersFull, "Бумага 150 гр.");
     

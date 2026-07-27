@@ -8,18 +8,32 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=4">
+<link rel="stylesheet" href="css/app.css?v=16">
 </head>
 <body>
 
 <header class="app-top-bar" id="app-top-bar">
-    <button type="button" class="app-user-btn" id="authBtn" onclick="toggleAuthModal()" title="Аккаунт" aria-label="Аккаунт" aria-haspopup="dialog">
-        <svg class="app-user-btn-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.87 0-7 2.13-7 4.75V20h14v-1.25C19 16.13 15.87 14 12 14z"/></svg>
-    </button>
-    <nav class="tabs-nav" aria-label="Разделы">
-        <button class="tab-btn active" data-tab-target="main-tab" onclick="switchTab('main-tab')">Калькулятор</button>
-        <button class="tab-btn" id="adv-tab-btn" data-tab-target="search-tab" onclick="switchTab('search-tab')" style="display:none;">Поиск</button>
-    </nav>
+    <div class="app-brandbar">
+        <div class="app-brand">
+            <span class="app-brand-logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg></span>
+            <span class="app-brand-name">PrintPro <b>Precision</b></span>
+        </div>
+        <button type="button" class="nav-menu-toggle" id="navMenuToggle" onclick="toggleNavMenu()" aria-label="Разделы" aria-expanded="false" aria-controls="tabsNav">
+            <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></svg>
+            <span class="nav-menu-toggle-label">Разделы</span>
+        </button>
+        <nav class="tabs-nav" id="tabsNav" aria-label="Разделы">
+            <button class="nav-tab tab-btn active" data-tab-target="main-tab" onclick="switchTab('main-tab')"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h4"/></svg><span>Калькулятор</span></button>
+            <button class="nav-tab tab-btn gated-nav" id="adv-tab-btn" data-tab-target="search-tab" onclick="openOrdersView('list', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg><span>Заказы</span></button>
+            <button class="nav-tab tab-btn gated-nav" id="kanban-nav-btn" data-tab-target="search-tab" onclick="openOrdersView('kanban', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Канбан</span></button>
+        </nav>
+        <div class="app-brand-actions">
+            <button type="button" class="nav-newquote-btn" disabled title="Раздел в разработке" aria-label="Новый расчёт (скоро)"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg><span>New Quote</span></button>
+            <button type="button" class="app-user-btn" id="authBtn" onclick="toggleAuthModal()" title="Аккаунт" aria-label="Аккаунт" aria-haspopup="dialog">
+                <svg class="app-user-btn-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.87 0-7 2.13-7 4.75V20h14v-1.25C19 16.13 15.87 14 12 14z"/></svg>
+            </button>
+        </div>
+    </div>
 </header>
 
 <div id="auth-modal" onmousedown="overlayDown(event)" onclick="if (overlayClickedSelf(event)) toggleAuthModal()">
@@ -32,6 +46,7 @@
                 <span id="role-badge" class="auth-role-badge">ГОСТЬ</span>
                 <div id="user-display-name" class="auth-user-name">Режим просмотра</div>
             </div>
+            <button type="button" id="calcSettingsBtn" class="auth-settings-btn gated-nav" style="display:none;" onclick="openCalcSettings()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>Настройки калькулятора</button>
             <button type="button" id="logoutBtn" class="auth-logout-btn" onclick="logout()">Выйти</button>
         </div>
 
@@ -48,11 +63,18 @@
 </div>
 
 <div id="main-tab" class="tab-content active">
-    <div class="container">
+    <div class="container" id="calcContainer">
         <div style="position: absolute; left: -9999px; top: -9999px;">
             <input type="text" id="honey_field" name="user_website_url" tabindex="-1" autocomplete="off">
         </div>
-        <h2>Калькулятор полиграфии</h2>
+        <div class="calc-grid">
+        <div class="calc-form-col">
+        <div class="calc-form-head">
+            <h2>Калькулятор полиграфии</h2>
+            <span class="calc-version-badge" title="Версия расчётного модуля">v2.4 Precision</span>
+        </div>
+        <div class="calc-body">
+        <div class="calc-fields">
         <label>Тип продукции</label>
         <select id="type" onchange="updateType()">
             <option value="sheet">Листовая продукция</option>
@@ -127,26 +149,77 @@
                 </select>
             </div>
         </div>
+        </div><!-- /calc-fields -->
 
-        <button onclick="calc()">РАССЧИТАТЬ СТОИМОСТЬ</button>
-
-        <div id="resultMain" class="result-main">
-            <div class="rec-price-box">
-                <span class="rec-price-label" id="recMultiplierLabel">Рекомендованная цена</span>
-                <span class="rec-price-val" id="recPriceVal">0 ₽</span>
-                <div id="roundPriceControls" style="display:none; margin-top:12px; gap:8px; justify-content:center;">
-                    <button onclick="roundSelectedPrice(0)" style="margin:0; width:auto; padding:6px 10px; font-size:12px; border-radius:5px;">Округлить до ₽</button>
-                    <button onclick="roundSelectedPrice(1)" style="margin:0; width:auto; padding:6px 10px; font-size:12px; border-radius:5px;">Округлить до 0.1 ₽</button>
+        <aside class="calc-preview" aria-hidden="true">
+            <div class="calc-preview-head">
+                <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21v-16a2 2 0 0 1 2 -2h6l6 6v12"/><path d="M13 3v6h6"/></svg>
+                <span>Превью</span>
+            </div>
+            <div class="calc-preview-stage">
+                <div class="calc-preview-diagram">
+                    <div class="calc-preview-dim-w"><span id="previewWidthLabel">90 мм</span></div>
+                    <div class="calc-preview-dim-h"><span id="previewHeightLabel">50 мм</span></div>
+                    <div class="calc-preview-rect" id="previewRect">
+                        <svg class="calc-preview-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>
+                    </div>
                 </div>
             </div>
-            <div id="staffCostSummary" class="staff-cost-summary" style="display:none;"></div>
-            <div id="markupSelectContainer" style="display:none; margin-bottom:15px;">
-                <label style="margin-top:0;">Выбор наценки</label>
-                <select id="markupSelect" onchange="handleMarkupSelectChange()"></select>
+            <p class="calc-preview-caption">Схематичное отображение пропорций</p>
+        </aside>
+        </div><!-- /calc-body -->
+
+        <button onclick="calc()">РАССЧИТАТЬ СТОИМОСТЬ</button>
+        </div><!-- /calc-form-col -->
+
+        <aside class="calc-side-col">
+        <div id="resultMain" class="result-main">
+            <div class="rec-price-box">
+                <button type="button" class="rec-price-gear" id="recPriceGear" onclick="openPriceSettings(event)" title="Настроить цену вручную" aria-label="Настроить цену вручную" style="display:none;"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg></button>
+                <div class="rec-price-head">
+                    <span class="rec-price-label" id="recMultiplierLabel">Рекомендованная цена</span>
+                </div>
+                <span class="rec-price-val" id="recPriceVal">0 ₽</span>
+                <div class="rec-price-stubs">
+                    <div class="rec-markup-row" id="markupCoefRow" style="display:none;">
+                        <span class="rec-stub-label">Наценка</span>
+                        <div class="rec-coef-btns" id="markupCoefBtns"></div>
+                    </div>
+                    <button type="button" class="rec-order-stub" disabled title="Раздел в разработке">
+                        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17h-11v-14h-2"/><path d="M6 5l14 1l-1 7h-13"/></svg>
+                        Оформить заказ
+                    </button>
+                </div>
+                <!-- Всплывающая настройка цены (поверх синего блока) -->
+                <div class="rec-price-settings" id="priceSettingsPopover" hidden>
+                    <div class="rps-head">
+                        <span class="rps-title">Настройка цены</span>
+                        <button type="button" class="rps-close" onclick="closePriceSettings()" aria-label="Закрыть">&times;</button>
+                    </div>
+                    <label class="rps-field">
+                        <span>Цена за штуку, ₽</span>
+                        <input type="number" id="psPerOne" step="0.01" min="0" inputmode="decimal" onchange="applyManualPerOne()">
+                    </label>
+                    <label class="rps-field">
+                        <span>Цена общая, ₽</span>
+                        <input type="number" id="psTotal" step="0.01" min="0" inputmode="decimal" onchange="applyManualTotal()">
+                    </label>
+                    <label class="rps-field">
+                        <span>Свой коэффициент</span>
+                        <input type="number" id="psCoef" step="0.05" min="0" inputmode="decimal" onchange="applyManualCoef()">
+                    </label>
+                    <div class="rps-round">
+                        <span>Округлить:</span>
+                        <button type="button" onclick="roundSelectedPrice(0); syncPriceSettingsInputs();">до ₽</button>
+                        <button type="button" onclick="roundSelectedPrice(1); syncPriceSettingsInputs();">до 0.1 ₽</button>
+                    </div>
+                </div>
             </div>
             <div id="costDetail" class="cost-detail"></div>
         </div>
         <div id="techData" class="tech-info" style="display:none;"><span id="techContent"></span></div>
+        </aside><!-- /calc-side-col -->
+        </div><!-- /calc-grid -->
     </div>
 
     <div class="container" id="crm-search-container" style="display:none;">
@@ -218,10 +291,6 @@
                     </div>
                     <button type="button" class="adv-toolbar-icon-btn clear-filters-btn" onclick="clearAdvFilters()" title="Сбросить фильтры" aria-label="Сбросить фильтры"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></button>
                     <button type="button" class="adv-toolbar-icon-btn kanban-zoom-btn" id="kanbanZoomBtn" onclick="toggleKanbanZoom()" title="Обзор доски (60%)" aria-label="Масштаб доски"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l4 0l0 -4"/><path d="M3 3l6 6"/><path d="M5 15l4 0l0 4"/><path d="M3 21l6 -6"/><path d="M19 9l-4 0l0 -4"/><path d="M21 3l-6 6"/><path d="M19 15l-4 0l0 4"/><path d="M21 21l-6 -6"/></svg></button>
-                    <div class="crm-view-toggle" role="group" aria-label="Вид списка заказов">
-                        <button type="button" class="crm-view-btn active" data-view="list" onclick="toggleCrmView('list')" title="Список" aria-label="Список"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg></button>
-                        <button type="button" class="crm-view-btn" data-view="kanban" onclick="toggleCrmView('kanban')" title="Канбан-доска" aria-label="Канбан-доска"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg></button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -230,13 +299,15 @@
     </div>
 </div>
 
-<script src="js/config.js?v=3003dca"></script>
-<script src="js/calculator-data.js?v=3003dca"></script>
-<script src="js/utils.js?v=3003dca"></script>
-<script src="js/auth.js?v=3003dca"></script>
-<script src="js/calculator.js?v=3003dca"></script>
-<script src="js/crm.js?v=3003dca"></script>
-<script src="js/element-editor.js?v=3003dca"></script>
-<script src="js/main.js?v=3003dca"></script>
+<script src="js/config.js?v=16"></script>
+<script src="js/calculator-data.js?v=16"></script>
+<script src="js/calc-settings.js?v=16"></script>
+<script src="js/calc-settings-ui.js?v=16"></script>
+<script src="js/utils.js?v=16"></script>
+<script src="js/auth.js?v=16"></script>
+<script src="js/calculator.js?v=16"></script>
+<script src="js/crm.js?v=16"></script>
+<script src="js/element-editor.js?v=16"></script>
+<script src="js/main.js?v=16"></script>
 </body>
 </html>

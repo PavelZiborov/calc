@@ -128,6 +128,9 @@ async function calc() {
 
                 lastCalcData.selectedMultiplier = currentMultMatch ? currentMultMatch.multiplier : null;
                 renderMarkupSelect(result.markupList, result.cost, lastCalcData.selectedMultiplier);
+                // шестерёнка ручной настройки цены — только для сотрудников
+                const gearEl = document.getElementById("recPriceGear");
+                if (gearEl) gearEl.style.display = "inline-flex";
                 // Берём структурированные данные из n8n; локальный расчёт оставляем как fallback.
                 lastCalcData.sra3Sheets = toFiniteNumber(
                     result.totalSheets ?? result.lastCalc?.totalSheets,
@@ -163,6 +166,11 @@ async function calc() {
             if (markupSelectContainer) markupSelectContainer.style.display = "none";
             const scs = document.getElementById("staffCostSummary");
             if (scs) scs.style.display = "none";
+            const gearEl = document.getElementById("recPriceGear");
+            if (gearEl) gearEl.style.display = "none";
+            const coefRow = document.getElementById("markupCoefRow");
+            if (coefRow) coefRow.style.display = "none";
+            if (typeof closePriceSettings === "function") closePriceSettings();
         }
 
         // Показываем результат с анимацией
