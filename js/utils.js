@@ -455,9 +455,23 @@ function roundSelectedPrice(decimals) {
 
     refreshSelectedPriceUI("Выбранная цена");
     syncStaffTechAndCopyUI();
+    if (typeof syncInlineEditInputs === "function") syncInlineEditInputs();
 }
 
-// Наценка теперь — ряд кнопок-коэффициентов внутри синего блока (x1.6, x1.7, …).
+// Наценка — ряд кнопок-коэффициентов в синем блоке: серверные (x1.6…x2) +
+// фиксированные дополнительные (x2.5, x3, x4, x5), считаемые от себестоимости.
+const EXTRA_MARKUP_COEFS = [2.5, 3, 4, 5];
+
+function makeCoefBtn(mult, selectedMultiplier) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "rec-coef-btn";
+    b.textContent = `x${mult}`;
+    b.dataset.mult = String(mult);
+    if (selectedMultiplier != null && Number(mult) === Number(selectedMultiplier)) b.classList.add("is-active");
+    return b;
+}
+
 function renderMarkupSelect(markupList, costTotal, selectedMultiplier) {
     window.currentMarkupList = Array.isArray(markupList) ? markupList : [];
     window.currentCostTotal = Number(costTotal) || 0;
@@ -467,18 +481,28 @@ function renderMarkupSelect(markupList, costTotal, selectedMultiplier) {
     if (!wrap) return;
 
     wrap.innerHTML = "";
+    const serverMults = new Set(window.currentMarkupList.map(m => Number(m.multiplier)));
+
+    // Серверные наценки
     window.currentMarkupList.forEach((m, idx) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "rec-coef-btn";
-        b.textContent = `x${m.multiplier}`;
+        const b = makeCoefBtn(m.multiplier, selectedMultiplier);
         b.dataset.idx = String(idx);
-        b.dataset.mult = String(m.multiplier);
         b.title = `${Number(m.total).toLocaleString('ru-RU')} ₽ (${Number(m.perOne).toFixed(2)} ₽/шт)`;
-        if (selectedMultiplier != null && Number(m.multiplier) === Number(selectedMultiplier)) {
-            b.classList.add("is-active");
-        }
         b.onclick = () => selectMarkupByIndex(idx);
+        wrap.appendChild(b);
+    });
+
+    // Дополнительные коэффициенты (считаются от себестоимости на клиенте)
+    const cost = window.currentCostTotal;
+    const qty = getCalcQty();
+    EXTRA_MARKUP_COEFS.forEach(coef => {
+        if (serverMults.has(coef)) return;
+        const b = makeCoefBtn(coef, selectedMultiplier);
+        if (cost > 0) {
+            const total = cost * coef;
+            b.title = `${Math.round(total).toLocaleString('ru-RU')} ₽ (${qty ? (total / qty).toFixed(2) : "—"} ₽/шт)`;
+        }
+        b.onclick = () => selectExtraCoef(coef);
         wrap.appendChild(b);
     });
 
@@ -490,7 +514,19 @@ function selectMarkupByIndex(idx) {
     if (!m) return;
     updateSelectedPrice(m.perOne, m.total, m.multiplier);
     highlightActiveCoef(m.multiplier);
-    syncPriceSettingsInputs();
+    syncInlineEditInputs();
+}
+
+// Дополнительный коэффициент: цена = себестоимость × коэффициент
+function selectExtraCoef(coef) {
+    const cost = Number(window.currentCostTotal ?? lastCalcData?.costTotal ?? 0);
+    if (!lastCalcData || !(coef > 0) || !(cost > 0)) return;
+    const qty = getCalcQty();
+    const total = Number((cost * coef).toFixed(2));
+    const pOne = qty ? total / qty : 0;
+    updateSelectedPrice(pOne, total, coef);
+    highlightActiveCoef(coef);
+    syncInlineEditInputs();
 }
 
 function highlightActiveCoef(mult) {
@@ -502,75 +538,67 @@ function highlightActiveCoef(mult) {
 // Совместимость: старый обработчик дропдауна больше не используется.
 function handleMarkupSelectChange() {}
 
-// --- Ручная настройка цены (шестерёнка) ---
 function getCalcQty() {
     return Number(lastCalcData?.qty ?? document.getElementById("tirazh")?.value ?? 0) || 0;
 }
 
-function openPriceSettings(event) {
+// --- Инлайн-редактирование цены (шестерёнка делает блок редактируемым) ---
+function toggleInlinePriceEdit(event) {
     if (event) event.stopPropagation();
     if (currentUser.role !== "staff" || !lastCalcData) return;
-    const pop = document.getElementById("priceSettingsPopover");
-    if (!pop) return;
-    syncPriceSettingsInputs();
-    pop.hidden = false;
-    setTimeout(() => document.addEventListener("click", priceSettingsOutside, true), 0);
-}
-
-function closePriceSettings() {
-    const pop = document.getElementById("priceSettingsPopover");
-    if (pop) pop.hidden = true;
-    document.removeEventListener("click", priceSettingsOutside, true);
-}
-
-function priceSettingsOutside(e) {
-    const pop = document.getElementById("priceSettingsPopover");
+    const box = document.querySelector(".rec-price-box");
+    const editing = box ? box.classList.toggle("is-editing") : false;
+    const val = document.getElementById("recPriceVal");
+    const edit = document.getElementById("recPriceEdit");
     const gear = document.getElementById("recPriceGear");
-    if (!pop || pop.hidden) return;
-    if (pop.contains(e.target) || (gear && gear.contains(e.target))) return;
-    closePriceSettings();
+    if (val) val.hidden = !!editing;
+    if (edit) edit.hidden = !editing;
+    if (gear) gear.classList.toggle("is-active", !!editing);
+    if (editing) {
+        syncInlineEditInputs();
+        const t = document.getElementById("editTotal");
+        if (t) { t.focus(); t.select(); }
+    }
 }
 
-function syncPriceSettingsInputs() {
+// Выйти из режима редактирования (напр. при новом расчёте)
+function exitInlinePriceEdit() {
+    const box = document.querySelector(".rec-price-box");
+    if (box) box.classList.remove("is-editing");
+    const val = document.getElementById("recPriceVal");
+    const edit = document.getElementById("recPriceEdit");
+    const gear = document.getElementById("recPriceGear");
+    if (val) val.hidden = false;
+    if (edit) edit.hidden = true;
+    if (gear) gear.classList.remove("is-active");
+}
+
+function syncInlineEditInputs() {
     const pOne = Number(lastCalcData?.pricePerOne ?? lastCalcData?.priceOne ?? 0);
     const total = Number(lastCalcData?.total ?? 0);
-    const perEl = document.getElementById("psPerOne");
-    const totEl = document.getElementById("psTotal");
-    const coefEl = document.getElementById("psCoef");
-    if (perEl) perEl.value = pOne ? pOne.toFixed(2) : "";
-    if (totEl) totEl.value = total ? total.toFixed(2) : "";
-    if (coefEl) coefEl.value = (lastCalcData?.selectedMultiplier != null) ? lastCalcData.selectedMultiplier : "";
+    const totEl = document.getElementById("editTotal");
+    const perEl = document.getElementById("editPerOne");
+    if (totEl && document.activeElement !== totEl) totEl.value = total ? total.toFixed(2) : "";
+    if (perEl && document.activeElement !== perEl) perEl.value = pOne ? pOne.toFixed(2) : "";
 }
 
 function applyManualPerOne() {
-    const v = parseFloat(document.getElementById("psPerOne")?.value);
+    const v = parseFloat(document.getElementById("editPerOne")?.value);
     if (!lastCalcData || !(v > 0)) return;
     const qty = getCalcQty();
     updateSelectedPrice(v, Number((v * qty).toFixed(2)), null);
     highlightActiveCoef(null);
-    syncPriceSettingsInputs();
+    syncInlineEditInputs();
 }
 
 function applyManualTotal() {
-    const v = parseFloat(document.getElementById("psTotal")?.value);
+    const v = parseFloat(document.getElementById("editTotal")?.value);
     if (!lastCalcData || !(v > 0)) return;
     const qty = getCalcQty();
     const pOne = qty ? v / qty : 0;
     updateSelectedPrice(pOne, Number(v.toFixed(2)), null);
     highlightActiveCoef(null);
-    syncPriceSettingsInputs();
-}
-
-function applyManualCoef() {
-    const c = parseFloat(document.getElementById("psCoef")?.value);
-    const cost = Number(lastCalcData?.costTotal ?? window.currentCostTotal ?? 0);
-    if (!lastCalcData || !(c > 0) || !(cost > 0)) return;
-    const qty = getCalcQty();
-    const total = Number((cost * c).toFixed(2));
-    const pOne = qty ? total / qty : 0;
-    updateSelectedPrice(pOne, total, c);
-    highlightActiveCoef(c);
-    syncPriceSettingsInputs();
+    syncInlineEditInputs();
 }
 
 function enableFullNameEdit() {

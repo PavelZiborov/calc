@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=16">
+<link rel="stylesheet" href="css/app.css?v=17">
 </head>
 <body>
 
@@ -175,44 +175,31 @@
         <aside class="calc-side-col">
         <div id="resultMain" class="result-main">
             <div class="rec-price-box">
-                <button type="button" class="rec-price-gear" id="recPriceGear" onclick="openPriceSettings(event)" title="Настроить цену вручную" aria-label="Настроить цену вручную" style="display:none;"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg></button>
+                <button type="button" class="rec-price-gear" id="recPriceGear" onclick="toggleInlinePriceEdit(event)" title="Редактировать цену" aria-label="Редактировать цену" style="display:none;"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg></button>
                 <div class="rec-price-head">
                     <span class="rec-price-label" id="recMultiplierLabel">Рекомендованная цена</span>
                 </div>
                 <span class="rec-price-val" id="recPriceVal">0 ₽</span>
+                <div class="rec-price-edit" id="recPriceEdit" hidden>
+                    <label class="rec-edit-field"><span>Общая, ₽</span><input type="number" id="editTotal" step="0.01" min="0" inputmode="decimal" onchange="applyManualTotal()"></label>
+                    <label class="rec-edit-field"><span>За штуку, ₽</span><input type="number" id="editPerOne" step="0.01" min="0" inputmode="decimal" onchange="applyManualPerOne()"></label>
+                </div>
                 <div class="rec-price-stubs">
                     <div class="rec-markup-row" id="markupCoefRow" style="display:none;">
                         <span class="rec-stub-label">Наценка</span>
                         <div class="rec-coef-btns" id="markupCoefBtns"></div>
                     </div>
+                    <div class="rec-markup-row" id="recRoundRow" style="display:none;">
+                        <span class="rec-stub-label">Округлить</span>
+                        <div class="rec-round-btns">
+                            <button type="button" onclick="roundSelectedPrice(0)">до ₽</button>
+                            <button type="button" onclick="roundSelectedPrice(2)">до коп.</button>
+                        </div>
+                    </div>
                     <button type="button" class="rec-order-stub" disabled title="Раздел в разработке">
                         <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17h-11v-14h-2"/><path d="M6 5l14 1l-1 7h-13"/></svg>
                         Оформить заказ
                     </button>
-                </div>
-                <!-- Всплывающая настройка цены (поверх синего блока) -->
-                <div class="rec-price-settings" id="priceSettingsPopover" hidden>
-                    <div class="rps-head">
-                        <span class="rps-title">Настройка цены</span>
-                        <button type="button" class="rps-close" onclick="closePriceSettings()" aria-label="Закрыть">&times;</button>
-                    </div>
-                    <label class="rps-field">
-                        <span>Цена за штуку, ₽</span>
-                        <input type="number" id="psPerOne" step="0.01" min="0" inputmode="decimal" onchange="applyManualPerOne()">
-                    </label>
-                    <label class="rps-field">
-                        <span>Цена общая, ₽</span>
-                        <input type="number" id="psTotal" step="0.01" min="0" inputmode="decimal" onchange="applyManualTotal()">
-                    </label>
-                    <label class="rps-field">
-                        <span>Свой коэффициент</span>
-                        <input type="number" id="psCoef" step="0.05" min="0" inputmode="decimal" onchange="applyManualCoef()">
-                    </label>
-                    <div class="rps-round">
-                        <span>Округлить:</span>
-                        <button type="button" onclick="roundSelectedPrice(0); syncPriceSettingsInputs();">до ₽</button>
-                        <button type="button" onclick="roundSelectedPrice(1); syncPriceSettingsInputs();">до 0.1 ₽</button>
-                    </div>
                 </div>
             </div>
             <div id="costDetail" class="cost-detail"></div>
@@ -299,15 +286,15 @@
     </div>
 </div>
 
-<script src="js/config.js?v=16"></script>
-<script src="js/calculator-data.js?v=16"></script>
-<script src="js/calc-settings.js?v=16"></script>
-<script src="js/calc-settings-ui.js?v=16"></script>
-<script src="js/utils.js?v=16"></script>
-<script src="js/auth.js?v=16"></script>
-<script src="js/calculator.js?v=16"></script>
-<script src="js/crm.js?v=16"></script>
-<script src="js/element-editor.js?v=16"></script>
-<script src="js/main.js?v=16"></script>
+<script src="js/config.js?v=17"></script>
+<script src="js/calculator-data.js?v=17"></script>
+<script src="js/calc-settings.js?v=17"></script>
+<script src="js/calc-settings-ui.js?v=17"></script>
+<script src="js/utils.js?v=17"></script>
+<script src="js/auth.js?v=17"></script>
+<script src="js/calculator.js?v=17"></script>
+<script src="js/crm.js?v=17"></script>
+<script src="js/element-editor.js?v=17"></script>
+<script src="js/main.js?v=17"></script>
 </body>
 </html>

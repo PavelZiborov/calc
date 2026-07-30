@@ -325,10 +325,9 @@
     .rec-price-val small { color:rgba(255,255,255,0.82); font-weight:600; font-size:14px; }
     .rec-price-stubs { margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.18); display:flex; flex-direction:column; gap:14px; }
     .rec-stub-label { color:rgba(255,255,255,0.82); font-size:14px; font-weight:500; flex:0 0 auto; }
-    /* Ряд коэффициентов наценки (в одну строку, при переполнении — скролл) */
+    /* Ряд коэффициентов наценки (переносится, чтобы все были видны) */
     .rec-markup-row { display:flex; align-items:center; gap:10px; min-width:0; }
-    .rec-coef-btns { display:flex; gap:4px; min-width:0; overflow-x:auto; scrollbar-width:none; padding:2px; background:rgba(255,255,255,0.12); border-radius:var(--r-sm); }
-    .rec-coef-btns::-webkit-scrollbar { display:none; }
+    .rec-coef-btns { display:flex; flex-wrap:wrap; gap:4px; min-width:0; padding:2px; background:rgba(255,255,255,0.12); border-radius:var(--r-sm); }
     .rec-coef-btn {
         margin:0; width:auto; flex:0 0 auto; padding:5px 9px;
         font-size:13px; font-weight:700; border-radius:6px;
@@ -338,6 +337,19 @@
     .rec-coef-btn:hover { background:rgba(255,255,255,0.16); }
     .rec-coef-btn.is-active { background:#fff; color:var(--accent-strong); }
     .rec-coef-btn.is-active:hover { background:#fff; }
+    /* Округление цены (кнопки в блоке) */
+    .rec-round-btns { display:inline-flex; gap:4px; background:rgba(255,255,255,0.12); border-radius:var(--r-sm); padding:2px; }
+    .rec-round-btns button { margin:0; width:auto; padding:5px 12px; font-size:13px; font-weight:600; border-radius:6px; background:transparent; color:rgba(255,255,255,0.9); box-shadow:none; }
+    .rec-round-btns button:hover { background:rgba(255,255,255,0.18); }
+    /* Инлайн-редактирование цены (по шестерёнке) */
+    .rec-price-gear.is-active { background:#fff; color:var(--accent-strong); }
+    .rec-price-val[hidden] { display:none; }
+    .rec-price-edit { display:flex; gap:12px; margin-top:12px; }
+    .rec-price-edit[hidden] { display:none; }
+    .rec-edit-field { display:flex; flex-direction:column; gap:4px; margin:0; flex:1 1 0; min-width:0; }
+    .rec-edit-field > span { font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.72); }
+    .rec-edit-field input { margin:0; width:100%; padding:9px 10px; font-size:17px; font-weight:700; background:#fff; border:none; border-radius:var(--r-sm); color:var(--accent-strong); font-variant-numeric:tabular-nums; box-sizing:border-box; }
+    .rec-edit-field input:focus { box-shadow:0 0 0 3px rgba(255,255,255,0.45); outline:none; }
     .rec-order-stub { margin:6px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:13px; background:#fff; color:var(--accent-strong); border-radius:var(--r-sm); font-size:15px; font-weight:600; box-shadow:none; }
     .rec-order-stub .icn { width:1.15em; height:1.15em; }
     .rec-order-stub:disabled { opacity:0.55; cursor:not-allowed; }

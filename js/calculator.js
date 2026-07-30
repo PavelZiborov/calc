@@ -128,9 +128,12 @@ async function calc() {
 
                 lastCalcData.selectedMultiplier = currentMultMatch ? currentMultMatch.multiplier : null;
                 renderMarkupSelect(result.markupList, result.cost, lastCalcData.selectedMultiplier);
-                // шестерёнка ручной настройки цены — только для сотрудников
+                // шестерёнка (редактирование цены) и округление — только для сотрудников
+                if (typeof exitInlinePriceEdit === "function") exitInlinePriceEdit();
                 const gearEl = document.getElementById("recPriceGear");
                 if (gearEl) gearEl.style.display = "inline-flex";
+                const roundRow = document.getElementById("recRoundRow");
+                if (roundRow) roundRow.style.display = "";
                 // Берём структурированные данные из n8n; локальный расчёт оставляем как fallback.
                 lastCalcData.sra3Sheets = toFiniteNumber(
                     result.totalSheets ?? result.lastCalc?.totalSheets,
@@ -170,7 +173,9 @@ async function calc() {
             if (gearEl) gearEl.style.display = "none";
             const coefRow = document.getElementById("markupCoefRow");
             if (coefRow) coefRow.style.display = "none";
-            if (typeof closePriceSettings === "function") closePriceSettings();
+            const roundRow = document.getElementById("recRoundRow");
+            if (roundRow) roundRow.style.display = "none";
+            if (typeof exitInlinePriceEdit === "function") exitInlinePriceEdit();
         }
 
         // Показываем результат с анимацией
