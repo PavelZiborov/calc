@@ -196,9 +196,9 @@
                             <button type="button" onclick="roundSelectedPrice(2)">до коп.</button>
                         </div>
                     </div>
-                    <button type="button" class="rec-order-stub" disabled title="Раздел в разработке">
-                        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17h-11v-14h-2"/><path d="M6 5l14 1l-1 7h-13"/></svg>
-                        Оформить заказ
+                    <button type="button" class="rec-order-stub" id="addToSheetBtn" onclick="addCurrentCalcToSheet()" title="Добавить этот расчёт в расчётный лист">
+                        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg>
+                        Добавить в расчёт
                     </button>
                 </div>
             </div>
@@ -295,6 +295,7 @@
 <script src="js/calculator.js?v=17"></script>
 <script src="js/crm.js?v=17"></script>
 <script src="js/element-editor.js?v=17"></script>
+<script src="js/calc-sheet.js?v=17"></script>
 <script src="js/main.js?v=17"></script>
 </body>
 </html>

@@ -3152,3 +3152,42 @@
             padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
         }
     }
+
+    /* === Расчётный лист (черновик заказа) === */
+    .calc-sheet { max-width: 780px; }
+    .csh-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .csh-head h2 { margin: 0; }
+    .csh-note { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+    .csh-count { flex: 0 0 auto; min-width: 26px; height: 26px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-container); color: #fff; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; }
+    .csh-items { margin-top: 16px; display: flex; flex-direction: column; }
+    .csh-empty { color: var(--text-muted); font-size: 14px; text-align: center; padding: 26px 12px; background: var(--surface-2); border: 1px dashed var(--border-2); border-radius: var(--r-md); }
+    .csh-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .csh-item:last-child { border-bottom: none; }
+    .csh-item-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .csh-item-name { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+    .csh-item-sub { font-size: 12px; color: var(--text-2); }
+    .csh-item-cost { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .csh-item-cost b { font-weight: 600; color: var(--text-2); }
+    .csh-item-total { flex: 0 0 auto; font-size: 14px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .csh-item-del { flex: 0 0 auto; margin: 0; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; background: var(--surface-3); color: var(--text-2); border: none; border-radius: var(--r-sm); box-shadow: none; }
+    .csh-item-del:hover { background: var(--danger-bg); color: var(--danger); }
+    /* ручная позиция */
+    .csh-item--manual { flex-wrap: wrap; }
+    .csh-name-input { flex: 1 1 200px; margin: 0; min-width: 140px; }
+    .csh-item-calc { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+    .csh-item-calc input { margin: 0; width: 78px; }
+    .csh-qty-input { width: 64px !important; }
+    .csh-x { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+    .csh-add-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-2); }
+    .csh-add-row .add-btn { margin: 0; width: auto; }
+    .csh-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .csh-total { font-size: 16px; color: var(--text); }
+    .csh-total b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .csh-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+    .csh-clear { margin: 0; width: auto; padding: 11px 16px; background: transparent; color: var(--text-2); border: 1px solid var(--border-2); border-radius: var(--r-sm); font-size: 14px; font-weight: 600; box-shadow: none; }
+    .csh-clear:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-bg); }
+    .csh-tocrm { margin: 0; width: auto; padding: 11px 20px; background: var(--accent-container); color: #fff; border-radius: var(--r-sm); font-size: 14px; font-weight: 600; }
+    .csh-tocrm:hover { background: var(--accent-strong); }
+    .csh-tocrm:disabled { opacity: 0.5; cursor: not-allowed; }
+    .nav-tab--sheet { color: var(--secondary); }
+    .nav-tab--sheet.active { color: #fff; }
