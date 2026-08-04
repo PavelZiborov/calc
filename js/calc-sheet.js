@@ -42,7 +42,19 @@ function addCurrentCalcToSheet() {
     });
     ensureCalcSheetTab();
     renderCalcSheet();
-    openCalcSheetTab();
+    // Вкладку открываем «в фоне» — НЕ переключаемся на неё автоматически.
+    flashAddToSheetBtn();
+}
+
+// Короткий фидбэк на кнопке «Добавить в расчёт» + счётчик на вкладке листа
+function flashAddToSheetBtn() {
+    const btn = document.getElementById("addToSheetBtn");
+    if (btn && !btn.dataset.flashing) {
+        btn.dataset.flashing = "1";
+        const original = btn.innerHTML;
+        btn.innerHTML = `<svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5l10 -10"/></svg> Добавлено в лист`;
+        setTimeout(() => { btn.innerHTML = original; delete btn.dataset.flashing; }, 1300);
+    }
 }
 
 function openCalcSheetTab() {
@@ -57,7 +69,7 @@ function ensureCalcSheetTab() {
         tabBtn.className = "nav-tab tab-btn nav-tab--sheet";
         tabBtn.dataset.tabTarget = CALC_SHEET_TAB_ID;
         tabBtn.onclick = () => openCalcSheetTab();
-        tabBtn.innerHTML = `<svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 12l2 2l4 -4"/></svg><span>Расчётный лист</span><span class="tab-close-btn" onclick="event.stopPropagation(); closeCalcSheet()" title="Закрыть лист">&times;</span>`;
+        tabBtn.innerHTML = `<svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 12l2 2l4 -4"/></svg><span>Расчётный лист</span><span class="csh-tab-count" id="cshTabCount" hidden></span><span class="tab-close-btn" onclick="event.stopPropagation(); closeCalcSheet()" title="Закрыть лист">&times;</span>`;
         document.querySelector(".tabs-nav")?.appendChild(tabBtn);
     }
     let tab = document.getElementById(CALC_SHEET_TAB_ID);
@@ -162,6 +174,7 @@ function renderCalcSheet() {
         <div class="csh-add-row">
           <button type="button" class="add-btn" onclick="switchTab('main-tab', document.querySelector('.tab-btn[data-tab-target=&quot;main-tab&quot;]'))">＋ Из калькулятора</button>
           <button type="button" class="add-btn add-btn-secondary" onclick="addManualSheetItem()">＋ Добавить вручную</button>
+          <button type="button" class="add-btn add-btn-secondary" id="cshCopyBtn" onclick="copyCalcSheetForCustomer()"${calcSheetItems.length ? "" : " disabled"}>Скопировать для заказчика</button>
         </div>
 
         <div class="csh-footer">
@@ -172,6 +185,65 @@ function renderCalcSheet() {
           </div>
         </div>
       </div>`;
+
+    updateCalcSheetTabCount();
+}
+
+// Счётчик позиций на вкладке листа (для фоновой осведомлённости)
+function updateCalcSheetTabCount() {
+    const badge = document.getElementById("cshTabCount");
+    if (!badge) return;
+    const n = calcSheetItems.length;
+    badge.textContent = String(n);
+    badge.hidden = n === 0;
+}
+
+// Текст для заказчика: все позиции БЕЗ себестоимости + итог (как в калькуляторе, но для списка)
+function buildCalcSheetCustomerText() {
+    const blocks = calcSheetItems.map(it => {
+        const name = it.name || "Позиция";
+        const qty = Number(it.qty) || 0;
+        const priceOne = Number(it.priceOne) || 0;
+        const total = Number(it.total) || 0;
+        if (total > 0 && priceOne > 0) {
+            return `${name}\n${qty} шт - ${csMoney(total)} ₽ (${priceOne.toFixed(2)} ₽/шт)`;
+        }
+        if (priceOne > 0) return `${name}\n${qty} шт - (${priceOne.toFixed(2)} ₽/шт)`;
+        return `${name}\n—`;
+    });
+    let text = blocks.join("\n\n");
+    if (calcSheetItems.length > 1) {
+        text += `\n\nИтого: ${csMoney(getCalcSheetTotal())} ₽`;
+    }
+    return text;
+}
+
+async function copyCalcSheetForCustomer() {
+    if (!calcSheetItems.length) return;
+    const text = buildCalcSheetCustomerText();
+    const btn = document.getElementById("cshCopyBtn");
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+        }
+        if (btn) {
+            const old = btn.textContent;
+            btn.textContent = "Скопировано ✓";
+            setTimeout(() => { btn.textContent = old; }, 1500);
+        }
+    } catch (e) {
+        alert("Не удалось скопировать:\n\n" + text);
+        console.error(e);
+    }
 }
 
 // НАБРОСОК: отправка листа в реальный заказ CRM. Пока — сводка + TODO.

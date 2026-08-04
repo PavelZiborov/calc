@@ -350,7 +350,10 @@
     .rec-edit-field > span { font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.72); }
     .rec-edit-field input { margin:0; width:100%; padding:9px 10px; font-size:17px; font-weight:700; background:#fff; border:none; border-radius:var(--r-sm); color:var(--accent-strong); font-variant-numeric:tabular-nums; box-sizing:border-box; }
     .rec-edit-field input:focus { box-shadow:0 0 0 3px rgba(255,255,255,0.45); outline:none; }
-    .rec-order-stub { margin:6px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:13px; background:#fff; color:var(--accent-strong); border-radius:var(--r-sm); font-size:15px; font-weight:600; box-shadow:none; }
+    .rec-order-stub { margin:6px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:13px; background:#fff; color:var(--accent-strong); border-radius:var(--r-sm); font-size:15px; font-weight:600; box-shadow:none; transition:background 0.15s ease, color 0.15s ease; }
+    /* hover — серый (на синем фоне контрастнее белого, не сливается) */
+    .rec-order-stub:hover { background:#e3e5ec; color:var(--accent-strong); }
+    .rec-order-stub:active { background:#d6d9e2; }
     .rec-order-stub .icn { width:1.15em; height:1.15em; }
     .rec-order-stub:disabled { opacity:0.55; cursor:not-allowed; }
     .rec-order-stub:disabled:hover { background:#fff; }
@@ -3191,3 +3194,5 @@
     .csh-tocrm:disabled { opacity: 0.5; cursor: not-allowed; }
     .nav-tab--sheet { color: var(--secondary); }
     .nav-tab--sheet.active { color: #fff; }
+    .csh-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; margin-left:2px; background:var(--secondary); color:#fff; border-radius:var(--r-pill); font-size:11px; font-weight:700; line-height:1; }
+    .nav-tab--sheet.active .csh-tab-count { background:rgba(255,255,255,0.28); }
