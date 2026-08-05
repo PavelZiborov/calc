@@ -97,7 +97,7 @@ function addManualSheetItem() {
     calcSheetItems.push({ id: ++calcSheetSeq, name: "", qty: 1, priceOne: 0, total: 0, cost: null, costHq: null, sra3: null, manual: true });
     renderCalcSheet();
     setTimeout(() => {
-        const inputs = document.querySelectorAll("#calc-sheet-tab .csh-item--manual .csh-name-input");
+        const inputs = document.querySelectorAll("#calc-sheet-tab .csh-item .csh-name-input");
         const last = inputs[inputs.length - 1];
         if (last) last.focus();
     }, 0);
@@ -108,44 +108,45 @@ function removeSheetItem(id) {
     renderCalcSheet();
 }
 
-function updateManualItem(id, field, value) {
+// Правка позиции (наименование/кол-во/цена) — для ВСЕХ позиций, и расчётных, и
+// ручных. Обновляем в месте (без ре-рендера), чтобы не терять фокус при вводе.
+function updateSheetItem(id, field, value) {
     const it = calcSheetItems.find(x => x.id === Number(id));
     if (!it) return;
     if (field === "name") it.name = value;
-    if (field === "qty") it.qty = Math.max(0, Number(value) || 0);
-    if (field === "priceOne") it.priceOne = Math.max(0, Number(value) || 0);
+    else if (field === "qty") it.qty = Math.max(0, Number(value) || 0);
+    else if (field === "priceOne") it.priceOne = Math.max(0, Number(value) || 0);
     it.total = csRound2(it.qty * it.priceOne);
-    renderCalcSheet();
+
+    const rowTotal = document.querySelector(`#calc-sheet-tab .csh-item[data-id="${it.id}"] .csh-item-total`);
+    if (rowTotal) rowTotal.textContent = `${csMoney(it.total)} ₽`;
+    const totalEl = document.querySelector("#calc-sheet-tab .csh-total b");
+    if (totalEl) totalEl.textContent = `${csMoney(getCalcSheetTotal())} ₽`;
 }
+// совместимость со старым именем
+function updateManualItem(id, field, value) { updateSheetItem(id, field, value); }
 
 function getCalcSheetTotal() {
     return calcSheetItems.reduce((s, it) => s + (Number(it.total) || 0), 0);
 }
 
+// Все позиции редактируемые: название / кол-во / цена. У расчётных дополнительно
+// строка себест./HQ/SRA3 (staff, справочно — не меняется при правке цены).
 function renderCalcSheetItem(it, isStaff) {
     const del = `<button type="button" class="csh-item-del" onclick="removeSheetItem(${it.id})" title="Удалить" aria-label="Удалить">&times;</button>`;
-    const costLine = (isStaff && it.cost != null)
+    const costLine = (isStaff && !it.manual && it.cost != null)
         ? `<div class="csh-item-cost">${it.sra3 != null ? `Листов SRA3: <b>${it.sra3}</b> · ` : ""}Себест.: <b>${Math.round(it.cost).toLocaleString("ru-RU")} ₽</b>${it.costHq != null ? ` · HQ: <b>${Math.round(it.costHq).toLocaleString("ru-RU")} ₽</b>` : ""}</div>`
         : "";
 
-    if (it.manual) {
-        return `
-        <div class="csh-item csh-item--manual" data-id="${it.id}">
-            <input class="csh-name-input" type="text" placeholder="Название позиции" value="${csEsc(it.name)}" onchange="updateManualItem(${it.id},'name',this.value)">
-            <div class="csh-item-calc">
-                <input class="csh-qty-input" type="number" min="0" inputmode="numeric" value="${it.qty}" onchange="updateManualItem(${it.id},'qty',this.value)"><span class="csh-x">шт ×</span>
-                <input class="csh-price-input" type="number" min="0" step="0.01" inputmode="decimal" value="${it.priceOne}" onchange="updateManualItem(${it.id},'priceOne',this.value)"><span class="csh-x">₽/шт</span>
-            </div>
-            <span class="csh-item-total">${csMoney(it.total)} ₽</span>
-            ${del}
-        </div>`;
-    }
     return `
-        <div class="csh-item" data-id="${it.id}">
+        <div class="csh-item csh-item--edit" data-id="${it.id}">
             <div class="csh-item-main">
-                <span class="csh-item-name">${csEsc(it.name)}</span>
-                <span class="csh-item-sub">${it.qty} шт × ${Number(it.priceOne).toFixed(2)} ₽/шт</span>
+                <input class="csh-name-input" type="text" placeholder="Название позиции" value="${csEsc(it.name)}" onchange="updateSheetItem(${it.id},'name',this.value)">
                 ${costLine}
+            </div>
+            <div class="csh-item-calc">
+                <input class="csh-qty-input" type="number" min="0" inputmode="numeric" value="${it.qty}" oninput="updateSheetItem(${it.id},'qty',this.value)"><span class="csh-x">шт ×</span>
+                <input class="csh-price-input" type="number" min="0" step="0.01" inputmode="decimal" value="${it.priceOne}" oninput="updateSheetItem(${it.id},'priceOne',this.value)"><span class="csh-x">₽/шт</span>
             </div>
             <span class="csh-item-total">${csMoney(it.total)} ₽</span>
             ${del}
@@ -175,6 +176,7 @@ function renderCalcSheet() {
           <button type="button" class="add-btn" onclick="switchTab('main-tab', document.querySelector('.tab-btn[data-tab-target=&quot;main-tab&quot;]'))">＋ Из калькулятора</button>
           <button type="button" class="add-btn add-btn-secondary" onclick="addManualSheetItem()">＋ Добавить вручную</button>
           <button type="button" class="add-btn add-btn-secondary" id="cshCopyBtn" onclick="copyCalcSheetForCustomer()"${calcSheetItems.length ? "" : " disabled"}>Скопировать для заказчика</button>
+          <button type="button" class="add-btn add-btn-secondary" id="cshKpBtn" onclick="downloadCalcSheetKp()"${calcSheetItems.length ? "" : " disabled"}>Скачать КП (Word)</button>
         </div>
 
         <div class="csh-footer">
@@ -259,4 +261,25 @@ function addCalcSheetToRealDeal() {
         `\n\nИтого: ${csMoney(getCalcSheetTotal())} ₽\n\n` +
         "Следующий шаг: создание сделки в CRM и отправка этих позиций."
     );
+}
+
+// Скачать коммерческое предложение (Word .docx) по позициям листа
+function downloadCalcSheetKp() {
+    if (!calcSheetItems.length) return;
+    if (typeof buildAndDownloadKpDocx !== "function") { alert("Модуль КП не загружен"); return; }
+    const positions = calcSheetItems.map(it => ({
+        name: (it.name || "Позиция").trim(),
+        unit: "Шт.",
+        qty: Number(it.qty) || 0,
+        priceOne: Number(it.priceOne) || 0,
+        total: Number(it.total) || 0
+    }));
+    try {
+        buildAndDownloadKpDocx(positions);
+        const btn = document.getElementById("cshKpBtn");
+        if (btn) { const o = btn.textContent; btn.textContent = "Готово ✓"; setTimeout(() => { btn.textContent = o; }, 1500); }
+    } catch (e) {
+        console.error(e);
+        alert("Не удалось сформировать КП: " + (e.message || e));
+    }
 }

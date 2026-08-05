@@ -3174,13 +3174,17 @@
     .csh-item-total { flex: 0 0 auto; font-size: 14px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .csh-item-del { flex: 0 0 auto; margin: 0; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; background: var(--surface-3); color: var(--text-2); border: none; border-radius: var(--r-sm); box-shadow: none; }
     .csh-item-del:hover { background: var(--danger-bg); color: var(--danger); }
-    /* ручная позиция */
-    .csh-item--manual { flex-wrap: wrap; }
-    .csh-name-input { flex: 1 1 200px; margin: 0; min-width: 140px; }
+    /* редактируемые позиции (наименование/кол-во/цена) */
+    .csh-item--edit { flex-wrap: wrap; align-items: flex-start; }
+    .csh-name-input { width: 100%; margin: 0; }
+    .csh-item-main .csh-item-cost { margin-top: 4px; }
     .csh-item-calc { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
     .csh-item-calc input { margin: 0; width: 78px; }
     .csh-qty-input { width: 64px !important; }
     .csh-x { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+    @media (max-width: 560px) {
+        .csh-item-calc { width: 100%; margin-top: 6px; }
+    }
     .csh-add-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-2); }
     .csh-add-row .add-btn { margin: 0; width: auto; }
     .csh-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
