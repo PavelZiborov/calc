@@ -475,6 +475,56 @@
     .checkbox-group { margin-top:15px; background:#FAF9F6; padding:14px; border-radius:12px; border:1px solid #EAE8E2; }
 
     .crm-item { border:1px solid var(--border); border-radius:var(--r-md); padding:15px; margin-top:15px; background:var(--surface); box-shadow:var(--shadow-card); }
+
+    /* Саммари под списком заказов: всего / оплачено / не оплачено */
+    .crm-list-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+    }
+    .crm-sum-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1 1 auto;
+        min-width: 120px;
+    }
+    .crm-sum-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+    .crm-sum-item b { font-size: 16px; font-weight: 700; color: var(--text); }
+    .crm-sum-paid { color: var(--success) !important; }
+    .crm-sum-debt { color: var(--danger) !important; }
+
+    /* Саммари под колонкой канбана */
+    .crm-kanban-column-summary {
+        flex: 0 0 auto;
+        margin: 6px 8px 2px;
+        padding: 8px 10px;
+        background: rgba(255,255,255,0.72);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 12px;
+    }
+    .crm-kanban-column-summary .csum-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 2px 0;
+    }
+    .crm-kanban-column-summary .csum-row span { color: var(--text-muted); font-weight: 600; }
+    .crm-kanban-column-summary .csum-row b { font-weight: 700; color: var(--text); }
+
     .crm-search-pagination {
         display: flex;
         flex-wrap: wrap;
@@ -2656,6 +2706,21 @@
         cursor: pointer;
         user-select: none;
     }
+    .adv-pay-filter {
+        flex: 1 1 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-size: 13px;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--text);
+        cursor: pointer;
+        user-select: none;
+    }
+    .adv-pay-filter input { width: auto; margin: 0; flex: 0 0 auto; }
     .adv-filters-popover-section .status-dropdown,
     .adv-filters-popover-section .date-range-dropdown {
         flex: 1 1 auto;

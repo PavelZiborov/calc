@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=19">
+<link rel="stylesheet" href="css/app.css?v=21">
 </head>
 <body>
 
@@ -270,6 +270,13 @@
                                     <div class="status-dropdown-list" id="advManagerList"></div>
                                 </div>
                             </div>
+                            <div class="adv-filters-popover-section">
+                                <label class="adv-filter-label" onclick="closeAdvFilterDropdowns()">Оплата</label>
+                                <label class="adv-pay-filter">
+                                    <input type="checkbox" id="advUnpaidOnly" onchange="onAdvUnpaidToggle(event)">
+                                    <span>Только неоплаченные</span>
+                                </label>
+                            </div>
                             <div class="adv-filters-popover-footer">
                                 <button type="button" class="adv-filters-apply-btn" onclick="applyAdvFilters(event)" title="Применить фильтры и найти">Применить</button>
                                 <button type="button" class="adv-filters-reset-btn" onclick="clearAdvFilters()" title="Сбросить фильтры">Сбросить</button>
@@ -286,17 +293,17 @@
     </div>
 </div>
 
-<script src="js/config.js?v=19"></script>
-<script src="js/calculator-data.js?v=19"></script>
-<script src="js/calc-settings.js?v=19"></script>
-<script src="js/calc-settings-ui.js?v=19"></script>
-<script src="js/utils.js?v=19"></script>
-<script src="js/auth.js?v=19"></script>
-<script src="js/calculator.js?v=19"></script>
-<script src="js/crm.js?v=19"></script>
-<script src="js/element-editor.js?v=19"></script>
-<script src="js/kp-docx.js?v=19"></script>
-<script src="js/calc-sheet.js?v=19"></script>
-<script src="js/main.js?v=19"></script>
+<script src="js/config.js?v=21"></script>
+<script src="js/calculator-data.js?v=21"></script>
+<script src="js/calc-settings.js?v=21"></script>
+<script src="js/calc-settings-ui.js?v=21"></script>
+<script src="js/utils.js?v=21"></script>
+<script src="js/auth.js?v=21"></script>
+<script src="js/calculator.js?v=21"></script>
+<script src="js/crm.js?v=21"></script>
+<script src="js/element-editor.js?v=21"></script>
+<script src="js/kp-docx.js?v=21"></script>
+<script src="js/calc-sheet.js?v=21"></script>
+<script src="js/main.js?v=21"></script>
 </body>
 </html>

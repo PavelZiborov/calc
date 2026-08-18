@@ -89,7 +89,8 @@ function collectAdvSearchParams() {
         managerNames: selectedManagerNames,
         dateFrom: formatDateForWebhook(document.getElementById("advDateFrom")?.value || ""),
         dateTo: formatDateForWebhook(document.getElementById("advDateTo")?.value || ""),
-        openDealsOnly: openDealsFilterActive
+        openDealsOnly: openDealsFilterActive,
+        unpaidOnly: isAdvUnpaidFilterActive()
     };
 
     return {
@@ -153,6 +154,9 @@ function restoreAdvSearchUiState() {
             if (input) input.checked = true;
         });
     }
+
+    const unpaidBox = document.getElementById("advUnpaidOnly");
+    if (unpaidBox) unpaidBox.checked = Boolean(filters.unpaidOnly);
 
     const dateFromEl = document.getElementById("advDateFrom");
     const dateToEl = document.getElementById("advDateTo");
@@ -840,6 +844,48 @@ function isAdvOpenDealsFilterActive() {
     return Boolean(document.querySelector('#advStatusList input[data-preset="open-deals"]:checked'));
 }
 
+// Фильтр «только неоплаченные» (без единой оплаты)
+function isAdvUnpaidFilterActive() {
+    return Boolean(document.getElementById("advUnpaidOnly")?.checked);
+}
+function isDealUnpaid(deal) {
+    const f = getDealFinancials(deal);
+    return Number(f.paid) <= 0.009;
+}
+function onAdvUnpaidToggle() {
+    updateAdvFilterUi();
+}
+
+// Саммари по набору сделок: всего / оплачено / не оплачено (долг)
+function summarizeDeals(deals) {
+    let total = 0, paid = 0, debt = 0;
+    (Array.isArray(deals) ? deals : []).forEach(d => {
+        const f = getDealFinancials(d);
+        total += Number(f.total) || 0;
+        paid += Number(f.paid) || 0;
+        debt += Number(f.debt) || 0;
+    });
+    return { total, paid, debt };
+}
+// Саммари под списком заказов
+function renderDealsListSummary(deals) {
+    const s = summarizeDeals(deals);
+    return `<div class="crm-list-summary">
+        <span class="crm-sum-item"><span class="crm-sum-label">Всего</span><b>${formatMoney(s.total)} ₽</b></span>
+        <span class="crm-sum-item"><span class="crm-sum-label">Оплачено</span><b class="crm-sum-paid">${formatMoney(s.paid)} ₽</b></span>
+        <span class="crm-sum-item"><span class="crm-sum-label">Не оплачено</span><b class="crm-sum-debt">${formatMoney(s.debt)} ₽</b></span>
+    </div>`;
+}
+// Компактное саммари под колонкой канбана
+function renderKanbanColumnSummary(deals) {
+    const s = summarizeDeals(deals);
+    return `<div class="crm-kanban-column-summary">
+        <div class="csum-row"><span>Всего</span><b>${formatMoney(s.total)} ₽</b></div>
+        <div class="csum-row"><span>Оплачено</span><b class="crm-sum-paid">${formatMoney(s.paid)} ₽</b></div>
+        <div class="csum-row"><span>Не оплачено</span><b class="crm-sum-debt">${formatMoney(s.debt)} ₽</b></div>
+    </div>`;
+}
+
 function onAdvStatusFilterChange(event) {
     const target = event?.target;
     if (target?.type === "checkbox") {
@@ -888,7 +934,7 @@ function hasActiveAdvFilters() {
     const managerChecked = document.querySelectorAll("#advManagerList input[type=\"checkbox\"]:checked").length;
     const dateFrom = document.getElementById("advDateFrom")?.value || "";
     const dateTo = document.getElementById("advDateTo")?.value || "";
-    return statusChecked > 0 || managerChecked > 0 || !!dateFrom || !!dateTo;
+    return statusChecked > 0 || managerChecked > 0 || !!dateFrom || !!dateTo || isAdvUnpaidFilterActive();
 }
 
 function syncAdvFiltersButtonState() {
@@ -1230,6 +1276,8 @@ function clearAdvFilters() {
 
     document.querySelectorAll('#advStatusList input[type="checkbox"]').forEach(input => input.checked = false);
     document.querySelectorAll('#advManagerList input[type="checkbox"]').forEach(input => input.checked = false);
+    const unpaidBox = document.getElementById("advUnpaidOnly");
+    if (unpaidBox) unpaidBox.checked = false;
     if (searchInput) searchInput.value = "";
     if (dateFrom) dateFrom.value = "";
     if (dateTo) dateTo.value = "";
@@ -2365,6 +2413,7 @@ function renderDealsKanban(deals, targetDiv) {
         const emptyHtml = col.deals.length
             ? ""
             : `<div class="crm-kanban-empty">Нет заказов</div>`;
+        const summaryHtml = col.deals.length ? renderKanbanColumnSummary(col.deals) : "";
 
         columnEl.innerHTML = `
             <header class="crm-kanban-column-header" style="--col-bg:${col.bk_color}; --col-text:${col.text_color}">
@@ -2374,7 +2423,8 @@ function renderDealsKanban(deals, targetDiv) {
             </header>
             <div class="crm-kanban-column-body">
                 ${cardsHtml}${emptyHtml}
-            </div>`;
+            </div>
+            ${summaryHtml}`;
 
         board.appendChild(columnEl);
     });
@@ -2394,12 +2444,30 @@ function renderDealsResults(deals, targetDiv, options = {}) {
     }
 
     const isAdvResults = targetDiv?.id === "advCrmResults";
+    // Клиентский фильтр «только неоплаченные». Для канбана он полный (загружаются
+    // все сделки); для списка — по текущей странице (корректную постраничную
+    // фильтрацию делает n8n-search-crm.js по filters.unpaidOnly).
+    let list = deals;
+    if (isAdvResults && isAdvUnpaidFilterActive()) {
+        list = (Array.isArray(deals) ? deals : []).filter(isDealUnpaid);
+    }
     const useKanban = isAdvResults && getCrmViewMode() === "kanban";
     targetDiv?.classList.toggle("crm-kanban-results-host", useKanban);
     if (useKanban) {
-        renderDealsKanban(deals, targetDiv);
+        renderDealsKanban(list, targetDiv);
     } else {
-        renderDealsList(deals, targetDiv, options);
+        renderDealsList(list, targetDiv, options);
+        if (isAdvResults && Array.isArray(list) && list.length) {
+            const sumWrap = document.createElement("div");
+            sumWrap.innerHTML = renderDealsListSummary(list);
+            const sumEl = sumWrap.firstElementChild;
+            if (sumEl) {
+                // саммари — под списком, но над пагинацией
+                const pager = targetDiv.querySelector(".crm-search-pagination");
+                if (pager) targetDiv.insertBefore(sumEl, pager);
+                else targetDiv.appendChild(sumEl);
+            }
+        }
     }
 }
 
