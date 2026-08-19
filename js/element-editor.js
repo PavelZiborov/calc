@@ -620,6 +620,75 @@ async function compressPreviewImage(file) {
     throw new Error("preview too large");
 }
 
+// --- Авто-превью из PDF-макета (pdf.js подгружается лениво, только при первом использовании) ---
+const PDFJS_ASSET_TAG = "3.11.174";
+let __pdfJsLoadPromise = null;
+function ensurePdfJs() {
+    const applyWorker = (lib) => {
+        try { lib.GlobalWorkerOptions.workerSrc = `js/pdf.worker.min.js?p=${PDFJS_ASSET_TAG}`; } catch (e) {}
+        return lib;
+    };
+    if (window.pdfjsLib) return Promise.resolve(applyWorker(window.pdfjsLib));
+    if (__pdfJsLoadPromise) return __pdfJsLoadPromise;
+    __pdfJsLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `js/pdf.min.js?p=${PDFJS_ASSET_TAG}`;
+        script.onload = () => {
+            if (!window.pdfjsLib) { __pdfJsLoadPromise = null; reject(new Error("pdfjsLib missing after load")); return; }
+            resolve(applyWorker(window.pdfjsLib));
+        };
+        script.onerror = () => { __pdfJsLoadPromise = null; reject(new Error("pdf.js load error")); };
+        document.head.appendChild(script);
+    });
+    return __pdfJsLoadPromise;
+}
+
+function isPdfFile(file) {
+    return !!file && (file.type === "application/pdf" || /\.pdf$/i.test(file.name || ""));
+}
+
+// Рендер первой страницы PDF в JPEG-файл
+async function renderPdfFirstPageToImageFile(file, baseName = "preview") {
+    const pdfjsLib = await ensurePdfJs();
+    const data = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    try {
+        const page = await pdf.getPage(1);
+        const base = page.getViewport({ scale: 1 });
+        const targetWidth = 1240;
+        const scale = Math.min(3, Math.max(0.5, targetWidth / (base.width || targetWidth)));
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(viewport.width));
+        canvas.height = Math.max(1, Math.round(viewport.height));
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
+        const safeBase = String(baseName || "preview").replace(/\.[^.]+$/, "") || "preview";
+        return new File([blob], `${safeBase}.jpg`, { type: "image/jpeg" });
+    } finally {
+        try { await pdf.cleanup?.(); } catch (e) {}
+        try { pdf.destroy?.(); } catch (e) {}
+    }
+}
+
+// Формирует превью из последнего загруженного макета (PDF → 1-я страница; картинку берёт как есть)
+async function autoGeneratePreviewFromLayout(file) {
+    if (!file) return;
+    let imageFile = null;
+    if (isPdfFile(file)) {
+        setPreviewEditorProgress("Формирование превью из PDF…", 0.12, { type: "preview" });
+        imageFile = await renderPdfFirstPageToImageFile(file, "preview");
+    } else if (PREVIEW_IMAGE_TYPES.includes(file.type)) {
+        imageFile = file;
+    } else {
+        return; // не PDF и не картинка — авто-превью не формируем
+    }
+    await uploadSinglePreviewFile(imageFile);
+}
+
 async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgress = null, timeoutMs = UPLOAD_TIMEOUT_MS) {
     if (typeof onProgress !== "function") {
         const response = await fetchWithTimeout(uploadUrl, {
@@ -2305,6 +2374,7 @@ async function uploadLayoutFiles(files) {
     setLayoutUploadProgress("Подготовка файла…", 0.05);
 
     const errors = [];
+    let lastUploaded = null;
 
     try {
         for (let i = 0; i < list.length; i++) {
@@ -2322,9 +2392,19 @@ async function uploadLayoutFiles(files) {
                         });
                     }
                 });
+                lastUploaded = file;
             } catch (e) {
                 console.warn("addElementLayout file", file.name, e);
                 errors.push(file.name);
+            }
+        }
+
+        // Авто-превью: формируем из последнего успешно загруженного макета
+        if (lastUploaded) {
+            try {
+                await autoGeneratePreviewFromLayout(lastUploaded);
+            } catch (e) {
+                console.warn("auto preview from layout failed", lastUploaded.name, e);
             }
         }
     } finally {
