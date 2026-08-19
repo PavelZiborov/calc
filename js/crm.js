@@ -4824,15 +4824,18 @@ function buildCopyItemFromElement(el) {
     const categoryId = getElementCategoryIdForCopy(el);
     item.category_id = Number.isFinite(categoryId) && categoryId > 0 ? categoryId : null;
 
+    // ВАЖНО: ключ cost всегда должен присутствовать и быть числом.
+    // n8n-нода добавления элемента подставляет {{ ...item.cost }} прямо в JSON —
+    // отсутствующий ключ рендерится как `undefined` и ломает тело запроса (400).
     const cost = getElementCost(el);
-    if (cost != null) {
-        item.cost = Math.round(cost);
-        item.cost_total = Math.round(cost);
-    }
+    const costNum = Number.isFinite(cost) ? Math.round(cost) : 0;
+    item.cost = costNum;
+    item.cost_total = costNum;
+
     const costHq = getElementCostHq(el);
-    if (costHq != null) item.cost_hq = Math.round(costHq);
+    item.cost_hq = Number.isFinite(costHq) ? Math.round(costHq) : null;
     const sra3 = getElementSra3Sheets(el);
-    if (sra3 != null) item.sra3_sheets = sra3;
+    item.sra3_sheets = Number.isFinite(sra3) ? sra3 : null;
 
     return item;
 }
