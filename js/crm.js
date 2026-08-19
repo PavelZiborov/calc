@@ -5045,6 +5045,12 @@ async function createDealFromDeal(sourceDealId, btn) {
                 newCard.scrollIntoView({ behavior: "smooth", block: "start" });
             }
         }
+
+        // Сразу открываем свежесозданную сделку в отдельной вкладке
+        if (newDeal.id) {
+            dealsCache.set(String(newDeal.id), newDeal);
+            await openDealInTab(newDeal.id);
+        }
     } catch (e) {
         alert("Не удалось создать новую сделку");
         console.error(e);
