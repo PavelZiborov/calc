@@ -4852,10 +4852,11 @@ async function copyDealWithPositions(sourceDealId, btn) {
     }
 
     try {
-        // 1) Источник с позициями — берём из кэша либо подгружаем
-        let src = dealsCache.get(String(sourceDealId));
-        if (!src || !Array.isArray(src.elements)) {
-            src = await fetchDealDetails(sourceDealId) || src;
+        // 1) Всегда берём ПОЛНУЮ карточку (getDeal): базовая себестоимость позиций
+        //    приходит только в детальной карточке, в кэше списка/канбана её нет.
+        let src = await fetchDealDetails(sourceDealId);
+        if (!src || !Array.isArray(src.elements) || !src.elements.length) {
+            src = dealsCache.get(String(sourceDealId)) || src;
         }
         const elements = Array.isArray(src?.elements) ? src.elements : [];
 
@@ -4889,12 +4890,34 @@ async function copyDealWithPositions(sourceDealId, btn) {
         // 4) Дублируем позиции (если сервер их ещё не скопировал)
         const serverAlreadyCopied = Array.isArray(newDeal.elements) && newDeal.elements.length > 0;
         if (!serverAlreadyCopied && srcElements.length) {
+            const newNum = newDeal.num || (typeof getDealNum === "function" ? getDealNum(newId) : null);
             for (let i = 0; i < srcElements.length; i++) {
                 const item = buildCopyItemFromElement(srcElements[i]);
                 if (!item.name || !(item.quantity > 0)) continue;
                 if (btn) btn.innerHTML = `${i + 1}/${srcElements.length}`;
                 try {
-                    await saveNewDealElement(newId, item);
+                    const saveResult = await saveNewDealElement(newId, item);
+                    // Себ., Себ. HQ и Листов SRA3 — часть из них (HQ/SRA3) хранится как
+                    // доп.поля CRM, которые нода создания не пишет. Дописываем всё через
+                    // updateElement (тот же путь, что и в редакторе позиции).
+                    const newElId = saveResult?.elementId;
+                    const hasCostData = item.cost > 0
+                        || Number.isFinite(item.cost_hq)
+                        || Number.isFinite(item.sra3_sheets);
+                    if (newElId && hasCostData) {
+                        const fields = {};
+                        if (item.cost > 0) fields.cost = item.cost;
+                        if (Number.isFinite(item.cost_hq)) fields.cost_hq = item.cost_hq;
+                        if (Number.isFinite(item.sra3_sheets)) fields.sra3_sheets = item.sra3_sheets;
+                        try {
+                            await elementAssetsApi("updateElement", {
+                                ...buildElementAssetsPayload(newId, newElId, newNum),
+                                fields
+                            });
+                        } catch (e) {
+                            console.warn("copyDeal: не удалось записать себестоимость", item.name, e);
+                        }
+                    }
                 } catch (e) {
                     console.warn("copyDeal: не удалось скопировать позицию", item.name, e);
                 }
