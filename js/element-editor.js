@@ -2365,6 +2365,14 @@ async function uploadSingleLayoutFile(file, options = {}) {
     });
 }
 
+// Есть ли уже превью у текущей позиции (в кэше)
+function elementEditorHasPreview() {
+    if (!currentElementEditor) return false;
+    const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
+    const p = elementAssetsCache.get(key)?.preview;
+    return !!(p && (isUsableAssetUrl(p.url) || isUsableAssetUrl(p.thumbUrl)));
+}
+
 async function uploadLayoutFiles(files) {
     if (!canEditElementAssets()) return;
 
@@ -2372,6 +2380,10 @@ async function uploadLayoutFiles(files) {
     if (!list.length) return;
 
     setLayoutUploadProgress("Подготовка файла…", 0.05);
+
+    // Авто-превью формируем только для ПЕРВОГО макета — если превью ещё нет.
+    // Дальнейшие макеты (превью уже есть) его не перезаписывают.
+    const hadPreviewBefore = elementEditorHasPreview();
 
     const errors = [];
     let lastUploaded = null;
@@ -2399,8 +2411,8 @@ async function uploadLayoutFiles(files) {
             }
         }
 
-        // Авто-превью: формируем из последнего успешно загруженного макета
-        if (lastUploaded) {
+        // Авто-превью: только при первом макете (когда превью ещё не было)
+        if (lastUploaded && !hadPreviewBefore) {
             try {
                 await autoGeneratePreviewFromLayout(lastUploaded);
             } catch (e) {
