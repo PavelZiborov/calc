@@ -887,9 +887,10 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: 6px;
         margin-top: 8px;
-        padding: 14px 12px;
+        min-height: 135px;
+        padding: 32px 12px;
         border: 1.5px dashed rgba(47, 125, 246, 0.32);
         border-radius: 8px;
         background: rgba(47, 125, 246, 0.035);
@@ -939,8 +940,8 @@
     }
     .element-editor-preview {
         width: 100%;
-        min-height: 135px;
-        max-height: 215px;
+        min-height: 72px;
+        max-height: 120px;
         border-radius: 8px;
         border: 1px dashed #d6d0c4;
         background: #faf9f6;
@@ -951,7 +952,7 @@
     }
     .element-editor-preview img {
         width: 100%;
-        max-height: 215px;
+        max-height: 120px;
         object-fit: contain;
         display: block;
     }
@@ -2503,8 +2504,9 @@
         .element-row-text, .element-row-total, .deal-total-only { font-size: 11px !important; line-height: 1.2; }
         .element-preview-thumb { flex: 0 0 20px; width: 20px; height: 20px; }
         .element-editor-modal { max-width: 100%; border-radius: 10px; }
-        .element-editor-preview { min-height: 107px; max-height: 173px; }
-        .element-editor-preview img { max-height: 173px; }
+        .element-editor-preview { min-height: 64px; max-height: 104px; }
+        .element-editor-preview img { max-height: 104px; }
+        .element-editor-layout-drop-zone { min-height: 112px; padding: 26px 12px; }
         .element-editor-row4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
         .element-editor-row5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
         .element-editor-row3 { grid-template-columns: 1fr 0.65fr 1fr; gap: 6px; }
