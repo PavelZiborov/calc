@@ -4500,15 +4500,16 @@ function renderDealActionButtonsLeft(deal) {
         ? `<button type="button" class="deal-action-btn" onclick="event.stopPropagation(); showDealContactInfo(${deal.id}, this)" title="Контакты клиента" aria-label="Контакты клиента">${icon("user")}</button>`
         : "";
     const createBtn = `<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`;
+    const copyBtn = `<button type="button" class="deal-action-btn deal-copy-btn" onclick="event.stopPropagation(); showCopyDealConfirm(${deal.id}, this)" title="Копировать сделку с позициями" aria-label="Копировать сделку с позициями">⧉</button>`;
 
-    return `<span class="deal-action-group">${contactBtn}${createBtn}${renderDealCrmButton(deal)}</span>`;
+    return `<span class="deal-action-group">${contactBtn}${createBtn}${copyBtn}${renderDealCrmButton(deal)}</span>`;
 }
 
 function renderDealActionButtons(deal, isDetailMode = false) {
     if (currentUser.role !== 'staff') return "";
     if (isDetailMode) return "";
 
-    return `${renderDealCrmButton(deal)}<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button>`;
+    return `${renderDealCrmButton(deal)}<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button><button type="button" class="deal-action-btn deal-copy-btn" onclick="event.stopPropagation(); showCopyDealConfirm(${deal.id}, this)" title="Копировать сделку с позициями" aria-label="Копировать сделку с позициями">⧉</button>`;
 }
 
 function renderDealDetailView(deal, detailContainer, tabBtn = null) {
@@ -4762,6 +4763,154 @@ function showCreateDealConfirm(sourceDealId, btn) {
         popover.remove();
         createDealFromDeal(sourceDealId, btn);
     };
+}
+
+function showCopyDealConfirm(sourceDealId, btn) {
+    if (!sourceDealId || !btn) return;
+
+    document.querySelectorAll('.deal-confirm-popover').forEach(el => el.remove());
+
+    const deal = dealsCache.get(String(sourceDealId));
+    const clientName = getDealClientName(deal);
+    const posCount = Array.isArray(deal?.elements) ? deal.elements.length : 0;
+    const posLabel = posCount ? ` (${posCount} поз.)` : "";
+    const rect = btn.getBoundingClientRect();
+    const popover = document.createElement('div');
+    popover.className = 'deal-confirm-popover';
+    popover.innerHTML = `
+        <div style="margin-bottom:10px;">Скопировать сделку клиента "${escapeHtml(clientName)}"${posLabel}?<br><span style="color:#888; font-size:12px;">Позиции с себестоимостью — без превью и макетов.</span></div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button type="button" class="confirm-no" style="background:#eef1f5; color:#555;">нет</button>
+            <button type="button" class="confirm-yes" style="background:#27ae60; color:white;">да</button>
+        </div>`;
+
+    document.body.appendChild(popover);
+
+    const left = Math.min(rect.left, window.innerWidth - popover.offsetWidth - 12);
+    popover.style.left = `${Math.max(12, left)}px`;
+    popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - popover.offsetHeight - 12)}px`;
+
+    popover.querySelector('.confirm-no').onclick = () => popover.remove();
+    popover.querySelector('.confirm-yes').onclick = () => {
+        popover.remove();
+        copyDealWithPositions(sourceDealId, btn);
+    };
+}
+
+// Категория позиции для копии (с запасным дефолтом)
+function getElementCategoryIdForCopy(el) {
+    const raw = el?.category_id ?? el?.categoryId ?? el?.category?.id;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+    return (typeof getDefaultElementCategoryId === "function" ? getDefaultElementCategoryId() : null);
+}
+
+// Формирует item для n8n 'save' из позиции-источника (только цены/себестоимость, без ассетов)
+function buildCopyItemFromElement(el) {
+    const qty = Number(getElementQuantity(el)) || 0;
+    const priceRaw = getElementPrice(el);
+    const totalRaw = getElementLineTotal(el);
+    const total = Number.isFinite(totalRaw) ? totalRaw : (Number.isFinite(priceRaw) && qty > 0 ? priceRaw * qty : 0);
+    const price = Number.isFinite(priceRaw) ? priceRaw : (qty > 0 ? total / qty : 0);
+
+    const item = {
+        name: getElementName(el),
+        quantity: qty,
+        total,
+        price,
+        units: getElementUnits(el) || "шт"
+    };
+
+    const categoryId = getElementCategoryIdForCopy(el);
+    item.category_id = Number.isFinite(categoryId) && categoryId > 0 ? categoryId : null;
+
+    const cost = getElementCost(el);
+    if (cost != null) {
+        item.cost = Math.round(cost);
+        item.cost_total = Math.round(cost);
+    }
+    const costHq = getElementCostHq(el);
+    if (costHq != null) item.cost_hq = Math.round(costHq);
+    const sra3 = getElementSra3Sheets(el);
+    if (sra3 != null) item.sra3_sheets = sra3;
+
+    return item;
+}
+
+async function copyDealWithPositions(sourceDealId, btn) {
+    if (!ensureActiveSession()) return;
+    if (!sourceDealId) return;
+
+    const originalHtml = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "…";
+        btn.style.opacity = "0.7";
+    }
+
+    try {
+        // 1) Источник с позициями — берём из кэша либо подгружаем
+        let src = dealsCache.get(String(sourceDealId));
+        if (!src || !Array.isArray(src.elements)) {
+            src = await fetchDealDetails(sourceDealId) || src;
+        }
+        const elements = Array.isArray(src?.elements) ? src.elements : [];
+
+        // 2) Догружаем себестоимость (Себ. HQ / Листов SRA3) по всем позициям
+        const elementIds = elements
+            .map(el => Number(getElementId(el)))
+            .filter(id => Number.isFinite(id) && id > 0);
+        if (elementIds.length && typeof prefetchElementFieldsBatch === "function") {
+            try { await prefetchElementFieldsBatch(sourceDealId, elementIds); } catch (_) {}
+            src = dealsCache.get(String(sourceDealId)) || src;
+        }
+        const srcElements = Array.isArray(src?.elements) ? src.elements : elements;
+
+        // 3) Создаём новую сделку для того же клиента
+        const response = await fetch(N8N_URL, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: 'createDeal',
+                sourceDealId: sourceDealId,
+                staffId: currentUser.crmId || null
+            })
+        });
+        if (!response.ok) throw new Error("Ошибка создания сделки");
+
+        const data = await response.json();
+        const newDeal = normalizeDealResponse(data, true);
+        const newId = newDeal?.id;
+        if (!newId) throw new Error("Сервер не вернул новую сделку");
+
+        // 4) Дублируем позиции (если сервер их ещё не скопировал)
+        const serverAlreadyCopied = Array.isArray(newDeal.elements) && newDeal.elements.length > 0;
+        if (!serverAlreadyCopied && srcElements.length) {
+            for (let i = 0; i < srcElements.length; i++) {
+                const item = buildCopyItemFromElement(srcElements[i]);
+                if (!item.name || !(item.quantity > 0)) continue;
+                if (btn) btn.innerHTML = `${i + 1}/${srcElements.length}`;
+                try {
+                    await saveNewDealElement(newId, item);
+                } catch (e) {
+                    console.warn("copyDeal: не удалось скопировать позицию", item.name, e);
+                }
+            }
+        }
+
+        // 5) Открываем новую сделку в отдельной вкладке
+        dealsCache.set(String(newId), newDeal);
+        await openDealInTab(newId);
+    } catch (e) {
+        alert("Не удалось скопировать сделку");
+        console.error(e);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            btn.style.opacity = "1";
+        }
+    }
 }
 
 function renderAdvSearchPagination(targetDiv) {
