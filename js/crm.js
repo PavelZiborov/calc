@@ -4284,6 +4284,32 @@ function renderDealTotalOnly(deal) {
     return `<div class="deal-total-only ${totalClass}" data-deal-id="${deal.id}">Итого: ${formatMoney(f.total)} ₽</div>`;
 }
 
+// Колонка «Сумма / Долг» табличного списка: сумма + долг (или «Оплачено»).
+function renderDealSumDebt(deal) {
+    const f = getDealFinancials(deal);
+    const totalClass = f.isPaid ? "is-ok" : "is-alert";
+    let sub = "";
+    if (f.debt > 0.009) {
+        sub = `<div class="dl-sum-debt">Долг: ${formatMoney(f.debt)} ₽</div>`;
+    } else if (f.total > 0) {
+        sub = `<div class="dl-sum-paid">Оплачено</div>`;
+    }
+    return `<div class="dl-sum-total ${totalClass}" data-deal-id="${deal.id}">${formatMoney(f.total)} ₽</div>${sub}`;
+}
+
+// Шапка колонок табличного списка сделок (десктоп; на мобиле скрыта через CSS).
+function renderDealListTableHead() {
+    return `<div class="crm-list-thead" aria-hidden="true">
+        <div class="dl-cell dl-num">№</div>
+        <div class="dl-cell dl-client">Клиент</div>
+        <div class="dl-cell dl-content">Содержимое сделки</div>
+        <div class="dl-cell dl-sum">Сумма / Долг</div>
+        <div class="dl-cell dl-status">Статус</div>
+        <div class="dl-cell dl-resp">Ответственный</div>
+        <div class="dl-cell dl-date">Создано</div>
+    </div>`;
+}
+
 // --- Прибыль по сделке (staff, карточка заказа) ---
 // Грязная = доход − себестоимость. Чистая = доход − налог 10% − себестоимость.
 const DEAL_PROFIT_TAX_RATE = 0.10;
@@ -5035,8 +5061,17 @@ function renderAdvSearchPagination(targetDiv) {
 
 function renderDealsList(deals, targetDiv, options = {}) {
     if (!targetDiv) return;
-    targetDiv.innerHTML = ""; 
+    targetDiv.innerHTML = "";
     const isDetailMode = Boolean(options.detailMode);
+
+    // В режиме списка карточки заворачиваем в табличную сетку с шапкой колонок.
+    let listTable = null;
+    if (!isDetailMode) {
+        listTable = document.createElement("div");
+        listTable.className = "crm-list-table";
+        listTable.innerHTML = renderDealListTableHead();
+        targetDiv.appendChild(listTable);
+    }
 
     deals.forEach(deal => {
         if (!isValidDeal(deal)) return;
@@ -5127,14 +5162,15 @@ function renderDealsList(deals, targetDiv, options = {}) {
                 ${renderPaymentSummary(deal, isClosed)}
             </div>
             ${renderDealExtraPanel(deal)}` : `
-            ${dealHeaderHtml}
-            <div class="elements-list">
-                <div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>
-                ${addBtnHtml}
-            </div>
-            ${renderDealListSearchFooter(deal, isClosed, false)}`;
-            
-        targetDiv.appendChild(card);
+            <div class="dl-cell dl-num">${dealLink}${dealActionButtons}</div>
+            <div class="dl-cell dl-client"><span class="dl-client-name">${icon("user")} ${escapeHtml(deal.client?.name || deal.client_name || "Клиент не указан")}</span></div>
+            <div class="dl-cell dl-content"><div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div></div>
+            <div class="dl-cell dl-sum">${renderDealSumDebt(deal)}</div>
+            <div class="dl-cell dl-status">${statusControl}</div>
+            <div class="dl-cell dl-resp">${escapeHtml(getDealResponsibleName(deal))}</div>
+            <div class="dl-cell dl-date">${escapeHtml(formatDealCreatedDate(getDealCreatedAt(deal)) || "")}</div>`;
+
+        (isDetailMode ? targetDiv : listTable).appendChild(card);
 
         if (isDetailMode && typeof scheduleElementAssetsLoading === "function") {
             scheduleElementAssetsLoading(deal);
