@@ -753,11 +753,26 @@
         border: 1px solid var(--accent, #2f7df6);
         box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.12);
     }
-    .element-editor-name-hint {
-        margin-top: 4px;
-        font-size: 12px;
-        line-height: 1.35;
+    .element-editor-rename-btn {
+        margin-top: 6px;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 600;
         color: var(--accent, #2f7df6);
+        background: rgba(47, 125, 246, 0.08);
+        border: 1px solid rgba(47, 125, 246, 0.35);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .element-editor-rename-btn:hover {
+        background: rgba(47, 125, 246, 0.16);
+    }
+    #elementEditorCategory:disabled {
+        background: #f4f2ec;
+        color: #6b675e;
+        cursor: default;
+        opacity: 1;
     }
     .element-editor-row3 {
         display: grid;

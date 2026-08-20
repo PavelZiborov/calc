@@ -1826,7 +1826,7 @@ function getElementEditorModal() {
             <div class="element-editor-body">
                 <label class="element-editor-label">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
-                <div id="elementEditorNameHint" class="element-editor-name-hint" style="display:none;">✏️ Здесь только описание — категория задаётся дропдауном ниже. Измените описание и/или категорию, затем «Сохранить и закрыть»: позиция пересоздастся с теми же ценами, себестоимостью и макетами.</div>
+                <button type="button" id="elementEditorRenameBtn" class="element-editor-rename-btn" style="display:none;" onclick="enableElementRenameEdit()">✏️ Редактировать наименование</button>
                 <div id="elementEditorCategoryWrap" class="element-editor-create-only" style="display:none;">
                     <label class="element-editor-label">Категория</label>
                     <select id="elementEditorCategory" class="element-editor-input"></select>
@@ -2037,20 +2037,45 @@ function setElementEditorStaffMode(isStaff) {
     }
 
     const nameInput = modal.querySelector("#elementEditorName");
-    const nameHint = modal.querySelector("#elementEditorNameHint");
-    const nameEditable = isStaff && !currentElementEditor?.isCreate;
+    const renameBtn = modal.querySelector("#elementEditorRenameBtn");
+    const nameCatSelect = modal.querySelector("#elementEditorCategory");
     if (nameInput && !currentElementEditor?.isCreate) {
-        // Наименование редактируемо для персонала: при сохранении с изменённым
-        // именем позиция физически пересоздаётся (CRM API не умеет rename).
-        nameInput.readOnly = !isStaff;
-        nameInput.tabIndex = isStaff ? 0 : -1;
-        nameInput.classList.toggle("element-editor-input-readonly", !isStaff);
-        nameInput.classList.toggle("element-editor-input-rename", isStaff);
-        nameInput.title = isStaff
-            ? "Можно переименовать. Позиция будет пересоздана с теми же ценами, себестоимостью и макетами."
-            : "";
+        // Наименование существующей позиции по умолчанию заблокировано.
+        // Редактирование включается кнопкой «Редактировать наименование».
+        nameInput.readOnly = true;
+        nameInput.tabIndex = -1;
+        nameInput.classList.add("element-editor-input-readonly");
+        nameInput.classList.remove("element-editor-input-rename");
+        nameInput.title = "";
     }
-    if (nameHint) nameHint.style.display = nameEditable ? "" : "none";
+    if (nameCatSelect && !currentElementEditor?.isCreate) {
+        nameCatSelect.disabled = true;
+    }
+    if (renameBtn) {
+        renameBtn.style.display = (isStaff && !currentElementEditor?.isCreate) ? "" : "none";
+        renameBtn.textContent = "✏️ Редактировать наименование";
+    }
+}
+
+// Разблокирует наименование и дропдаун категории для переименования позиции.
+function enableElementRenameEdit() {
+    const modal = document.getElementById("element-editor-modal");
+    if (!modal || !currentElementEditor || currentElementEditor.isCreate) return;
+    if (currentUser.role !== "staff" || currentElementEditor.isLocked) return;
+
+    const nameInput = modal.querySelector("#elementEditorName");
+    const catSelect = modal.querySelector("#elementEditorCategory");
+    const renameBtn = modal.querySelector("#elementEditorRenameBtn");
+
+    if (nameInput) {
+        nameInput.readOnly = false;
+        nameInput.tabIndex = 0;
+        nameInput.classList.remove("element-editor-input-readonly");
+        nameInput.classList.add("element-editor-input-rename");
+        nameInput.focus();
+    }
+    if (catSelect) catSelect.disabled = false;
+    if (renameBtn) renameBtn.style.display = "none";
 }
 
 // Наименование = «описание / категория». Для персонала показываем в поле только
