@@ -4287,14 +4287,22 @@ function renderDealTotalOnly(deal) {
 // Колонка «Сумма / Долг» табличного списка: сумма + долг (или «Оплачено»).
 function renderDealSumDebt(deal) {
     const f = getDealFinancials(deal);
-    const totalClass = f.isPaid ? "is-ok" : "is-alert";
+    const paid = Number(f.paid) || 0;
+    let cls = "is-ok";
     let sub = "";
-    if (f.debt > 0.009) {
-        sub = `<div class="dl-sum-debt">Долг: ${formatMoney(f.debt)} ₽</div>`;
-    } else if (f.total > 0) {
-        sub = `<div class="dl-sum-paid">Оплачено</div>`;
+    if (f.total <= 0.009) {
+        cls = "is-ok";                       // без суммы — нейтрально
+    } else if (f.debt <= 0.009) {
+        cls = "is-ok";                       // оплачено полностью
+        sub = `<div class="dl-sum-note">Оплачено</div>`;
+    } else if (paid > 0.009) {
+        cls = "is-partial";                  // частично оплачено
+        sub = `<div class="dl-sum-note dl-sum-note--partial">Частично оплачено</div>`;
+    } else {
+        cls = "is-unpaid";                   // не оплачено вовсе
+        sub = `<div class="dl-sum-note dl-sum-note--unpaid">Не оплачено</div>`;
     }
-    return `<div class="dl-sum-total ${totalClass}" data-deal-id="${deal.id}">${formatMoney(f.total)} ₽</div>${sub}`;
+    return `<div class="dl-sum-total ${cls}" data-deal-id="${deal.id}">${formatMoney(f.total)} ₽</div>${sub}`;
 }
 
 // Шапка колонок табличного списка сделок (десктоп; на мобиле скрыта через CSS).
@@ -5163,7 +5171,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
             </div>
             ${renderDealExtraPanel(deal)}` : `
             <div class="dl-cell dl-num">${dealLink}${dealActionButtons}</div>
-            <div class="dl-cell dl-client"><span class="dl-client-name">${icon("user")} ${escapeHtml(deal.client?.name || deal.client_name || "Клиент не указан")}</span></div>
+            <div class="dl-cell dl-client"><span class="dl-client-name">${escapeHtml(deal.client?.name || deal.client_name || "Клиент не указан")}</span></div>
             <div class="dl-cell dl-content"><div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div></div>
             <div class="dl-cell dl-sum">${renderDealSumDebt(deal)}</div>
             <div class="dl-cell dl-status">${statusControl}</div>
