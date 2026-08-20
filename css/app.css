@@ -1860,14 +1860,23 @@
     .deal-footer-meta--mobile { display: block; }
 
     @media (min-width: 601px) {
+        /* Плотный список сделок: шапка на всю ширину, содержимое слева,
+           «Итого» — в правую колонку той же строки (без отдельной строки-подвала). */
         .crm-item--list {
-            padding: 8px 12px;
-            margin-top: 8px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-areas: "head head" "body total";
+            column-gap: 14px;
+            row-gap: 2px;
+            align-items: center;
+            padding: 5px 12px;
+            margin-top: 5px;
         }
         .crm-item--list .crm-list-header {
+            grid-area: head;
             align-items: center;
-            margin-bottom: 4px;
-            gap: 10px;
+            margin-bottom: 0;
+            gap: 8px;
         }
         .crm-item--list .crm-list-header-main {
             display: flex;
@@ -1919,13 +1928,20 @@
             display: none;
         }
         .crm-item--list .elements-list {
-            padding: 4px 8px;
-            margin-top: 2px;
+            grid-area: body;
+            padding: 0;
+            margin-top: 0;
+            min-width: 0;
         }
         .crm-item--list .element-row {
-            padding: 3px 0;
+            padding: 1px 0;
             gap: 5px;
             border-bottom: none;
+        }
+        .crm-item--list .element-row > span:first-child {
+            font-size: 13px !important;
+            min-width: 16px !important;
+            margin-right: 4px !important;
         }
         .crm-item--list .element-row + .element-row {
             border-top: 1px solid #ebe8e0;
@@ -1940,23 +1956,22 @@
             padding: 2px 6px;
             font-size: 11px;
         }
-        .crm-item--list .add-btn-container {
-            margin-top: 4px;
-            padding-top: 0;
-            border-top: none;
-        }
+        /* Кнопка «Добавить просчёт» в списке скрыта ради плотности —
+           она доступна в детальной карточке заказа. */
+        .crm-item--list .add-btn-container { display: none; }
         .crm-item--list .deal-category-select-wrap { display:none; }
-        .crm-item--list .add-btn {
-            padding: 2px 8px;
-            font-size: 11px;
-        }
         .crm-item--list .crm-list-footer {
-            margin-top: 4px;
+            grid-area: total;
+            justify-content: flex-end;
+            align-self: center;
+            margin-top: 0;
             padding-top: 0;
             border-top: none;
         }
         .crm-item--list .deal-total-only {
-            font-size: 11px;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
         }
         /* Детальная карточка заказа на десктопе: позиция отображается столбцами
            статус | превью | название | количество | себестоимость | сумма.
