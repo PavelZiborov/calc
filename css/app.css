@@ -1949,8 +1949,15 @@
         .crm-item--list:hover { background: var(--surface-2); }
         .crm-item--list .dl-cell { padding: 3px 9px; min-width: 0; }
 
-        .crm-item--list .dl-num { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+        .crm-item--list .dl-num { display: flex; align-items: flex-start; gap: 3px; white-space: nowrap; }
         .crm-item--list .dl-num .deal-num-btn { font-size: 12.5px; font-weight: bold; }
+        /* Компактные кнопки действий в списке (крупные 24px слишком выделяются). */
+        .crm-item--list .dl-num .deal-action-btn {
+            width: 18px !important; height: 18px; min-width: 18px !important;
+            margin: 0 0 0 3px;
+            font-size: 10px; line-height: 16px;
+            border-radius: 5px;
+        }
         .crm-item--list .dl-client-name {
             display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             color: var(--text); font-size: 11.5px;
