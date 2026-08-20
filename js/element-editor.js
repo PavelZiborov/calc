@@ -1826,7 +1826,7 @@ function getElementEditorModal() {
             <div class="element-editor-body">
                 <label class="element-editor-label">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
-                <div id="elementEditorNameHint" class="element-editor-name-hint" style="display:none;">✏️ Щёлкните прямо по названию выше и измените текст, затем «Сохранить и закрыть». Позиция будет пересоздана с теми же ценами, себестоимостью и макетами.</div>
+                <div id="elementEditorNameHint" class="element-editor-name-hint" style="display:none;">✏️ Здесь только описание — категория задаётся дропдауном ниже. Измените описание и/или категорию, затем «Сохранить и закрыть»: позиция пересоздастся с теми же ценами, себестоимостью и макетами.</div>
                 <div id="elementEditorCategoryWrap" class="element-editor-create-only" style="display:none;">
                     <label class="element-editor-label">Категория</label>
                     <select id="elementEditorCategory" class="element-editor-input"></select>
@@ -2053,6 +2053,30 @@ function setElementEditorStaffMode(isStaff) {
     if (nameHint) nameHint.style.display = nameEditable ? "" : "none";
 }
 
+// Наименование = «описание / категория». Для персонала показываем в поле только
+// описание (редактируемое), а категорию — отдельным дропдауном (как при создании),
+// чтобы её можно было менять и чтобы она не задваивалась при пересоздании.
+function setupElementNameCategoryFields(modal, element, isStaff) {
+    const nameInput = modal.querySelector("#elementEditorName");
+    const catWrap = modal.querySelector("#elementEditorCategoryWrap");
+    const catSelect = modal.querySelector("#elementEditorCategory");
+
+    if (isStaff) {
+        if (nameInput) nameInput.value = getElementBaseName(element);
+        if (catWrap && catSelect) {
+            fillElementEditorCategorySelect(modal);
+            const catId = getElementCategoryIdForCopy(element);
+            if (catId != null && catSelect.querySelector(`option[value="${CSS.escape(String(catId))}"]`)) {
+                catSelect.value = String(catId);
+            }
+            catWrap.style.display = "";
+        }
+    } else {
+        if (nameInput) nameInput.value = getElementName(element);
+        if (catWrap) catWrap.style.display = "none";
+    }
+}
+
 function openElementEditor(event, trigger) {
     if (event) event.stopPropagation();
     if (!ensureActiveSession()) return;
@@ -2081,11 +2105,10 @@ function openElementEditor(event, trigger) {
     setElementEditorStaffMode(isStaff);
     setElementEditorLayout({ isCreate: false, showAssets: true });
 
-    const name = getElementName(element);
     const qty = getElementQuantity(element);
     const price = getElementPrice(element);
     const total = getElementLineTotal(element);
-    modal.querySelector("#elementEditorName").value = name;
+    setupElementNameCategoryFields(modal, element, isStaff);
     modal.querySelector("#elementEditorQty").value = qty || "";
     modal.querySelector("#elementEditorPrice").value = Number.isFinite(price) ? price : "";
     modal.querySelector("#elementEditorTotal").value = Number.isFinite(total) ? total : "";
@@ -2758,23 +2781,28 @@ async function renameElementViaRecreate(dealId, oldElementId, dealNum, item, onL
 }
 
 async function renameElementFromEditor(ctx) {
-    const { newName, qty, price, total, costRaw, costHqRaw, sra3Raw, element, saveBtn } = ctx;
+    const { newName, categoryId: pickedCategoryId, qty, price, total, costRaw, costHqRaw, sra3Raw, element, saveBtn } = ctx;
+
+    if (!newName) {
+        alert("Введите наименование позиции");
+        return;
+    }
 
     const layoutsCount = (() => {
         const a = elementAssetsCache.get(assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId));
         return Array.isArray(a?.layouts) ? a.layouts.length : 0;
     })();
     const confirmMsg = layoutsCount
-        ? `Переименовать позицию? Она будет пересоздана с теми же ценами и себестоимостью, макеты (${layoutsCount}) и превью перезальются заново.`
-        : "Переименовать позицию? Она будет пересоздана с теми же ценами и себестоимостью.";
+        ? `Сохранить изменение наименования/категории? Позиция будет пересоздана с теми же ценами и себестоимостью, макеты (${layoutsCount}) и превью перезальются заново.`
+        : "Сохранить изменение наименования/категории? Позиция будет пересоздана с теми же ценами и себестоимостью.";
     if (!confirm(confirmMsg)) return;
 
     const cost = costRaw !== "" ? Math.round(Number(costRaw)) : getElementCost(element);
     const costHq = costHqRaw !== "" ? Math.round(Number(costHqRaw)) : getElementCostHq(element);
     const sra3 = sra3Raw !== "" ? Number(sra3Raw) : getElementSra3Sheets(element);
-    const categoryId = typeof getElementCategoryIdForCopy === "function"
-        ? getElementCategoryIdForCopy(element)
-        : null;
+    const categoryId = (Number.isFinite(pickedCategoryId) && pickedCategoryId > 0)
+        ? pickedCategoryId
+        : (typeof getElementCategoryIdForCopy === "function" ? getElementCategoryIdForCopy(element) : null);
     const units = getElementEditorUnitsValue() || getElementUnits(element) || "шт";
     const responsibleIds = getSelectedElementEditorResponsibleIds();
 
@@ -2843,17 +2871,24 @@ async function saveElementEditor() {
         return;
     }
 
-    // Изменилось наименование → CRM API не умеет rename, пересоздаём позицию.
+    // Изменилось описание ИЛИ категория → CRM API не умеет rename/смену категории,
+    // пересоздаём позицию. В поле — только описание, категория — из дропдауна.
     const currentElement = findDealElement(
         currentElementEditor.dealId,
         currentElementEditor.elementId,
         currentElementEditor.elementIndex
     );
-    const newName = String(modal.querySelector("#elementEditorName")?.value || "").trim();
-    const currentName = currentElement ? getElementName(currentElement) : "";
-    if (newName && currentName && newName !== currentName) {
+    const newDescription = String(modal.querySelector("#elementEditorName")?.value || "").trim();
+    const oldDescription = currentElement ? getElementBaseName(currentElement) : "";
+    const oldCategoryId = currentElement ? getElementCategoryIdForCopy(currentElement) : null;
+    const catSelect = modal.querySelector("#elementEditorCategory");
+    const newCategoryId = catSelect && catSelect.value ? Number(catSelect.value) : oldCategoryId;
+    const nameChanged = newDescription && newDescription !== oldDescription;
+    const categoryChanged = Number.isFinite(newCategoryId) && Number(newCategoryId) !== Number(oldCategoryId);
+    if (currentElement && (nameChanged || categoryChanged)) {
         return renameElementFromEditor({
-            newName,
+            newName: newDescription,
+            categoryId: newCategoryId,
             qty,
             price: Number.isFinite(price) ? price : 0,
             total: Number.isFinite(total) ? total : 0,

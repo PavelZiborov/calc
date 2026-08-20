@@ -1612,6 +1612,31 @@ function getElementName(element) {
     return element?.category_and_name || element?.name || element?.title || "";
 }
 
+// Имя категории позиции (по category_id из справочника категорий)
+function getElementCategoryName(element) {
+    const catId = getElementCategoryIdForCopy(element);
+    const cats = typeof getCategories === "function" ? getCategories() : [];
+    const found = cats.find(c => String(c.id) === String(catId));
+    return found ? String(found.name || "").trim() : "";
+}
+
+// Базовое наименование БЕЗ хвоста «/ Категория». В CRM отображаемое имя =
+// «описание / категория», причём категорию дописывает сервер при создании.
+// Поэтому при копировании/переименовании слать нужно только описание, иначе
+// категория задваивается при каждом пересоздании.
+function getElementBaseName(element) {
+    let full = String(getElementName(element) || "").trim();
+    const cat = getElementCategoryName(element);
+    if (cat) {
+        const suffix = " / " + cat;
+        // убираем хвостовые повторы «/ Категория» (накопленные прошлыми пересозданиями)
+        while (full.endsWith(suffix)) {
+            full = full.slice(0, -suffix.length).trim();
+        }
+    }
+    return full;
+}
+
 function getElementQuantity(element) {
     return Number(element?.quantity ?? element?.qty) || 0;
 }
@@ -4814,7 +4839,8 @@ function buildCopyItemFromElement(el) {
     const price = Number.isFinite(priceRaw) ? priceRaw : (qty > 0 ? total / qty : 0);
 
     const item = {
-        name: getElementName(el),
+        // базовое описание без «/ Категория» — категорию сервер допишет по category_id
+        name: getElementBaseName(el),
         quantity: qty,
         total,
         price,
