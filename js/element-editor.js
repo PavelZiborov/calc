@@ -675,7 +675,7 @@ async function renderPdfFirstPageToImageFile(file, baseName = "preview") {
 }
 
 // Формирует превью из последнего загруженного макета (PDF → 1-я страница; картинку берёт как есть)
-async function autoGeneratePreviewFromLayout(file) {
+async function autoGeneratePreviewFromLayout(file, target = null) {
     if (!file) return;
     let imageFile = null;
     if (isPdfFile(file)) {
@@ -686,7 +686,7 @@ async function autoGeneratePreviewFromLayout(file) {
     } else {
         return; // не PDF и не картинка — авто-превью не формируем
     }
-    await uploadSinglePreviewFile(imageFile);
+    await uploadSinglePreviewFile(imageFile, target ? { target } : {});
 }
 
 async function uploadFileToYandexUrl(uploadUrl, file, mimeType = null, onProgress = null, timeoutMs = UPLOAD_TIMEOUT_MS) {
@@ -2034,7 +2034,14 @@ function setElementEditorStaffMode(isStaff) {
 
     const nameInput = modal.querySelector("#elementEditorName");
     if (nameInput && !currentElementEditor?.isCreate) {
-        nameInput.readOnly = true;
+        // Наименование редактируемо для персонала: при сохранении с изменённым
+        // именем позиция физически пересоздаётся (CRM API не умеет rename).
+        nameInput.readOnly = !isStaff;
+        nameInput.tabIndex = isStaff ? 0 : -1;
+        nameInput.classList.toggle("element-editor-input-readonly", !isStaff);
+        if (isStaff) {
+            nameInput.title = "Можно переименовать. Позиция будет пересоздана с теми же ценами, себестоимостью и макетами.";
+        }
     }
 }
 
@@ -2206,7 +2213,8 @@ function renderElementEditorAssets() {
     });
 }
 
-async function uploadSinglePreviewFile(file) {
+async function uploadSinglePreviewFile(file, options = {}) {
+    const target = options.target || currentElementEditor;
     if (!PREVIEW_IMAGE_TYPES.includes(file.type)) {
         throw new Error("unsupported preview type");
     }
@@ -2221,9 +2229,9 @@ async function uploadSinglePreviewFile(file) {
     }
 
     const payload = buildElementAssetsPayload(
-        currentElementEditor.dealId,
-        currentElementEditor.elementId,
-        currentElementEditor.dealNum
+        target.dealId,
+        target.elementId,
+        target.dealNum
     );
 
     setPreviewEditorProgress("Регистрация превью…", 0.18);
@@ -2248,7 +2256,7 @@ async function uploadSinglePreviewFile(file) {
     }, { timeoutMs: SERVER_TIMEOUT_MS });
 
     const assets = normalizeAssetsResponse(data);
-    const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
+    const key = assetsCacheKey(target.dealId, target.elementId);
     const prev = elementAssetsCache.get(key) || { layouts: [] };
     const preview = normalizePreview(assets.preview) || normalizePreview(prev.preview);
     if (preview && prep.diskFileName) {
@@ -2263,7 +2271,7 @@ async function uploadSinglePreviewFile(file) {
         layoutsLoading: false
     });
 
-    updateElementThumb(currentElementEditor.dealId, currentElementEditor.elementId);
+    updateElementThumb(target.dealId, target.elementId);
 }
 
 async function uploadPreviewFiles(files) {
@@ -2314,11 +2322,12 @@ function getLayoutUploadTimeoutMs(fileSize = 0) {
 
 async function uploadSingleLayoutFile(file, options = {}) {
     const uploadTimeoutMs = getLayoutUploadTimeoutMs(file.size);
+    const target = options.target || currentElementEditor;
 
     const payload = buildElementAssetsPayload(
-        currentElementEditor.dealId,
-        currentElementEditor.elementId,
-        currentElementEditor.dealNum
+        target.dealId,
+        target.elementId,
+        target.dealNum
     );
     const safeFileName = toSafeUploadFileName(file.name, "layout");
     const updateProgress = (label, progress) => {
@@ -2353,7 +2362,7 @@ async function uploadSingleLayoutFile(file, options = {}) {
     }, { timeoutMs: Math.max(SERVER_TIMEOUT_MS, uploadTimeoutMs) });
 
     const assets = normalizeAssetsResponse(data);
-    const key = assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId);
+    const key = assetsCacheKey(target.dealId, target.elementId);
     const prev = elementAssetsCache.get(key) || {};
     elementAssetsCache.set(key, {
         ...prev,
@@ -2625,6 +2634,185 @@ function updateElementRowDom(dealId, elementId, element) {
     rowEl.setAttribute("data-price", String(lineTotal));
 }
 
+// ---- Переименование позиции (CRM API не умеет rename → delete + recreate) ----
+
+// Качает файл макета по URL (Я.Диск). Может упасть из-за CORS → тогда null,
+// и вызывающий код привяжет макет ссылкой (fallback).
+async function fetchLayoutAsFile(layout) {
+    const url = layout?.url;
+    if (!isUsableAssetUrl(url)) return null;
+    try {
+        const resp = await fetch(url, { credentials: "omit" });
+        if (!resp.ok) return null;
+        const blob = await resp.blob();
+        if (!blob || blob.size === 0) return null;
+        let name = String(layout.name || "layout").trim() || "layout";
+        const type = blob.type
+            || (/\.pdf$/i.test(name) ? "application/pdf" : "application/octet-stream");
+        if (type === "application/pdf" && !/\.pdf$/i.test(name)) name += ".pdf";
+        return new File([blob], name, { type });
+    } catch (e) {
+        return null; // CORS / сеть → fallback-ссылка
+    }
+}
+
+async function attachLayoutLinkToElement(target, url, name) {
+    await elementAssetsApi("addElementLayout", {
+        ...buildElementAssetsPayload(target.dealId, target.elementId, target.dealNum),
+        type: "link",
+        url,
+        name: String(name || url.replace(/^https?:\/\//, "")).slice(0, 60)
+    });
+}
+
+// Переносит макеты старой позиции на новую: файлы — перекачкой + повторной заливкой,
+// при неудаче (CORS) — ссылкой. Возвращает первый перезалитый PDF (для превью).
+async function reattachLayoutsToNewElement(target, oldLayouts, onProgress) {
+    let firstPdfFile = null;
+    for (let i = 0; i < oldLayouts.length; i++) {
+        const layout = oldLayouts[i];
+        if (typeof onProgress === "function") onProgress(i + 1, oldLayouts.length);
+        try {
+            if (layout.type === "link") {
+                await attachLayoutLinkToElement(target, layout.url, layout.name);
+                continue;
+            }
+            const file = await fetchLayoutAsFile(layout);
+            if (file) {
+                await uploadSingleLayoutFile(file, { target, onProgress: () => {} });
+                if (!firstPdfFile && isPdfFile(file)) firstPdfFile = file;
+            } else {
+                await attachLayoutLinkToElement(target, layout.url, layout.name);
+            }
+        } catch (e) {
+            console.warn("rename: не удалось перенести макет", layout?.name, e);
+            try { await attachLayoutLinkToElement(target, layout.url, layout.name); } catch (_) {}
+        }
+    }
+    return firstPdfFile;
+}
+
+// Полный цикл переименования: пересоздать позицию, дописать себестоимость,
+// перенести макеты (+ пересобрать превью), удалить старую позицию.
+async function renameElementViaRecreate(dealId, oldElementId, dealNum, item, onLayoutProgress) {
+    // 1) Макеты старой позиции (превью пересоберём из первого PDF)
+    let oldAssets = elementAssetsCache.get(assetsCacheKey(dealId, oldElementId));
+    if (!oldAssets || oldAssets.layoutsLoaded !== true) {
+        try {
+            const fetched = await fetchElementAssets(dealId, oldElementId, dealNum, { silent401: true });
+            oldAssets = { ...(oldAssets || {}), ...fetched, layoutsLoaded: true };
+        } catch (_) {}
+    }
+    const oldLayouts = Array.isArray(oldAssets?.layouts) ? oldAssets.layouts : [];
+
+    // 2) Создаём новую позицию с новым наименованием и теми же данными
+    const saveResult = await saveNewDealElement(dealId, item);
+    const newElementId = await resolveCreatedElementId(dealId, item, saveResult);
+    const target = { dealId: String(dealId), elementId: String(newElementId), dealNum };
+
+    // 3) Дописываем себестоимость / доп.поля (Себ., Себ. HQ, Листов SRA3)
+    const fields = {};
+    if (Number.isFinite(item.cost) && item.cost > 0) fields.cost = item.cost;
+    if (Number.isFinite(item.cost_hq)) fields.cost_hq = item.cost_hq;
+    if (Number.isFinite(item.sra3_sheets)) fields.sra3_sheets = item.sra3_sheets;
+    if (Object.keys(fields).length) {
+        try {
+            await elementAssetsApi("updateElement", {
+                ...buildElementAssetsPayload(dealId, newElementId, dealNum),
+                fields
+            });
+        } catch (e) { console.warn("rename: updateElement", e); }
+    }
+
+    // 4) Переносим макеты, из первого PDF пересобираем превью
+    if (oldLayouts.length) {
+        const firstPdf = await reattachLayoutsToNewElement(target, oldLayouts, onLayoutProgress);
+        if (firstPdf) {
+            try { await autoGeneratePreviewFromLayout(firstPdf, target); }
+            catch (e) { console.warn("rename: preview", e); }
+        }
+    }
+
+    // 5) Удаляем старую позицию
+    try {
+        await fetchWithTimeout(N8N_URL, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                action: "deleteDealElement",
+                dealId: Number(dealId),
+                elementId: Number(oldElementId)
+            })
+        });
+    } catch (e) { console.warn("rename: delete old element", e); }
+
+    return newElementId;
+}
+
+async function renameElementFromEditor(ctx) {
+    const { newName, qty, price, total, costRaw, costHqRaw, sra3Raw, element, saveBtn } = ctx;
+
+    const layoutsCount = (() => {
+        const a = elementAssetsCache.get(assetsCacheKey(currentElementEditor.dealId, currentElementEditor.elementId));
+        return Array.isArray(a?.layouts) ? a.layouts.length : 0;
+    })();
+    const confirmMsg = layoutsCount
+        ? `Переименовать позицию? Она будет пересоздана с теми же ценами и себестоимостью, макеты (${layoutsCount}) и превью перезальются заново.`
+        : "Переименовать позицию? Она будет пересоздана с теми же ценами и себестоимостью.";
+    if (!confirm(confirmMsg)) return;
+
+    const cost = costRaw !== "" ? Math.round(Number(costRaw)) : getElementCost(element);
+    const costHq = costHqRaw !== "" ? Math.round(Number(costHqRaw)) : getElementCostHq(element);
+    const sra3 = sra3Raw !== "" ? Number(sra3Raw) : getElementSra3Sheets(element);
+    const categoryId = typeof getElementCategoryIdForCopy === "function"
+        ? getElementCategoryIdForCopy(element)
+        : null;
+    const units = getElementEditorUnitsValue() || getElementUnits(element) || "шт";
+    const responsibleIds = getSelectedElementEditorResponsibleIds();
+
+    const costNum = Number.isFinite(cost) ? cost : 0;
+    const item = {
+        name: newName,
+        quantity: qty,
+        total,
+        price,
+        units,
+        category_id: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : null,
+        cost: costNum,
+        cost_total: costNum,
+        cost_hq: Number.isFinite(costHq) ? costHq : null,
+        sra3_sheets: Number.isFinite(sra3) ? sra3 : null
+    };
+    if (responsibleIds.length) item.responsible_ids = responsibleIds;
+
+    if (!item.category_id) {
+        alert("Не удалось определить категорию позиции — переименование недоступно");
+        return;
+    }
+
+    const dealId = currentElementEditor.dealId;
+    const oldElementId = currentElementEditor.elementId;
+    const dealNum = currentElementEditor.dealNum;
+
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Переименование…"; }
+    try {
+        await renameElementViaRecreate(dealId, oldElementId, dealNum, item, (i, n) => {
+            if (saveBtn) saveBtn.textContent = `Макеты ${i}/${n}…`;
+        });
+        clearDealAssetsCache(dealId);
+        if (typeof reloadDealTabContent === "function") {
+            await reloadDealTabContent(dealId);
+        }
+        if (typeof refreshElementRowMetas === "function") refreshElementRowMetas(dealId);
+        closeElementEditor();
+    } catch (e) {
+        console.error("renameElement", e);
+        alert("Не удалось переименовать позицию");
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Сохранить и закрыть"; }
+    }
+}
+
 async function saveElementEditor() {
     if (currentElementEditor?.isCreate) {
         return saveNewElementFromEditor(false);
@@ -2645,6 +2833,26 @@ async function saveElementEditor() {
     if (qty <= 0) {
         alert("Укажите количество больше 0");
         return;
+    }
+
+    // Изменилось наименование → CRM API не умеет rename, пересоздаём позицию.
+    const currentElement = findDealElement(
+        currentElementEditor.dealId,
+        currentElementEditor.elementId,
+        currentElementEditor.elementIndex
+    );
+    const newName = String(modal.querySelector("#elementEditorName")?.value || "").trim();
+    const currentName = currentElement ? getElementName(currentElement) : "";
+    if (newName && currentName && newName !== currentName) {
+        return renameElementFromEditor({
+            newName,
+            qty,
+            price: Number.isFinite(price) ? price : 0,
+            total: Number.isFinite(total) ? total : 0,
+            costRaw, costHqRaw, sra3Raw,
+            element: currentElement,
+            saveBtn
+        });
     }
 
     const fields = {
