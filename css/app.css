@@ -747,6 +747,18 @@
         color: #6b675e;
         cursor: default;
     }
+    /* Наименование в режиме переименования — явно редактируемое поле */
+    .element-editor-input-rename {
+        background: #fff;
+        border: 1px solid var(--accent, #2f7df6);
+        box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.12);
+    }
+    .element-editor-name-hint {
+        margin-top: 4px;
+        font-size: 12px;
+        line-height: 1.35;
+        color: var(--accent, #2f7df6);
+    }
     .element-editor-row3 {
         display: grid;
         grid-template-columns: 1fr 0.7fr 1fr;

@@ -1821,8 +1821,9 @@ function getElementEditorModal() {
                 <button type="button" class="element-editor-close" onclick="closeElementEditor()" aria-label="Закрыть">&times;</button>
             </div>
             <div class="element-editor-body">
-                <label class="element-editor-label" title="Название задаётся при добавлении позиции в CRM; API не позволяет переименовать">Наименование</label>
+                <label class="element-editor-label">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
+                <div id="elementEditorNameHint" class="element-editor-name-hint" style="display:none;">✏️ Можно изменить — при сохранении позиция будет пересоздана с теми же ценами, себестоимостью и макетами</div>
                 <div id="elementEditorCategoryWrap" class="element-editor-create-only" style="display:none;">
                     <label class="element-editor-label">Категория</label>
                     <select id="elementEditorCategory" class="element-editor-input"></select>
@@ -2033,16 +2034,20 @@ function setElementEditorStaffMode(isStaff) {
     }
 
     const nameInput = modal.querySelector("#elementEditorName");
+    const nameHint = modal.querySelector("#elementEditorNameHint");
+    const nameEditable = isStaff && !currentElementEditor?.isCreate;
     if (nameInput && !currentElementEditor?.isCreate) {
         // Наименование редактируемо для персонала: при сохранении с изменённым
         // именем позиция физически пересоздаётся (CRM API не умеет rename).
         nameInput.readOnly = !isStaff;
         nameInput.tabIndex = isStaff ? 0 : -1;
         nameInput.classList.toggle("element-editor-input-readonly", !isStaff);
-        if (isStaff) {
-            nameInput.title = "Можно переименовать. Позиция будет пересоздана с теми же ценами, себестоимостью и макетами.";
-        }
+        nameInput.classList.toggle("element-editor-input-rename", isStaff);
+        nameInput.title = isStaff
+            ? "Можно переименовать. Позиция будет пересоздана с теми же ценами, себестоимостью и макетами."
+            : "";
     }
+    if (nameHint) nameHint.style.display = nameEditable ? "" : "none";
 }
 
 function openElementEditor(event, trigger) {
