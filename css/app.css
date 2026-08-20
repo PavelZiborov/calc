@@ -1889,8 +1889,6 @@
         .crm-item--list .dl-sum-total.is-unpaid { color: var(--danger); }
         .crm-item--list .dl-sum-total.is-partial { color: var(--pay-partial); }
         .crm-item--list .dl-sum-note { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-        .crm-item--list .dl-sum-note--unpaid { color: var(--danger); }
-        .crm-item--list .dl-sum-note--partial { color: var(--pay-partial); }
         .crm-item--list .deal-save-area { display: none !important; }
     }
 
@@ -1919,18 +1917,25 @@
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: subgrid;
-            align-items: start;
+            /* stretch → ячейки на всю высоту строки: контент прижат кверху,
+               а вертикальные разделители тянутся во всю высоту. */
+            align-items: stretch;
         }
+        /* Тонкие вертикальные разделители между колонками. */
+        .crm-list-thead .dl-cell,
+        .crm-item--list .dl-cell { border-right: 1px solid var(--border); }
+        .crm-list-thead .dl-date,
+        .crm-item--list .dl-date { border-right: none; }
         .crm-list-thead {
             background: var(--surface-2);
             border-bottom: 1px solid var(--border);
-            font-size: 10.5px;
+            font-size: 9.5px;
             font-weight: 700;
             letter-spacing: 0.03em;
             text-transform: uppercase;
             color: var(--text-muted);
         }
-        .crm-list-thead .dl-cell { padding: 7px 10px; }
+        .crm-list-thead .dl-cell { padding: 6px 9px; }
         .crm-item--list {
             margin: 0;
             padding: 0;
@@ -1942,13 +1947,13 @@
         }
         .crm-list-thead + .crm-item--list { border-top: none; }
         .crm-item--list:hover { background: var(--surface-2); }
-        .crm-item--list .dl-cell { padding: 4px 10px; min-width: 0; }
+        .crm-item--list .dl-cell { padding: 3px 9px; min-width: 0; }
 
         .crm-item--list .dl-num { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
-        .crm-item--list .dl-num .deal-num-btn { font-size: 14px; font-weight: bold; }
+        .crm-item--list .dl-num .deal-num-btn { font-size: 12.5px; font-weight: bold; }
         .crm-item--list .dl-client-name {
             display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-            color: var(--text); font-size: 13px;
+            color: var(--text); font-size: 11.5px;
         }
         .crm-item--list .dl-content .deal-elements-list { display: flex; flex-direction: column; gap: 1px; }
         .crm-item--list .dl-content .element-row {
@@ -1961,32 +1966,35 @@
         .crm-item--list .dl-content .element-row-total,
         .crm-item--list .dl-content .element-row-meta { display: none !important; }
         .crm-item--list .dl-content .element-row-text {
-            font-size: 12px !important; line-height: 1.3; padding: 0;
+            font-size: 11px !important; line-height: 1.3; padding: 0;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
         }
         .crm-item--list .dl-sum { text-align: right; white-space: nowrap; }
-        .crm-item--list .dl-sum-total { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .crm-item--list .dl-sum-total { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
         .crm-item--list .dl-sum-total.is-ok { color: var(--success); }
         .crm-item--list .dl-sum-total.is-unpaid { color: var(--danger); }
         .crm-item--list .dl-sum-total.is-partial { color: var(--pay-partial); }
-        .crm-item--list .dl-sum-note { font-size: 11px; font-weight: 600; color: var(--text-muted); }
-        .crm-item--list .dl-sum-note--unpaid { color: var(--danger); }
-        .crm-item--list .dl-sum-note--partial { color: var(--pay-partial); }
-        /* Статусы одной ширины: пилюля заполняет фиксированную колонку и центрируется. */
+        /* Подпись под суммой — всегда серая (цветом выделяется сама сумма). */
+        .crm-item--list .dl-sum-note { font-size: 10px; font-weight: 600; color: var(--text-muted); }
+        /* Статусы одной ширины и одинакового скругления: пилюля заполняет
+           фиксированную колонку. width !important перебивает #adv-search-container button{width:auto}. */
         .crm-item--list .dl-status .status-badge,
         .crm-item--list .dl-status .editable-status {
             display: block;
-            width: 100%;
+            width: 100% !important;
             box-sizing: border-box;
+            margin: 0;
             text-align: center;
-            font-size: 11px;
-            padding: 4px 8px;
+            font-size: 10.5px;
+            line-height: 1.2;
+            padding: 4px 6px;
+            border-radius: 6px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .crm-item--list .dl-resp { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .crm-item--list .dl-date { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .crm-item--list .dl-resp { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .crm-item--list .dl-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
         .crm-item--list .deal-save-area { display: none !important; }
         /* Детальная карточка заказа на десктопе: позиция отображается столбцами
            статус | превью | название | количество | себестоимость | сумма.
