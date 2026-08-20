@@ -1517,11 +1517,14 @@ function setElementEditorLayout({ isCreate = false, showAssets = true } = {}) {
     const categoryWrap = modal.querySelector("#elementEditorCategoryWrap");
     if (categoryWrap) categoryWrap.style.display = isCreate ? "" : "none";
 
+    // Наименование: в режиме создания — всегда редактируемо. Для существующей
+    // позиции редактируемостью управляет setElementEditorStaffMode (переименование),
+    // поэтому здесь его НЕ трогаем, иначе перетрём rename-режим (readOnly=true).
     const nameInput = modal.querySelector("#elementEditorName");
-    if (nameInput) {
-        nameInput.readOnly = !isCreate;
-        nameInput.classList.toggle("element-editor-input-readonly", !isCreate);
-        nameInput.tabIndex = isCreate ? 0 : -1;
+    if (nameInput && isCreate) {
+        nameInput.readOnly = false;
+        nameInput.classList.remove("element-editor-input-readonly", "element-editor-input-rename");
+        nameInput.tabIndex = 0;
     }
 
     const saveAssetsBtn = modal.querySelector("#elementEditorSaveAssets");
@@ -1823,7 +1826,7 @@ function getElementEditorModal() {
             <div class="element-editor-body">
                 <label class="element-editor-label">Наименование</label>
                 <textarea id="elementEditorName" rows="2" class="element-editor-input element-editor-input-readonly" readonly tabindex="-1"></textarea>
-                <div id="elementEditorNameHint" class="element-editor-name-hint" style="display:none;">✏️ Можно изменить — при сохранении позиция будет пересоздана с теми же ценами, себестоимостью и макетами</div>
+                <div id="elementEditorNameHint" class="element-editor-name-hint" style="display:none;">✏️ Щёлкните прямо по названию выше и измените текст, затем «Сохранить и закрыть». Позиция будет пересоздана с теми же ценами, себестоимостью и макетами.</div>
                 <div id="elementEditorCategoryWrap" class="element-editor-create-only" style="display:none;">
                     <label class="element-editor-label">Категория</label>
                     <select id="elementEditorCategory" class="element-editor-input"></select>
