@@ -5151,6 +5151,12 @@ function renderDealsList(deals, targetDiv, options = {}) {
                 </div>`
             : '';
 
+        // Компактная кнопка «добавить текущий просчёт в сделку» под позициями
+        // в строке списка. Только для открытых заказов (персонал).
+        const listAddBtn = (currentUser.role === 'staff' && !isClosed)
+            ? `<button type="button" class="dl-add-calc" onclick="event.stopPropagation(); addToDeal(${deal.id}, this)" title="Добавить текущий просчёт из калькулятора в эту сделку">＋ Добавить просчёт</button>`
+            : '';
+
         card.innerHTML = isDetailMode ? `
             ${dealHeaderHtml}
             <div class="client-name">${icon("user")} ${escapeHtml(deal.client?.name || deal.client_name || 'Клиент не указан')}</div>
@@ -5172,7 +5178,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
             ${renderDealExtraPanel(deal)}` : `
             <div class="dl-cell dl-num">${dealLink}${dealActionButtons}</div>
             <div class="dl-cell dl-client"><span class="dl-client-name">${escapeHtml(deal.client?.name || deal.client_name || "Клиент не указан")}</span></div>
-            <div class="dl-cell dl-content"><div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div></div>
+            <div class="dl-cell dl-content"><div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>${listAddBtn}</div>
             <div class="dl-cell dl-sum">${renderDealSumDebt(deal)}</div>
             <div class="dl-cell dl-status">${statusControl}</div>
             <div class="dl-cell dl-resp">${escapeHtml(getDealResponsibleName(deal))}</div>
