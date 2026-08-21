@@ -1,6 +1,8 @@
 // --- КОНФИГУРАЦИЯ И СЕССИЯ ---
 let SRA3_W = 320, SRA3_H = 450; // могут переопределяться настройками калькулятора (calc-settings.js)
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
+// Раздел «Клиенты»: своя БД клиентов + дублирование в CRM (n8n-clients.js).
+const CLIENTS_URL = "https://n8n.heavenprint.digital/webhook/clients";
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
 const DELETE_ASSETS_TIMEOUT_MS = 45000;

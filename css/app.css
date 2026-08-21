@@ -242,6 +242,57 @@
     #calcContainer { max-width: min(1200px, 100%); }
     /* Список заказов под калькулятором — по ширине калькулятора. */
     #crm-search-container { max-width: min(1200px, 100%); }
+
+    /* ===== Раздел «Клиенты» ===== */
+    #clients-container { max-width: min(1400px, 100%); }
+    .clients-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .clients-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); }
+    .clients-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .clients-search {
+        width: 240px; max-width: 100%; padding: 8px 12px; margin: 0;
+        border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; background: var(--surface);
+    }
+    .clients-btn {
+        margin: 0; width: auto; padding: 8px 14px; font-size: 13px; font-weight: 600;
+        border-radius: var(--r-sm); box-shadow: none; cursor: pointer; border: 1px solid transparent;
+    }
+    .clients-btn-add { background: var(--accent-container); color: #fff; }
+    .clients-btn-add:hover { background: var(--accent-strong); }
+    .clients-btn-sync { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+    .clients-btn-sync:hover { background: var(--accent-tint); color: var(--accent-strong); }
+    .clients-btn-cancel { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+    .clients-btn-cancel:hover { background: var(--surface-3); }
+
+    .clients-form { margin-bottom: 14px; padding: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .clients-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .clients-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .clients-form-grid input { margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; background: var(--surface); color: var(--text); font-weight: 400; }
+    .clients-form-wide { grid-column: 1 / -1; }
+    .clients-form-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    .clients-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); }
+    .clients-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
+    .clients-table thead th {
+        position: sticky; top: 0; z-index: 1; text-align: left; padding: 9px 12px;
+        background: var(--surface-2); border-bottom: 1px solid var(--border);
+        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); white-space: nowrap;
+    }
+    .clients-table tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .clients-table tbody tr:last-child td { border-bottom: none; }
+    .clients-table tbody tr:hover { background: var(--surface-2); }
+    .clients-td-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .clients-td-nowrap { white-space: nowrap; }
+    .clients-td-notes { color: var(--text-muted); max-width: 260px; }
+    .clients-company { font-weight: 600; color: var(--text); }
+    .clients-crm-link { margin-left: 6px; color: var(--accent); text-decoration: none; font-weight: 700; }
+    .clients-crm-link:hover { color: var(--accent-strong); }
+    .clients-table a { color: var(--accent); text-decoration: none; }
+    .clients-table a:hover { text-decoration: underline; }
+    .clients-debt { color: var(--danger); font-weight: 600; }
+    .clients-debt-zero { color: var(--text-muted); }
+    .clients-count { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+    .clients-empty { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
+    .clients-empty--error { color: var(--danger); }
     .calc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
     .calc-form-col { min-width: 0; }
     .calc-side-col { position: sticky; top: 96px; min-width: 0; }

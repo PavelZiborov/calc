@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=41">
+<link rel="stylesheet" href="css/app.css?v=42">
 </head>
 <body>
 
@@ -26,6 +26,7 @@
             <button class="nav-tab tab-btn active" data-tab-target="main-tab" onclick="switchTab('main-tab')"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h4"/></svg><span>Калькулятор</span></button>
             <button class="nav-tab tab-btn gated-nav" id="adv-tab-btn" data-tab-target="search-tab" onclick="openOrdersView('list', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg><span>Заказы</span></button>
             <button class="nav-tab tab-btn gated-nav" id="kanban-nav-btn" data-tab-target="search-tab" onclick="openOrdersView('kanban', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Канбан</span></button>
+            <button class="nav-tab tab-btn gated-nav" id="clients-nav-btn" data-tab-target="clients-tab" onclick="openClientsView(this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></svg><span>Клиенты</span></button>
         </nav>
         <div class="app-brand-actions">
             <button type="button" class="nav-newquote-btn" disabled title="Раздел в разработке" aria-label="Новый расчёт (скоро)"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg><span>New Quote</span></button>
@@ -293,17 +294,45 @@
     </div>
 </div>
 
-<script src="js/config.js?v=41"></script>
-<script src="js/calculator-data.js?v=41"></script>
-<script src="js/calc-settings.js?v=41"></script>
-<script src="js/calc-settings-ui.js?v=41"></script>
-<script src="js/utils.js?v=41"></script>
-<script src="js/auth.js?v=41"></script>
-<script src="js/calculator.js?v=41"></script>
-<script src="js/crm.js?v=41"></script>
-<script src="js/element-editor.js?v=41"></script>
-<script src="js/kp-docx.js?v=41"></script>
-<script src="js/calc-sheet.js?v=41"></script>
-<script src="js/main.js?v=41"></script>
+<div id="clients-tab" class="tab-content">
+    <div class="container" id="clients-container">
+        <div class="clients-header">
+            <h2 class="clients-title">Клиенты</h2>
+            <div class="clients-toolbar">
+                <input type="text" id="clientsSearchInput" class="clients-search" placeholder="Поиск клиентов…" oninput="onClientsSearchInput(this.value)">
+                <button type="button" class="clients-btn clients-btn-add" onclick="toggleClientForm()">＋ Добавить клиента</button>
+                <button type="button" class="clients-btn clients-btn-sync" onclick="syncClientsFromCrm(this)" title="Загрузить клиентов из CRM в свою базу">⟳ Синхронизировать из CRM</button>
+            </div>
+        </div>
+        <div id="clientAddForm" class="clients-form" style="display:none;">
+            <div class="clients-form-grid">
+                <label>Компания / имя<input type="text" id="clientCompany" placeholder="ООО Ромашка"></label>
+                <label>Контактное лицо<input type="text" id="clientContact" placeholder="Иван Иванов"></label>
+                <label>Телефон<input type="text" id="clientPhone" placeholder="+7 999 000-00-00"></label>
+                <label>Email<input type="text" id="clientEmail" placeholder="mail@example.com"></label>
+                <label class="clients-form-wide">Заметки<input type="text" id="clientNotes" placeholder="Комментарий"></label>
+            </div>
+            <div class="clients-form-actions">
+                <button type="button" class="clients-btn clients-btn-add" onclick="submitNewClient(this)">Сохранить (в БД и CRM)</button>
+                <button type="button" class="clients-btn clients-btn-cancel" onclick="toggleClientForm(false)">Отмена</button>
+            </div>
+        </div>
+        <div id="clientsResults"></div>
+    </div>
+</div>
+
+<script src="js/config.js?v=42"></script>
+<script src="js/calculator-data.js?v=42"></script>
+<script src="js/calc-settings.js?v=42"></script>
+<script src="js/calc-settings-ui.js?v=42"></script>
+<script src="js/utils.js?v=42"></script>
+<script src="js/auth.js?v=42"></script>
+<script src="js/calculator.js?v=42"></script>
+<script src="js/crm.js?v=42"></script>
+<script src="js/element-editor.js?v=42"></script>
+<script src="js/kp-docx.js?v=42"></script>
+<script src="js/calc-sheet.js?v=42"></script>
+<script src="js/clients.js?v=42"></script>
+<script src="js/main.js?v=42"></script>
 </body>
 </html>
