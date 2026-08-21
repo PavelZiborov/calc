@@ -5117,6 +5117,9 @@ function renderDealsList(deals, targetDiv, options = {}) {
     if (!targetDiv) return;
     targetDiv.innerHTML = "";
     const isDetailMode = Boolean(options.detailMode);
+    // Кнопка «Добавить просчёт» + инлайн-сохранение — только в списке под калькулятором
+    // (#crmResults), но не в разделе «Заказы» (#advCrmResults).
+    const isCalcList = !isDetailMode && targetDiv.id === "crmResults";
 
     // В режиме списка карточки заворачиваем в табличную сетку с шапкой колонок.
     let listTable = null;
@@ -5198,9 +5201,13 @@ function renderDealsList(deals, targetDiv, options = {}) {
             : '';
 
         // Компактная кнопка «добавить текущий просчёт в сделку» под позициями
-        // в строке списка. Только для открытых заказов (персонал).
-        const listAddBtn = (currentUser.role === 'staff' && !isClosed)
+        // в строке списка. Только под калькулятором, для открытых заказов (персонал).
+        const listAddBtn = (isCalcList && currentUser.role === 'staff' && !isClosed)
             ? `<button type="button" class="dl-add-calc" onclick="event.stopPropagation(); addToDeal(${deal.id}, this)" title="Добавить текущий просчёт из калькулятора в эту сделку">＋ Добавить просчёт</button>`
+            : '';
+        // Область сохранения появляется под калькулятором после добавления просчёта.
+        const listSaveArea = isCalcList
+            ? `<div class="deal-save-area" data-deal-id="${deal.id}" style="display:none;"><button onclick="event.stopPropagation(); saveDeal(${deal.id}, this)">${icon("save")} Сохранить</button></div>`
             : '';
 
         card.innerHTML = isDetailMode ? `
@@ -5224,7 +5231,7 @@ function renderDealsList(deals, targetDiv, options = {}) {
             ${renderDealExtraPanel(deal)}` : `
             <div class="dl-cell dl-num">${dealLink}${dealActionButtons}</div>
             <div class="dl-cell dl-client"><span class="dl-client-name">${escapeHtml(deal.client?.name || deal.client_name || "Клиент не указан")}</span></div>
-            <div class="dl-cell dl-content"><div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>${listAddBtn}</div>
+            <div class="dl-cell dl-content"><div class="deal-elements-list" data-deal-id="${deal.id}">${elementsHtml}</div>${listAddBtn}${listSaveArea}</div>
             <div class="dl-cell dl-sum">${renderDealSumDebt(deal)}</div>
             <div class="dl-cell dl-status">${statusControl}</div>
             <div class="dl-cell dl-resp">${escapeHtml(getDealResponsibleName(deal))}</div>
