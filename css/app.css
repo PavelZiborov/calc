@@ -240,6 +240,8 @@
 
     /* === Калькулятор: 2-колоночная сетка (Blueprint Precision) === */
     #calcContainer { max-width: min(1600px, 100%); }
+    /* Список заказов под калькулятором — по ширине калькулятора. */
+    #crm-search-container { max-width: min(1600px, 100%); }
     .calc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
     .calc-form-col { min-width: 0; }
     .calc-side-col { position: sticky; top: 96px; min-width: 0; }
@@ -1824,6 +1826,31 @@
     .deal-action-group { display:inline-flex; align-items:center; gap:2px; margin-left:6px; vertical-align:middle; }
     .deal-action-group .deal-action-btn { margin:0; width:17px; height:17px; min-width:17px; font-size:10px; line-height:15px; border-radius:4px; }
     .deal-action-group .deal-crm-btn { margin-left:5px; }
+    /* Свёртка кнопок действий сделки в «⋯» на узких экранах */
+    .deal-actions { display: inline-flex; align-items: center; }
+    .deal-actions-more { display: none; }
+    .deal-actions-menu {
+        position: fixed;
+        z-index: 2000;
+        display: flex;
+        gap: 6px;
+        padding: 7px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+    .deal-actions-menu .deal-action-btn {
+        width: 32px !important; height: 32px; min-width: 32px !important;
+        font-size: 15px; line-height: 30px; border-radius: 8px;
+    }
+    /* Когда таблица сжата (планшет/узкое окно) — три кнопки прячем, показываем «⋯». */
+    @media (min-width: 601px) and (max-width: 1100px) {
+        .crm-item--list .deal-actions .deal-crm-btn,
+        .crm-item--list .deal-actions .deal-create-btn,
+        .crm-item--list .deal-actions .deal-copy-btn { display: none !important; }
+        .crm-item--list .deal-actions .deal-actions-more { display: inline-flex; }
+    }
     .deal-add-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
     .add-btn-secondary { background:#f1efe9; color:#3a3833; border:1px solid #eae8e2; }
     .add-btn-secondary:hover { background:#eae8e2; }

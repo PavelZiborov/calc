@@ -4568,7 +4568,53 @@ function renderDealActionButtons(deal, isDetailMode = false) {
     if (currentUser.role !== 'staff') return "";
     if (isDetailMode) return "";
 
-    return `${renderDealCrmButton(deal)}<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button><button type="button" class="deal-action-btn deal-copy-btn" onclick="event.stopPropagation(); showCopyDealConfirm(${deal.id}, this)" title="Копировать сделку с позициями" aria-label="Копировать сделку с позициями">⧉</button>`;
+    const buttons = `${renderDealCrmButton(deal)}<button type="button" class="deal-action-btn deal-create-btn" onclick="event.stopPropagation(); showCreateDealConfirm(${deal.id}, this)" title="Добавить новую сделку" aria-label="Добавить новую сделку">＋</button><button type="button" class="deal-action-btn deal-copy-btn" onclick="event.stopPropagation(); showCopyDealConfirm(${deal.id}, this)" title="Копировать сделку с позициями" aria-label="Копировать сделку с позициями">⧉</button>`;
+    // На узких экранах три кнопки не влезают → сворачиваются в одну «⋯» с попапом (CSS).
+    return `<span class="deal-actions" data-deal-id="${deal.id}">${buttons}<button type="button" class="deal-action-btn deal-actions-more" onclick="event.stopPropagation(); openDealActionsMenu(event, this)" title="Действия" aria-label="Действия">⋯</button></span>`;
+}
+
+function closeDealActionsMenu() {
+    document.querySelectorAll(".deal-actions-menu").forEach(m => m.remove());
+    document.removeEventListener("click", closeDealActionsMenu);
+    window.removeEventListener("resize", closeDealActionsMenu);
+    window.removeEventListener("scroll", closeDealActionsMenu, true);
+}
+
+// Попап с тремя действиями (открыть в CRM / новая сделка / копировать) —
+// показывается по клику на «⋯», когда кнопки свёрнуты на узком экране.
+function openDealActionsMenu(event, moreBtn) {
+    event.stopPropagation();
+    const alreadyOpen = document.querySelector(".deal-actions-menu");
+    closeDealActionsMenu();
+    if (alreadyOpen) return; // повторный клик — закрыть
+
+    const container = moreBtn.closest(".deal-actions");
+    if (!container) return;
+
+    const menu = document.createElement("div");
+    menu.className = "deal-actions-menu";
+    container.querySelectorAll(".deal-crm-btn, .deal-create-btn, .deal-copy-btn").forEach(btn => {
+        menu.appendChild(btn.cloneNode(true)); // клоны сохраняют onclick/title
+    });
+    document.body.appendChild(menu);
+
+    const r = moreBtn.getBoundingClientRect();
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    let top = r.bottom + 4;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+    let left = r.right - mw;
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    menu.style.top = top + "px";
+    menu.style.left = Math.max(8, left) + "px";
+
+    // Любой клик по пункту (capture, до stopPropagation клонов) закрывает меню.
+    menu.addEventListener("click", () => setTimeout(closeDealActionsMenu, 0), true);
+    setTimeout(() => {
+        document.addEventListener("click", closeDealActionsMenu);
+        window.addEventListener("resize", closeDealActionsMenu);
+        window.addEventListener("scroll", closeDealActionsMenu, true);
+    }, 0);
 }
 
 function renderDealDetailView(deal, detailContainer, tabBtn = null) {
