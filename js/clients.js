@@ -85,7 +85,7 @@ async function loadClients() {
     } catch (e) {
         console.error("loadClients", e);
         clientsState.items = [];
-        clientsState.error = "Не удалось загрузить клиентов. Проверьте, что вебхук «clients» в n8n настроен.";
+        clientsState.error = "Не удалось загрузить клиентов. Бэкенд клиентов (/api/clients) недоступен — раздел заработает после переноса на сервер.";
     } finally {
         clientsState.loading = false;
         renderClientsTable();
