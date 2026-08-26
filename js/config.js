@@ -2,9 +2,10 @@
 let SRA3_W = 320, SRA3_H = 450; // могут переопределяться настройками калькулятора (calc-settings.js)
 const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 // Раздел «Клиенты»: свой бэкенд на сервере (Postgres) — server/backend.
-// Относительный путь: когда фронт отдаётся с поддомена, /api/clients — same-origin
-// (без CORS). На GitHub Pages путь 404-ит и раздел показывает аккуратную заглушку.
-const CLIENTS_URL = "/api/clients";
+// Абсолютный адрес → работает с ОБОИХ доменов: с calc.heavendevelop.ru это
+// same-origin, с github.io — кросс-домен (бэкенд отдаёт CORS). Сюда же будем
+// переносить остальные API по мере ухода с n8n.
+const CLIENTS_URL = "https://calc.heavendevelop.ru/api/clients";
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
 const DELETE_ASSETS_TIMEOUT_MS = 45000;
