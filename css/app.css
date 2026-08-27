@@ -366,6 +366,47 @@
     .cc-deal-status { white-space: nowrap; color: var(--text-muted); }
     .cc-deal-date { color: var(--text-muted); }
 
+    /* ==== Карточка заказа (в стиле детальной карточки «Заказы») ==== */
+    .dbo-card { background: var(--surface); border-radius: 14px; box-shadow: 0 16px 50px rgba(28,27,25,0.28); width: min(900px, 100%); max-height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
+    .dbo-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
+    .dbo-head-left { min-width: 0; }
+    .dbo-num { font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+    .dbo-client { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 15px; color: var(--text); }
+    .dbo-client .dbo-ic { color: var(--text-muted); flex: 0 0 auto; }
+    .dbo-head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .dbo-head-right .dbk-status-pill { width: auto; min-width: 128px; font-size: 12.5px; padding: 7px 16px; }
+    .dbo-crm { color: var(--accent); font-weight: 700; font-size: 16px; text-decoration: none; padding: 2px 6px; }
+    .dbo-crm:hover { color: var(--accent-strong); }
+    .dbo-close { width: 30px; height: 30px; min-width: 30px; margin: 0; padding: 0; border: none; border-radius: 8px; background: transparent; font-size: 22px; line-height: 1; color: var(--text-muted); cursor: pointer; }
+    .dbo-close:hover { background: var(--surface-2); color: var(--text); }
+    .dbo-body { padding: 18px 22px 22px; overflow-y: auto; }
+
+    .dbo-elements { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 2px 14px 6px; }
+    .dbo-el-head, .dbo-el-row { display: grid; grid-template-columns: 88px minmax(0,1fr) 66px 80px 108px; align-items: center; gap: 10px; }
+    .dbo-el-head { padding: 10px 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    .dbo-el-head span:nth-child(3), .dbo-el-head span:nth-child(4), .dbo-el-head span:nth-child(5) { text-align: right; }
+    .dbo-el-row { padding: 11px 0; border-bottom: 1px dashed var(--border); }
+    .dbo-el-row:last-child { border-bottom: none; }
+    .dbo-el-name { font-size: 14px; color: var(--accent); font-weight: 500; min-width: 0; }
+    .dbo-el-qty, .dbo-el-cost, .dbo-el-sum { text-align: right; font-variant-numeric: tabular-nums; }
+    .dbo-el-qty { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
+    .dbo-el-cost { color: var(--text-muted); font-size: 13px; }
+    .dbo-el-sum { font-weight: 700; color: var(--text); font-size: 14px; }
+    .dbo-el-status .dbk-status-select { font-size: 11px; padding: 3px 5px; }
+    .dbo-el-empty { padding: 18px 0; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+    .dbo-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+    .dbo-meta { font-size: 14px; color: var(--text-muted); line-height: 1.75; }
+    .dbo-meta b { color: var(--text); }
+    .dbo-totals { flex: 0 0 auto; }
+
+    .dbo-section { margin-top: 18px; }
+    .dbo-section-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .dbo-costinfo { padding: 12px 14px; min-height: 44px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-size: 13.5px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .dbo-invoice { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); }
+    .dbo-invoice a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .dbo-invoice a:hover { text-decoration: underline; }
+
     /* ---- Заказы БД: канбан ---- */
     .dbk-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
     .dbk-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); }

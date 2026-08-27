@@ -773,21 +773,30 @@ async function setElementStatus(dealId, elId, statusId, sel) {
     }
 }
 
+// Значение доп-поля по его id (из additional_fields сделки).
+function dbAfById(fields, id) {
+    if (!Array.isArray(fields)) return "";
+    const f = fields.find(x => Number(x?.id) === Number(id));
+    return f ? String(f.value ?? "").trim() : "";
+}
+function money2(n) {
+    return (Number(n) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+const DBO_USER_ICON = '<svg class="dbo-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg>';
+
+// Строка элемента: СТАТУС · НАЗВАНИЕ · КОЛ-ВО · СЕБЕС. · СУММА (как в детальной карточке).
 function dbElementRow(e) {
-    const total = money(e.total);
     const qty = Number(e.quantity) || 0;
-    const af = dbAfWithValue(e.additional_fields);
-    const afHtml = af.length
-        ? `<div class="dbk-el-af">${af.map(f => `<span class="dbk-el-af-chip">${escapeHtml(f.name || "")}: ${dbAfValueHtml(f.value)}</span>`).join("")}</div>`
-        : "";
+    const cost = Number(e.cost) || 0;
+    const total = Number(e.total) || 0;
     return `
-        <tr>
-            <td class="clients-td-num">${escapeHtml(String(e.num ?? ""))}</td>
-            <td>${escapeHtml(e.category_and_name || e.name || "—")}${afHtml}</td>
-            <td class="clients-td-num">${qty}${e.units ? " " + escapeHtml(e.units) : ""}</td>
-            <td class="clients-td-num">${total} ₽</td>
-            <td class="cc-deal-status">${dbElementStatusSelectHtml(e)}</td>
-        </tr>`;
+        <div class="dbo-el-row">
+            <div class="dbo-el-status">${dbElementStatusSelectHtml(e)}</div>
+            <div class="dbo-el-name">${escapeHtml(e.category_and_name || e.name || "—")}</div>
+            <div class="dbo-el-qty">${qty} ${escapeHtml(e.units || "шт")}</div>
+            <div class="dbo-el-cost">${cost ? money(cost) : "—"}</div>
+            <div class="dbo-el-sum">${money2(total)}</div>
+        </div>`;
 }
 
 function renderDbDealCard(data, crmId) {
@@ -800,58 +809,69 @@ function renderDbDealCard(data, crmId) {
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
-    const crmLink = `<a class="client-card-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener">В CRM ↗</a>`;
 
-    // Статус сделки — редактируемый (если справочник статусов загружен).
+    // Статус — цветная пилюля с меню (как в «Заказах»).
     const dealStatusControl = (dbOrdersState.statuses && dbOrdersState.statuses.length)
         ? dbDealStatusSelectHtml({ crm_deal_id: crmId, status_id: d.status_id, status_name: d.status_name })
-        : `<span class="cc-stat-value" style="font-size:15px">${escapeHtml(d.status_name || "—")}</span>`;
+        : `<span class="dbk-status-pill" style="background:#dfdfdf;color:#555">${escapeHtml(d.status_name || "Статус не установлен")}</span>`;
 
-    const stats = `
-        <div class="client-card-stats">
-            <div class="cc-stat"><span class="cc-stat-label">Статус</span>${dealStatusControl}</div>
-            <div class="cc-stat"><span class="cc-stat-label">Сумма</span><span class="cc-stat-value">${money(amount)} ₽</span></div>
-            <div class="cc-stat"><span class="cc-stat-label">Оплачено</span><span class="cc-stat-value">${money(paid)} ₽</span></div>
-            <div class="cc-stat"><span class="cc-stat-label">Долг</span><span class="cc-stat-value ${debt > 0.009 ? "is-negative" : ""}">${money(debt)} ₽</span></div>
-        </div>`;
+    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Себес.</span><span>Сумма</span></div>`;
+    const elBody = elements.length
+        ? elements.map(dbElementRow).join("")
+        : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
 
-    const dealAf = dbAfWithValue(d.additional_fields);
-    const dealAfBlock = dealAf.length ? `
-        <div class="dbk-af">
-            <div class="dbk-af-head">Доп. поля сделки</div>
-            <div class="dbk-af-grid">${dealAf.map(f => `
-                <div class="dbk-af-row"><span class="dbk-af-name">${escapeHtml(f.name || "")}</span><span class="dbk-af-val">${dbAfValueHtml(f.value)}</span></div>`).join("")}</div>
+    // Доп-поля: информация по себестоимости + счёт.
+    const costInfo = dbAfById(d.additional_fields, 476);
+    const invNum = dbAfById(d.additional_fields, 477);
+    const invDate = dbAfById(d.additional_fields, 1105);
+    const invLink = dbAfById(d.additional_fields, 1104) || dbAfById(d.additional_fields, 1106);
+
+    const costBlock = costInfo ? `
+        <div class="dbo-section">
+            <div class="dbo-section-title">Информация по себестоимости</div>
+            <div class="dbo-costinfo">${escapeHtml(costInfo)}</div>
+        </div>` : "";
+    const invoiceBlock = (invNum || invDate || invLink) ? `
+        <div class="dbo-section">
+            <div class="dbo-section-title">Счёт</div>
+            <div class="dbo-invoice">
+                ${invNum ? `<span>№&nbsp;<b>${escapeHtml(invNum)}</b></span>` : ""}
+                ${invDate ? `<span>от ${escapeHtml(invDate)}</span>` : ""}
+                ${invLink ? `<a href="${escapeHtml(invLink)}" target="_blank" rel="noopener">Открыть счёт ↗</a>` : ""}
+            </div>
         </div>` : "";
 
-    const elementsBlock = elements.length ? `
-        <div class="client-card-deals-head"><span>Элементы <b>(${elements.length})</b></span></div>
-        <div class="clients-table-wrap">
-            <table class="clients-table cc-deals-table">
-                <thead><tr><th class="clients-td-num">№</th><th>Наименование</th><th class="clients-td-num">Кол-во</th><th class="clients-td-num">Сумма</th><th>Статус</th></tr></thead>
-                <tbody>${elements.map(dbElementRow).join("")}</tbody>
-            </table>
-        </div>` : `
-        <div class="client-card-deals-empty">
-            <p>Элементов в базе нет.</p>
-            <p class="cc-hint">Нажмите «⟳ Элементы» в разделе, чтобы подтянуть их из CRM.</p>
-        </div>`;
-
     ov.innerHTML = `
-        <div class="client-card" role="dialog" aria-modal="true">
-            <div class="client-card-header">
-                <div class="client-card-title">
-                    <h3>Заказ № ${escapeHtml(String(d.num ?? crmId))}</h3>
-                    <div class="client-card-sub">${escapeHtml(d.client_name || "—")}${d.employee_name ? " · " + escapeHtml(d.employee_name) : ""}${d.created_at_crm ? " · " + escapeHtml(d.created_at_crm) : ""}</div>
+        <div class="dbo-card" role="dialog" aria-modal="true">
+            <div class="dbo-head">
+                <div class="dbo-head-left">
+                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}</div>
+                    <div class="dbo-client">${DBO_USER_ICON} ${escapeHtml(d.client_name || "—")}</div>
                 </div>
-                <div class="client-card-header-actions">
-                    ${crmLink}
-                    <button class="client-card-close" onclick="closeDbDealCard()" aria-label="Закрыть">&times;</button>
+                <div class="dbo-head-right">
+                    ${dealStatusControl}
+                    <a class="dbo-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в CRM">↗</a>
+                    <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
                 </div>
             </div>
-            <div class="client-card-body">
-                ${stats}
-                ${dealAfBlock}
-                ${elementsBlock}
+            <div class="dbo-body">
+                <div class="dbo-elements">
+                    ${elHead}
+                    ${elBody}
+                </div>
+                <div class="dbo-mid">
+                    <div class="dbo-meta">
+                        ${d.created_at_crm ? `<div>Дата заказа: <b>${escapeHtml(d.created_at_crm)}</b></div>` : ""}
+                        ${d.employee_name ? `<div>Менеджер: <b>${escapeHtml(d.employee_name)}</b></div>` : ""}
+                    </div>
+                    <div class="payment-summary dbo-totals">
+                        <div class="payment-summary-row"><span class="payment-summary-label">Всего</span><span class="payment-summary-value">${money2(amount)}</span><span></span></div>
+                        <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span></span></div>
+                        <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
+                    </div>
+                </div>
+                ${costBlock}
+                ${invoiceBlock}
             </div>
         </div>`;
 }
