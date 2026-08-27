@@ -137,6 +137,9 @@ function updateDbViewToggle() {
     if (k) k.classList.toggle("is-active", dbOrdersState.view === "kanban");
     const zoomWrap = document.getElementById("dbZoomWrap");
     if (zoomWrap) zoomWrap.style.display = dbOrdersState.view === "kanban" ? "" : "none";
+    // Канбан — на весь экран (класс на body включает полноширинную раскладку).
+    const active = document.getElementById("db-orders-tab")?.classList.contains("active");
+    document.body.classList.toggle("db-kanban-active", dbOrdersState.view === "kanban" && !!active);
     updateDbZoomUI();
 }
 function renderDbOrders() {
@@ -273,7 +276,9 @@ function buildDbColumns(deals, statuses) {
         col.deals.push(d);
     });
     const cols = [];
-    order.forEach(id => { const c = byId.get(id); if (c && c.deals.length) cols.push(c); });
+    // Все статусы из справочника показываем колонками — даже пустые (для перетаскивания).
+    order.forEach(id => { const c = byId.get(id); if (c) cols.push(c); });
+    // Прочие статусы (которых нет в справочнике) — только если в них есть сделки.
     extra.forEach(id => { const c = byId.get(id); if (c && c.deals.length) cols.push(c); });
     return cols;
 }
@@ -323,13 +328,14 @@ function renderDbKanban() {
     }
     const cols = buildDbColumns(deals, dbOrdersState.statuses);
     const zoom = dbOrdersState.kanbanZoom || 1;
+    // Drop-зона — весь столбик (наводить можно куда угодно в колонке, не только на карточки).
     host.innerHTML = `<div class="dbk-board" style="zoom:${zoom}">${cols.map(c => `
-        <div class="dbk-col">
+        <div class="dbk-col" data-status-id="${c.id}" ondragover="dbDragOver(event)" ondragleave="dbDragLeave(event)" ondrop="dbDrop(event, ${c.id})">
             <div class="dbk-col-head"${dbColHeadStyle(c)}>
                 <span class="dbk-col-name">${escapeHtml(c.name)}</span>
                 <span class="dbk-col-count">${c.deals.length}</span>
             </div>
-            <div class="dbk-col-body" data-status-id="${c.id}" ondragover="dbDragOver(event)" ondragleave="dbDragLeave(event)" ondrop="dbDrop(event, ${c.id})">${c.deals.map(dbDealCardHtml).join("")}</div>
+            <div class="dbk-col-body">${c.deals.map(dbDealCardHtml).join("")}</div>
         </div>`).join("")}</div>`;
 }
 
@@ -344,15 +350,20 @@ function dbDragEnd(e) { if (e.currentTarget) e.currentTarget.classList.remove("d
 function dbDragOver(e) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    if (e.currentTarget) e.currentTarget.classList.add("dbk-col-body--over");
+    if (e.currentTarget) e.currentTarget.classList.add("dbk-col--over");
 }
-function dbDragLeave(e) { if (e.currentTarget) e.currentTarget.classList.remove("dbk-col-body--over"); }
+function dbDragLeave(e) {
+    // не снимать подсветку при переходе на дочерний элемент (карточку) внутри столбика
+    if (e.currentTarget && !e.currentTarget.contains(e.relatedTarget)) {
+        e.currentTarget.classList.remove("dbk-col--over");
+    }
+}
 function dbDrop(e, statusId) {
     e.preventDefault();
-    if (e.currentTarget) e.currentTarget.classList.remove("dbk-col-body--over");
+    if (e.currentTarget) e.currentTarget.classList.remove("dbk-col--over");
     const id = dbDragDealId; dbDragDealId = null;
     if (!id || !Number.isFinite(Number(statusId)) || Number(statusId) < 0) return;
-    const deal = dbOrdersState.deals.find(d => Number(d.crm_deal_id) === Number(id));
+    const deal = dbFindDeal(id);
     if (!deal || Number(deal.status_id) === Number(statusId)) return;
     setDealStatus(id, statusId);
 }
