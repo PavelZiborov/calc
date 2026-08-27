@@ -713,6 +713,7 @@ function closeDbDealCard() {
     document.removeEventListener("keydown", dbDealCardEsc);
     dbCloseStatusMenu();
     if (typeof dbCloseElStatusMenu === "function") dbCloseElStatusMenu();
+    if (typeof closeDbElEdit === "function") closeDbElEdit();
 }
 
 async function openDbDealCard(crmId) {
@@ -759,6 +760,99 @@ let dbCardDealId = null;
 let dbCardElementStatuses = [];
 
 let dbCardData = null;   // текущие данные карточки (для оптимистичного апдейта статусов)
+let dbCardCategories = []; // категории прайс-листа (для смены категории элемента)
+
+// ---- Редактирование элемента (поля; имя/категорию — через пересоздание в CRM) ----
+function dbElEditEsc(e) { if (e.key === "Escape") closeDbElEdit(); }
+function closeDbElEdit() {
+    const ov = document.getElementById("dbElEditOverlay");
+    if (ov) ov.remove();
+    document.removeEventListener("keydown", dbElEditEsc);
+}
+function dbOpenElEdit(elId) {
+    const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
+    if (!e) return;
+    closeDbElEdit();
+    const name = e.name || e.category_and_name || "";
+    const catId = e.category_id != null ? Number(e.category_id) : null;
+    const catOpts = (dbCardCategories || []).map(c =>
+        `<option value="${c.id}"${Number(c.id) === catId ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+    const costHq = dbAfById(e.additional_fields, 1057);
+    const sheets = dbAfById(e.additional_fields, 1066);
+    const ov = document.createElement("div");
+    ov.id = "dbElEditOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbElEdit()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head">
+                <h3>Редактирование позиции</h3>
+                <button class="dbo-close" onclick="closeDbElEdit()" aria-label="Закрыть">×</button>
+            </div>
+            <div class="dbo-edit-body">
+                <label class="dbo-edit-wide">Наименование
+                    <input type="text" id="dbEditName" value="${escapeHtml(name)}">
+                </label>
+                <label class="dbo-edit-wide">Категория
+                    <select id="dbEditCat">${catOpts || `<option value="">— нет категорий —</option>`}</select>
+                </label>
+                <label>Кол-во<input type="number" step="any" id="dbEditQty" value="${Number(e.quantity) || 0}"></label>
+                <label>Единица<input type="text" id="dbEditUnits" value="${escapeHtml(e.units || "шт")}"></label>
+                <label>Цена<input type="number" step="any" id="dbEditPrice" value="${Number(e.price) || 0}"></label>
+                <label>Сумма<input type="number" step="any" id="dbEditTotal" value="${Number(e.total) || 0}"></label>
+                <label>Себестоимость<input type="number" step="any" id="dbEditCost" value="${Number(e.cost) || 0}"></label>
+                <label>Себест. HQ<input type="number" step="any" id="dbEditCostHq" value="${escapeHtml(costHq)}"></label>
+                <label>Количество листов<input type="number" step="any" id="dbEditSheets" value="${escapeHtml(sheets)}"></label>
+            </div>
+            <div class="dbo-edit-note">Имя и категорию в PrintOffice нельзя менять напрямую — при их изменении позиция пересоздаётся (удаляется и создаётся заново).</div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbEditSaveBtn" onclick="dbSaveElEdit(${elId})">Сохранить</button>
+                <button class="dbo-btn" onclick="closeDbElEdit()">Отмена</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    document.addEventListener("keydown", dbElEditEsc);
+    setTimeout(() => document.getElementById("dbEditName")?.focus(), 0);
+}
+async function dbSaveElEdit(elId) {
+    const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
+    if (!e) return;
+    const val = id => document.getElementById(id)?.value;
+    const name = String(val("dbEditName") || "").trim();
+    const categoryId = val("dbEditCat") !== "" ? Number(val("dbEditCat")) : null;
+    const units = String(val("dbEditUnits") || "шт").trim() || "шт";
+    const quantity = Number(val("dbEditQty")) || 0;
+    const price = Number(val("dbEditPrice")) || 0;
+    const total = Number(val("dbEditTotal")) || 0;
+    const cost = Number(val("dbEditCost")) || 0;
+    const costHq = String(val("dbEditCostHq") || "").trim();
+    const sheets = String(val("dbEditSheets") || "").trim();
+    // имя/категория изменились → пересоздание
+    const recreate = (name !== String(e.name || "").trim()) || (categoryId !== (e.category_id != null ? Number(e.category_id) : null));
+
+    const btn = document.getElementById("dbEditSaveBtn");
+    if (btn) { btn.disabled = true; btn.textContent = recreate ? "Пересоздание…" : "Сохранение…"; }
+    try {
+        const data = await clientsApi("editElement", {
+            dealId: Number(dbCardDealId), elementId: Number(elId),
+            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate
+        });
+        // обновляем карточку свежими данными
+        if (data?.deal) dbCardData.deal = data.deal;
+        if (Array.isArray(data?.elements)) dbCardData.elements = data.elements;
+        renderDbDealCard(dbCardData, dbCardDealId);
+        closeDbElEdit();
+        if (typeof showReadinessToast === "function") showReadinessToast("Позиция сохранена");
+        // освежим список/канбан позади (суммы/содержимое могли измениться)
+        loadDbDeals();
+    } catch (err) {
+        console.error("editElement", err);
+        if (btn) { btn.disabled = false; btn.textContent = "Сохранить"; }
+        alert("Не удалось сохранить позицию в CRM.");
+    }
+}
 
 function dbIcon(name) { return (typeof icon === "function") ? icon(name) : ""; }
 // Цвет/иконка статуса элемента по имени (как getStatusIcon в CRM).
@@ -871,7 +965,7 @@ function dbElementRow(e) {
         <div class="dbo-el-row">
             <div class="dbo-el-status">${dbElStatusBtn(e)}</div>
             <div class="dbo-el-name">
-                <div class="dbo-el-title">${escapeHtml(e.category_and_name || e.name || "—")}</div>
+                <div class="dbo-el-title dbo-el-title--edit" onclick="dbOpenElEdit(${e.crm_element_id})" title="Редактировать позицию">${escapeHtml(e.category_and_name || e.name || "—")}</div>
                 ${dbElAfLine(e)}
             </div>
             <div class="dbo-el-qty">${qty} ${escapeHtml(e.units || "шт")}</div>
@@ -888,6 +982,7 @@ function renderDbDealCard(data, crmId) {
     dbCardDealId = crmId;
     dbCardData = data;
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
+    dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
