@@ -228,14 +228,29 @@ async function openDbDealCard(crmId) {
     }
 }
 
+// Значение доппполя: ссылку — линком, остальное — текстом.
+function dbAfValueHtml(v) {
+    const s = String(v ?? "").trim();
+    if (/^https?:\/\//i.test(s)) return `<a href="${escapeHtml(s)}" target="_blank" rel="noopener">ссылка ↗</a>`;
+    return escapeHtml(s);
+}
+// Только поля с непустым значением.
+function dbAfWithValue(fields) {
+    return Array.isArray(fields) ? fields.filter(f => String(f?.value ?? "").trim() !== "") : [];
+}
+
 function dbElementRow(e) {
     const total = money(e.total);
     const qty = Number(e.quantity) || 0;
     const status = String(e.status_name || "").trim();
+    const af = dbAfWithValue(e.additional_fields);
+    const afHtml = af.length
+        ? `<div class="dbk-el-af">${af.map(f => `<span class="dbk-el-af-chip">${escapeHtml(f.name || "")}: ${dbAfValueHtml(f.value)}</span>`).join("")}</div>`
+        : "";
     return `
         <tr>
             <td class="clients-td-num">${escapeHtml(String(e.num ?? ""))}</td>
-            <td>${escapeHtml(e.category_and_name || e.name || "—")}</td>
+            <td>${escapeHtml(e.category_and_name || e.name || "—")}${afHtml}</td>
             <td class="clients-td-num">${qty}${e.units ? " " + escapeHtml(e.units) : ""}</td>
             <td class="clients-td-num">${total} ₽</td>
             <td class="cc-deal-status">${status ? escapeHtml(status) : "—"}</td>
@@ -259,6 +274,14 @@ function renderDbDealCard(data, crmId) {
             <div class="cc-stat"><span class="cc-stat-label">Оплачено</span><span class="cc-stat-value">${money(paid)} ₽</span></div>
             <div class="cc-stat"><span class="cc-stat-label">Долг</span><span class="cc-stat-value ${debt > 0.009 ? "is-negative" : ""}">${money(debt)} ₽</span></div>
         </div>`;
+
+    const dealAf = dbAfWithValue(d.additional_fields);
+    const dealAfBlock = dealAf.length ? `
+        <div class="dbk-af">
+            <div class="dbk-af-head">Доп. поля сделки</div>
+            <div class="dbk-af-grid">${dealAf.map(f => `
+                <div class="dbk-af-row"><span class="dbk-af-name">${escapeHtml(f.name || "")}</span><span class="dbk-af-val">${dbAfValueHtml(f.value)}</span></div>`).join("")}</div>
+        </div>` : "";
 
     const elementsBlock = elements.length ? `
         <div class="client-card-deals-head"><span>Элементы <b>(${elements.length})</b></span></div>
@@ -287,6 +310,7 @@ function renderDbDealCard(data, crmId) {
             </div>
             <div class="client-card-body">
                 ${stats}
+                ${dealAfBlock}
                 ${elementsBlock}
             </div>
         </div>`;

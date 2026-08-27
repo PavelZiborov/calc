@@ -393,6 +393,18 @@
 
     .dbk-empty { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
     .dbk-empty--error { color: var(--danger); }
+
+    /* Доп. поля сделки/элементов */
+    .dbk-af { margin: 4px 0 18px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .dbk-af-head { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+    .dbk-af-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 18px; }
+    .dbk-af-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 3px 0; border-bottom: 1px dotted var(--border); }
+    .dbk-af-name { color: var(--text-muted); }
+    .dbk-af-val { color: var(--text); font-weight: 600; text-align: right; word-break: break-word; }
+    .dbk-af-val a { color: var(--accent); text-decoration: none; }
+    .dbk-el-af { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+    .dbk-el-af-chip { font-size: 11px; color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+    .dbk-el-af-chip a { color: var(--accent); text-decoration: none; }
     .calc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
     .calc-form-col { min-width: 0; }
     .calc-side-col { position: sticky; top: 96px; min-width: 0; }
