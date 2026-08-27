@@ -411,8 +411,9 @@ async function syncDeals(btn, reopenCrmId) {
     try {
         const data = await clientsApi("syncDealsFromCrm", {});
         const total = Number(data?.total ?? 0);
+        const deleted = Number(data?.deleted ?? 0);
         if (typeof showReadinessToast === "function") {
-            showReadinessToast(`Сделки синхронизированы${total ? `: ${total}` : ""}`);
+            showReadinessToast(`Сделки синхронизированы${total ? `: ${total}` : ""}${deleted ? `, удалено: ${deleted}` : ""}`);
         }
         if (reopenCrmId) openClientCard(reopenCrmId);
     } catch (e) {
