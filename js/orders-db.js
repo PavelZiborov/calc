@@ -706,7 +706,12 @@ function renderDbSyncBanner(job) {
 }
 
 // ---- Карточка заказа (сделка + элементы) ----
-function dbDealCardEsc(e) { if (e.key === "Escape") closeDbDealCard(); }
+function dbDealCardEsc(e) {
+    if (e.key !== "Escape") return;
+    // Если открыта форма позиции — Esc закрывает её (обрабатывает dbElEditEsc), не заказ.
+    if (document.getElementById("dbElEditOverlay")) return;
+    closeDbDealCard();
+}
 function closeDbDealCard() {
     const ov = document.getElementById("dbDealCardOverlay");
     if (ov) ov.style.display = "none";
@@ -789,6 +794,9 @@ function dbOpenElEdit(elId) {
         `<option value="${c.id}"${Number(c.id) === catId ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
     const costHq = dbAfById(e.additional_fields, 1057);
     const sheets = dbAfById(e.additional_fields, 1066);
+    // себестоимость за единицу (для пропорционального пересчёта при смене кол-ва)
+    const q0 = Number(e.quantity) || 0;
+    dbEditCostPerUnit = q0 ? (Number(e.cost) || 0) / q0 : 0;
     const ov = document.createElement("div");
     ov.id = "dbElEditOverlay";
     ov.className = "client-card-overlay dbo-edit-overlay";
@@ -803,7 +811,7 @@ function dbOpenElEdit(elId) {
             </div>
             <div class="dbo-edit-body">
                 <label class="dbo-edit-wide">Наименование
-                    <input type="text" id="dbEditName" class="dbo-edit-name" value="${escapeHtml(name)}">
+                    <textarea id="dbEditName" class="dbo-edit-name" rows="1" oninput="dbAutoGrow(this)">${escapeHtml(name)}</textarea>
                 </label>
                 <label class="dbo-edit-wide">Категория
                     <select id="dbEditCat">${catOpts || `<option value="">— нет категорий —</option>`}</select>
@@ -813,10 +821,10 @@ function dbOpenElEdit(elId) {
                         <input type="text" id="dbEditUnits" list="dbUnitsList" value="${escapeHtml(e.units || "шт")}">
                         <datalist id="dbUnitsList"><option value="шт"></option><option value="услуга"></option></datalist>
                     </label>
-                    <label>Кол-во<input type="number" step="any" id="dbEditQty" value="${Number(e.quantity) || 0}"></label>
-                    <label>Цена<input type="number" step="any" id="dbEditPrice" value="${Number(e.price) || 0}"></label>
+                    <label>Кол-во<input type="number" step="any" id="dbEditQty" value="${Number(e.quantity) || 0}" oninput="dbEditRecalc('qty')"></label>
+                    <label>Цена<input type="number" step="any" id="dbEditPrice" value="${Number(e.price) || 0}" oninput="dbEditRecalc('price')"></label>
                     <label>Себестоимость<input type="number" step="any" id="dbEditCost" value="${Number(e.cost) || 0}"></label>
-                    <label>Сумма<input type="number" step="any" id="dbEditTotal" value="${Number(e.total) || 0}"></label>
+                    <label>Сумма<input type="number" step="any" id="dbEditTotal" value="${Number(e.total) || 0}" oninput="dbEditRecalc('total')"></label>
                 </div>
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="number" step="any" id="dbEditCostHq" value="${escapeHtml(costHq)}"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="number" step="any" id="dbEditSheets" value="${escapeHtml(sheets)}"></label>
@@ -829,7 +837,32 @@ function dbOpenElEdit(elId) {
         </div>`;
     document.body.appendChild(ov);
     document.addEventListener("keydown", dbElEditEsc);
-    setTimeout(() => document.getElementById("dbEditName")?.focus(), 0);
+    setTimeout(() => { const t = document.getElementById("dbEditName"); if (t) { dbAutoGrow(t); t.focus(); } }, 0);
+}
+// Авто-высота textarea наименования (растёт вниз по мере ввода).
+function dbAutoGrow(el) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.max(el.scrollHeight, 40) + "px";
+}
+let dbEditCostPerUnit = 0;
+// Пересчёт цен на лету: кол-во/цена → сумма и себест.; сумма → цена.
+function dbEditRecalc(source) {
+    const g = id => { const el = document.getElementById(id); return el ? (Number(el.value) || 0) : 0; };
+    const s = (id, v) => { const el = document.getElementById(id); if (el) el.value = dbRound(v); };
+    const qty = g("dbEditQty"), price = g("dbEditPrice"), total = g("dbEditTotal");
+    if (source === "qty") {
+        s("dbEditTotal", qty * price);
+        s("dbEditCost", dbEditCostPerUnit * qty);   // себест. пропорционально кол-ву
+    } else if (source === "price") {
+        s("dbEditTotal", qty * price);
+    } else if (source === "total") {
+        s("dbEditPrice", qty ? total / qty : price);
+    }
+}
+function dbRound(n) {
+    const r = Math.round((Number(n) || 0) * 100) / 100;
+    return Number.isInteger(r) ? String(r) : String(r);
 }
 async function dbSaveElEdit(elId) {
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
