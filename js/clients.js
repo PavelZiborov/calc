@@ -1,7 +1,8 @@
 // js/clients.js — раздел «Клиенты».
-// Клиенты хранятся в СВОЕЙ БД (Postgres через n8n-вебхук CLIENTS_URL).
-// При создании из приложения клиент дублируется в CRM PrintOffice24 (BD→CRM).
-// Обратная синхронизация (CRM→БД) — по cron в n8n и по кнопке «Синхронизировать».
+// Клиенты/сделки хранятся в СВОЕЙ БД (Postgres) через серверный бэкенд CLIENTS_URL
+// (/api/clients). При создании из приложения клиент дублируется в CRM PrintOffice24.
+// Обратная синхронизация (CRM→БД) — по cron и по кнопкам «Синхронизировать».
+// Клик по строке клиента → карточка с балансом и сделками (getClient).
 
 const clientsState = {
     items: [],
@@ -110,8 +111,11 @@ function clientRowHtml(c) {
     const debtHtml = c.debt > 0.009
         ? `<span class="clients-debt">${money(c.debt)} ₽</span>`
         : `<span class="clients-debt-zero">—</span>`;
+    const clickable = c.crmId
+        ? ` class="clients-row-clickable" onclick="onClientRowClick(event, ${c.crmId})" title="Открыть карточку клиента"`
+        : "";
     return `
-        <tr>
+        <tr${clickable}>
             <td class="clients-td-company"><span class="clients-company">${escapeHtml(c.company || "—")}</span>${crmLink}</td>
             <td>${escapeHtml(c.contactName || "—")}</td>
             <td class="clients-td-nowrap">${phone ? `<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ""))}">${escapeHtml(phone)}</a>` : "—"}</td>
@@ -221,6 +225,199 @@ async function syncClientsFromCrm(btn) {
         console.error("syncFromCrm", e);
         alert("Не удалось синхронизировать из CRM. Проверьте вебхук и права.");
     } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+}
+
+// ============================================================================
+//  Карточка клиента (баланс + сделки). Клик по строке → провалиться в карточку.
+// ============================================================================
+
+// Клик по строке открывает карточку, но не мешает ссылкам (CRM/тел/почта).
+function onClientRowClick(event, crmId) {
+    if (event && event.target && event.target.closest("a")) return;
+    openClientCard(crmId);
+}
+
+function clientCardEscHandler(e) {
+    if (e.key === "Escape") closeClientCard();
+}
+
+function closeClientCard() {
+    const overlay = document.getElementById("clientCardOverlay");
+    if (overlay) overlay.style.display = "none";
+    document.removeEventListener("keydown", clientCardEscHandler);
+}
+
+async function openClientCard(crmId) {
+    if (!ensureActiveSession()) return;
+    if (!crmId) return;
+
+    let overlay = document.getElementById("clientCardOverlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "clientCardOverlay";
+        overlay.className = "client-card-overlay";
+        overlay.setAttribute("onmousedown", "overlayDown(event)");
+        overlay.setAttribute("onclick", "if (overlayClickedSelf(event)) closeClientCard()");
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = "flex";
+    overlay.innerHTML = `<div class="client-card"><div class="client-card-loading">Загрузка карточки…</div></div>`;
+    document.addEventListener("keydown", clientCardEscHandler);
+
+    try {
+        const data = await clientsApi("getClient", { crmId: Number(crmId) });
+        renderClientCard(data, crmId);
+    } catch (e) {
+        console.error("getClient", e);
+        overlay.innerHTML = `
+            <div class="client-card">
+                <div class="client-card-header">
+                    <h3>Ошибка</h3>
+                    <button class="client-card-close" onclick="closeClientCard()" aria-label="Закрыть">&times;</button>
+                </div>
+                <div class="client-card-body">
+                    <div class="clients-empty clients-empty--error">Не удалось загрузить карточку клиента.</div>
+                </div>
+            </div>`;
+    }
+}
+
+// Класс оплаты сделки по долгу/оплате (как в списке просчётов).
+function dealPayClass(amount, paid, debt) {
+    if (debt <= 0.009) return "is-ok";
+    if (paid <= 0.009) return "is-unpaid";
+    return "is-partial";
+}
+
+function clientCardDealRow(d) {
+    const amount = Number(d.amount) || 0;
+    const debt = Number(d.debt) || 0;
+    const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
+    const cls = dealPayClass(amount, paid, debt);
+    const num = String(d.num ?? d.crm_deal_id ?? "").trim();
+    const crmId = d.crm_deal_id;
+    const numHtml = crmId
+        ? `<a href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener">№ ${escapeHtml(num)}</a>`
+        : `№ ${escapeHtml(num)}`;
+    const status = String(d.status_name ?? "").trim();
+    const date = String(d.created_at_crm ?? "").trim();
+    const debtCell = debt > 0.009
+        ? `<span class="cc-debt">${money(debt)} ₽</span>`
+        : `<span class="cc-debt-zero">оплачено</span>`;
+    return `
+        <tr>
+            <td class="cc-deal-num">${numHtml}</td>
+            <td class="cc-deal-content">${escapeHtml(String(d.content ?? "") || "—")}</td>
+            <td class="clients-td-num cc-deal-amount ${cls}">${money(amount)} ₽</td>
+            <td class="clients-td-num">${money(paid)} ₽</td>
+            <td class="clients-td-num">${debtCell}</td>
+            <td class="cc-deal-status">${status ? escapeHtml(status) : "—"}</td>
+            <td class="clients-td-nowrap cc-deal-date">${escapeHtml(date || "—")}</td>
+        </tr>`;
+}
+
+function renderClientCard(data, crmId) {
+    const overlay = document.getElementById("clientCardOverlay");
+    if (!overlay) return;
+    const c = normalizeClient(data?.client) || {};
+    const deals = Array.isArray(data?.deals) ? data.deals : [];
+
+    const contactBits = [c.contactName, c.mobile || c.landline, c.email].filter(Boolean);
+    const sub = contactBits.map(escapeHtml).join(" · ");
+    const crmLink = crmId
+        ? `<a class="client-card-crm" href="https://crm.heavendevelop.ru/editClient/${crmId}" target="_blank" rel="noopener">В CRM ↗</a>`
+        : "";
+
+    const balanceCls = c.balance < -0.009 ? "is-negative" : (c.balance > 0.009 ? "is-positive" : "");
+    const stats = `
+        <div class="client-card-stats">
+            <div class="cc-stat">
+                <span class="cc-stat-label">Баланс</span>
+                <span class="cc-stat-value ${balanceCls}">${money(c.balance)} ₽</span>
+            </div>
+            <div class="cc-stat">
+                <span class="cc-stat-label">Оплатил</span>
+                <span class="cc-stat-value">${money(c.income)} ₽</span>
+            </div>
+            <div class="cc-stat">
+                <span class="cc-stat-label">Долг</span>
+                <span class="cc-stat-value ${c.debt > 0.009 ? "is-negative" : ""}">${money(c.debt)} ₽</span>
+            </div>
+            <div class="cc-stat">
+                <span class="cc-stat-label">Сделок</span>
+                <span class="cc-stat-value">${c.dealsCount || deals.length || 0}</span>
+            </div>
+        </div>`;
+
+    let dealsBlock;
+    if (deals.length) {
+        dealsBlock = `
+            <div class="client-card-deals-head">
+                <span>Сделки <b>(${deals.length})</b></span>
+                <button class="clients-btn clients-btn-sync cc-sync-deals" onclick="syncDeals(this, ${crmId})">Обновить сделки</button>
+            </div>
+            <div class="clients-table-wrap">
+                <table class="clients-table cc-deals-table">
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Наименование</th>
+                            <th class="clients-td-num">Сумма</th>
+                            <th class="clients-td-num">Оплачено</th>
+                            <th class="clients-td-num">Долг</th>
+                            <th>Статус</th>
+                            <th>Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody>${deals.map(clientCardDealRow).join("")}</tbody>
+                </table>
+            </div>`;
+    } else {
+        dealsBlock = `
+            <div class="client-card-deals-empty">
+                <p>Сделок в базе нет.</p>
+                <p class="cc-hint">Если у клиента есть сделки в CRM — синхронизируйте их в базу.</p>
+                <button class="clients-btn clients-btn-add cc-sync-deals" onclick="syncDeals(this, ${crmId})">Синхронизировать сделки из CRM</button>
+            </div>`;
+    }
+
+    overlay.innerHTML = `
+        <div class="client-card" role="dialog" aria-modal="true">
+            <div class="client-card-header">
+                <div class="client-card-title">
+                    <h3>${escapeHtml(c.company || "Клиент")}</h3>
+                    ${sub ? `<div class="client-card-sub">${sub}</div>` : ""}
+                </div>
+                <div class="client-card-header-actions">
+                    ${crmLink}
+                    <button class="client-card-close" onclick="closeClientCard()" aria-label="Закрыть">&times;</button>
+                </div>
+            </div>
+            <div class="client-card-body">
+                ${stats}
+                ${data?.crmError ? `<div class="client-card-warn">Свежие данные из CRM недоступны — показаны сохранённые.</div>` : ""}
+                ${dealsBlock}
+            </div>
+        </div>`;
+}
+
+// Синхронизация всех сделок CRM → БД. reopenCrmId — переоткрыть карточку после.
+async function syncDeals(btn, reopenCrmId) {
+    if (!ensureActiveSession()) return;
+    const original = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.innerHTML = "Синхронизация…"; }
+    try {
+        const data = await clientsApi("syncDealsFromCrm", {});
+        const total = Number(data?.total ?? 0);
+        if (typeof showReadinessToast === "function") {
+            showReadinessToast(`Сделки синхронизированы${total ? `: ${total}` : ""}`);
+        }
+        if (reopenCrmId) openClientCard(reopenCrmId);
+    } catch (e) {
+        console.error("syncDealsFromCrm", e);
+        alert("Не удалось синхронизировать сделки из CRM.");
         if (btn) { btn.disabled = false; btn.innerHTML = original; }
     }
 }

@@ -293,6 +293,76 @@
     .clients-count { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
     .clients-empty { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
     .clients-empty--error { color: var(--danger); }
+    .clients-row-clickable { cursor: pointer; }
+
+    /* ---- Карточка клиента (модалка: баланс + сделки) ---- */
+    .client-card-overlay {
+        position: fixed; inset: 0; z-index: 2200;
+        display: none; align-items: flex-start; justify-content: center;
+        background: rgba(28, 27, 25, 0.5);
+        padding: 40px 16px; overflow-y: auto;
+    }
+    .client-card {
+        background: var(--surface); border-radius: 14px;
+        box-shadow: 0 16px 50px rgba(28, 27, 25, 0.28);
+        width: min(920px, 100%); max-height: calc(100vh - 80px);
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+    .client-card-loading { padding: 48px 16px; text-align: center; color: var(--text-muted); }
+    .client-card-header {
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+        padding: 18px 20px; border-bottom: 1px solid var(--border);
+    }
+    .client-card-title h3 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); }
+    .client-card-sub { margin-top: 4px; font-size: 13px; color: var(--text-muted); }
+    .client-card-header-actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+    .client-card-crm { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
+    .client-card-crm:hover { color: var(--accent-strong); text-decoration: underline; }
+    .client-card-close {
+        width: 30px; height: 30px; min-width: 30px; padding: 0; margin: 0;
+        border: none; border-radius: 8px; background: transparent;
+        font-size: 22px; line-height: 1; color: var(--text-muted); cursor: pointer;
+    }
+    .client-card-close:hover { background: var(--surface-2); color: var(--text); }
+    .client-card-body { padding: 18px 20px 22px; overflow-y: auto; }
+
+    .client-card-stats {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px; margin-bottom: 18px;
+    }
+    .cc-stat {
+        display: flex; flex-direction: column; gap: 3px;
+        padding: 12px 14px; background: var(--surface-2);
+        border: 1px solid var(--border); border-radius: var(--r-md);
+    }
+    .cc-stat-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+    .cc-stat-value { font-size: 18px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .cc-stat-value.is-negative { color: var(--danger); }
+    .cc-stat-value.is-positive { color: var(--success, #15803D); }
+
+    .client-card-warn {
+        margin-bottom: 14px; padding: 8px 12px; font-size: 13px;
+        color: var(--pay-partial); background: #FFF4EC; border: 1px solid #F3D6C2; border-radius: var(--r-sm);
+    }
+    .client-card-deals-head {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        margin-bottom: 8px; font-size: 14px; color: var(--text);
+    }
+    .cc-sync-deals { margin: 0; width: auto; }
+    .client-card-deals-empty { padding: 28px 16px; text-align: center; color: var(--text-muted); }
+    .client-card-deals-empty p { margin: 0 0 6px; }
+    .client-card-deals-empty .cc-hint { font-size: 13px; }
+    .client-card-deals-empty .cc-sync-deals { margin-top: 10px; }
+    .cc-deals-table td { font-size: 12.5px; }
+    .cc-deal-num a { font-weight: 600; }
+    .cc-deal-content { max-width: 280px; color: var(--text-2, var(--text)); }
+    .cc-deal-amount.is-ok { color: var(--success, #15803D); font-weight: 600; }
+    .cc-deal-amount.is-unpaid { color: var(--danger); font-weight: 600; }
+    .cc-deal-amount.is-partial { color: var(--pay-partial); font-weight: 600; }
+    .cc-debt { color: var(--danger); font-weight: 600; }
+    .cc-debt-zero { color: var(--text-muted); }
+    .cc-deal-status { white-space: nowrap; color: var(--text-muted); }
+    .cc-deal-date { color: var(--text-muted); }
     .calc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
     .calc-form-col { min-width: 0; }
     .calc-side-col { position: sticky; top: 96px; min-width: 0; }
