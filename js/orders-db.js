@@ -14,13 +14,22 @@ const dbOrdersState = {
 };
 try { const v = localStorage.getItem("dbOrdersView"); if (v === "list" || v === "kanban") dbOrdersState.view = v; } catch (_) {}
 dbOrdersState.filters = { statuses: new Set(), debtOnly: false };
+dbOrdersState.page = 1;
+dbOrdersState.perPage = 100;
+dbOrdersState.total = 0;
+dbOrdersState.pages = 1;
+dbOrdersState.kanbanDeals = [];
+dbOrdersState.kanbanZoom = 1;
+try { const z = parseFloat(localStorage.getItem("dbKanbanZoom")); if (z >= 0.5 && z <= 1) dbOrdersState.kanbanZoom = z; } catch (_) {}
 
 let dbDealsSearchTimer = null;
 
-// Фильтрация уже загруженных сделок (клиентская): статусы + «только с долгом».
-function getDbFilteredDeals() {
-    let list = dbOrdersState.deals || [];
+// Клиентская фильтрация канбана (открытые сделки уже ограничены сервером).
+function getDbKanbanFiltered() {
+    let list = dbOrdersState.kanbanDeals || [];
     const f = dbOrdersState.filters;
+    const q = (dbOrdersState.query || "").trim().toLowerCase();
+    if (q) list = list.filter(d => (`${d.num || ""} ${d.client_name || ""} ${d.content || ""}`).toLowerCase().includes(q));
     if (f.statuses && f.statuses.size) list = list.filter(d => f.statuses.has(Number(d.status_id)));
     if (f.debtOnly) list = list.filter(d => (Number(d.debt) || 0) > 0.009);
     return list;
@@ -39,7 +48,12 @@ function clearDbSearch() {
     if (inp) inp.value = "";
     dbOrdersState.query = "";
     updateDbSearchClearBtn();
-    loadDbDeals();
+    dbApplyQueryOrFilters();
+}
+// Список: перезагрузка с сервера (пагинация/фильтры серверные). Канбан: клиентский рендер.
+function dbApplyQueryOrFilters() {
+    if (dbOrdersState.view === "kanban") { renderDbKanban(); }
+    else { dbOrdersState.page = 1; loadDbList(); }
 }
 // Кнопка фильтров — открыть/закрыть, наполнить статусы.
 function toggleDbFilters(e) {
@@ -78,7 +92,7 @@ function applyDbFilters() {
     dbOrdersState.filters.statuses = sel;
     dbOrdersState.filters.debtOnly = !!(debt && debt.checked);
     updateDbFiltersBtn();
-    renderDbOrders();
+    dbApplyQueryOrFilters();
 }
 function resetDbFilters() {
     dbOrdersState.filters.statuses = new Set();
@@ -86,13 +100,12 @@ function resetDbFilters() {
     const debt = document.getElementById("dbFilterDebtOnly");
     if (debt) debt.checked = false;
     const inp = document.getElementById("dbkSearchInput");
-    const hadQuery = !!dbOrdersState.query;
     if (inp) inp.value = "";
     dbOrdersState.query = "";
     updateDbSearchClearBtn();
     updateDbFiltersBtn();
     renderDbFilterStatuses();
-    if (hadQuery) loadDbDeals(); else renderDbOrders();
+    dbApplyQueryOrFilters();
 }
 function updateDbFiltersBtn() {
     const btn = document.getElementById("dbFiltersBtn");
@@ -109,18 +122,22 @@ function openDbOrders(trigger) {
     else renderDbOrders();
 }
 
-// Переключение Список/Канбан.
+// Переключение Список/Канбан — подгружаем данные под вид.
 function setDbView(view) {
     if (view !== "list" && view !== "kanban") return;
     dbOrdersState.view = view;
     try { localStorage.setItem("dbOrdersView", view); } catch (_) {}
-    renderDbOrders();
+    updateDbViewToggle();
+    loadDbDeals();
 }
 function updateDbViewToggle() {
     const l = document.getElementById("dbViewListBtn");
     const k = document.getElementById("dbViewKanbanBtn");
     if (l) l.classList.toggle("is-active", dbOrdersState.view === "list");
     if (k) k.classList.toggle("is-active", dbOrdersState.view === "kanban");
+    const zoomWrap = document.getElementById("dbZoomWrap");
+    if (zoomWrap) zoomWrap.style.display = dbOrdersState.view === "kanban" ? "" : "none";
+    updateDbZoomUI();
 }
 function renderDbOrders() {
     updateDbViewToggle();
@@ -128,23 +145,57 @@ function renderDbOrders() {
     else renderDbList();
 }
 
+// Диспетчер загрузки по виду.
 async function loadDbDeals() {
+    if (dbOrdersState.view === "kanban") return loadDbKanban();
+    return loadDbList();
+}
+async function loadDbList() {
     if (!ensureActiveSession()) return;
     dbOrdersState.loading = true;
     dbOrdersState.error = "";
-    renderDbOrders();
+    renderDbList();
     try {
-        const data = await clientsApi("listDeals", { q: dbOrdersState.query || "" });
+        const f = dbOrdersState.filters;
+        const data = await clientsApi("listDeals", {
+            q: dbOrdersState.query || "",
+            page: dbOrdersState.page,
+            perPage: dbOrdersState.perPage,
+            statusIds: f.statuses ? [...f.statuses] : [],
+            debtOnly: !!f.debtOnly
+        });
         dbOrdersState.deals = Array.isArray(data?.deals) ? data.deals : [];
-        dbOrdersState.statuses = Array.isArray(data?.statuses) ? data.statuses : [];
+        if (Array.isArray(data?.statuses)) dbOrdersState.statuses = data.statuses;
+        dbOrdersState.total = Number(data?.total) || 0;
+        dbOrdersState.pages = Number(data?.pages) || 1;
+        dbOrdersState.page = Number(data?.page) || dbOrdersState.page;
         dbOrdersState.loaded = true;
     } catch (e) {
-        console.error("loadDbDeals", e);
+        console.error("loadDbList", e);
         dbOrdersState.deals = [];
         dbOrdersState.error = "Не удалось загрузить заказы. Проверьте бэкенд (/api/clients).";
     } finally {
         dbOrdersState.loading = false;
-        renderDbOrders();
+        renderDbList();
+    }
+}
+async function loadDbKanban() {
+    if (!ensureActiveSession()) return;
+    dbOrdersState.loading = true;
+    dbOrdersState.error = "";
+    renderDbKanban();
+    try {
+        const data = await clientsApi("listKanbanDeals", {});
+        dbOrdersState.kanbanDeals = Array.isArray(data?.deals) ? data.deals : [];
+        if (Array.isArray(data?.statuses)) dbOrdersState.statuses = data.statuses;
+        dbOrdersState.loaded = true;
+    } catch (e) {
+        console.error("loadDbKanban", e);
+        dbOrdersState.kanbanDeals = [];
+        dbOrdersState.error = "Не удалось загрузить канбан.";
+    } finally {
+        dbOrdersState.loading = false;
+        renderDbKanban();
     }
 }
 
@@ -152,7 +203,52 @@ function onDbDealsSearchInput(value) {
     dbOrdersState.query = String(value || "");
     updateDbSearchClearBtn();
     clearTimeout(dbDealsSearchTimer);
-    dbDealsSearchTimer = setTimeout(() => loadDbDeals(), 350);
+    dbDealsSearchTimer = setTimeout(() => dbApplyQueryOrFilters(), 350);
+}
+
+// Пагинация списка.
+function dbGoToPage(p) {
+    p = Math.max(1, Math.min(dbOrdersState.pages, Number(p) || 1));
+    if (p === dbOrdersState.page) return;
+    dbOrdersState.page = p;
+    loadDbList();
+    const host = document.getElementById("dbOrdersBody");
+    if (host && host.scrollIntoView) host.scrollIntoView({ block: "start" });
+}
+function dbPageNumbers(page, pages) {
+    const out = [];
+    const win = 2;
+    const start = Math.max(1, page - win), end = Math.min(pages, page + win);
+    if (start > 1) { out.push(1); if (start > 2) out.push("…"); }
+    for (let i = start; i <= end; i++) out.push(i);
+    if (end < pages) { if (end < pages - 1) out.push("…"); out.push(pages); }
+    return out;
+}
+function renderDbPager() {
+    const page = dbOrdersState.page, pages = dbOrdersState.pages;
+    if (pages <= 1) return "";
+    const btn = (label, p, o = {}) => `<button type="button" class="dbk-page${o.active ? " is-active" : ""}"${o.disabled ? " disabled" : ""} onclick="dbGoToPage(${p})">${label}</button>`;
+    let html = btn("«", 1, { disabled: page <= 1 }) + btn("‹", page - 1, { disabled: page <= 1 });
+    dbPageNumbers(page, pages).forEach(n => {
+        html += (n === "…") ? `<span class="dbk-page-ell">…</span>` : btn(String(n), n, { active: n === page });
+    });
+    html += btn("›", page + 1, { disabled: page >= pages }) + btn("»", pages, { disabled: page >= pages });
+    return `<div class="dbk-pager">${html}</div>`;
+}
+
+// Масштаб канбана (100..50%), сохраняется в localStorage.
+function setDbZoom(v) {
+    let z = parseFloat(v);
+    if (!(z >= 0.5 && z <= 1)) z = 1;
+    dbOrdersState.kanbanZoom = z;
+    try { localStorage.setItem("dbKanbanZoom", String(z)); } catch (_) {}
+    const board = document.querySelector("#dbOrdersBody .dbk-board");
+    if (board) board.style.zoom = z;
+    updateDbZoomUI();
+}
+function updateDbZoomUI() {
+    const sel = document.getElementById("dbZoomSelect");
+    if (sel) sel.value = String(dbOrdersState.kanbanZoom || 1);
 }
 
 // Колонки канбана: статусы CRM (в их порядке, только непустые) + прочие статусы из данных.
@@ -205,16 +301,12 @@ function dbDealCardHtml(d) {
         </div>`;
 }
 
-function dbEmptyOrGuard(host, deals) {
-    if (dbOrdersState.loading && !dbOrdersState.deals.length) {
-        host.innerHTML = `<div class="dbk-empty">Загрузка заказов…</div>`; return true;
+function dbEmptyMsg(host, sourceLen, filtered, kind) {
+    if (dbOrdersState.loading && !sourceLen) {
+        host.innerHTML = `<div class="dbk-empty">Загрузка…</div>`; return true;
     }
     if (dbOrdersState.error) {
         host.innerHTML = `<div class="dbk-empty dbk-empty--error">${escapeHtml(dbOrdersState.error)}</div>`; return true;
-    }
-    if (!deals.length) {
-        const filtered = dbOrdersState.query || dbFiltersActive();
-        host.innerHTML = `<div class="dbk-empty">${filtered ? "Ничего не найдено." : "Нет заказов в базе. Нажмите «⟳ Сделки», затем «⟳ Элементы»."}</div>`; return true;
     }
     return false;
 }
@@ -222,10 +314,16 @@ function dbEmptyOrGuard(host, deals) {
 function renderDbKanban() {
     const host = document.getElementById("dbOrdersBody");
     if (!host) return;
-    const deals = getDbFilteredDeals();
-    if (dbEmptyOrGuard(host, deals)) return;
+    if (dbEmptyMsg(host, dbOrdersState.kanbanDeals.length)) return;
+    const deals = getDbKanbanFiltered();
+    if (!deals.length) {
+        const filtered = dbOrdersState.query || dbFiltersActive();
+        host.innerHTML = `<div class="dbk-empty">${filtered ? "Ничего не найдено." : "Нет открытых заказов. Завершённые скрыты (кроме сегодняшних)."}</div>`;
+        return;
+    }
     const cols = buildDbColumns(deals, dbOrdersState.statuses);
-    host.innerHTML = `<div class="dbk-board">${cols.map(c => `
+    const zoom = dbOrdersState.kanbanZoom || 1;
+    host.innerHTML = `<div class="dbk-board" style="zoom:${zoom}">${cols.map(c => `
         <div class="dbk-col">
             <div class="dbk-col-head"${dbColHeadStyle(c)}>
                 <span class="dbk-col-name">${escapeHtml(c.name)}</span>
@@ -259,49 +357,100 @@ function dbDrop(e, statusId) {
     setDealStatus(id, statusId);
 }
 
+// Найти сделку во всех загруженных коллекциях (список + канбан).
+function dbFindDeal(dealId) {
+    const id = Number(dealId);
+    return (dbOrdersState.deals || []).find(d => Number(d.crm_deal_id) === id)
+        || (dbOrdersState.kanbanDeals || []).find(d => Number(d.crm_deal_id) === id) || null;
+}
+function dbSetDealStatusLocal(dealId, statusId, statusName) {
+    const id = Number(dealId);
+    [dbOrdersState.deals, dbOrdersState.kanbanDeals].forEach(arr => (arr || []).forEach(d => {
+        if (Number(d.crm_deal_id) === id) { d.status_id = statusId; d.status_name = statusName; }
+    }));
+}
+
 // ---- Смена статуса сделки (оптимистично + PUT в CRM через бэкенд) ----
 async function setDealStatus(dealId, statusId) {
-    const deal = dbOrdersState.deals.find(d => Number(d.crm_deal_id) === Number(dealId));
-    if (!deal) return;
-    const prev = { status_id: deal.status_id, status_name: deal.status_name };
+    const deal = dbFindDeal(dealId);
+    const prev = deal ? { status_id: deal.status_id, status_name: deal.status_name } : null;
     const st = (dbOrdersState.statuses || []).find(s => Number(s.id) === Number(statusId));
-    deal.status_id = Number(statusId);
-    deal.status_name = st ? st.name : deal.status_name;
+    dbSetDealStatusLocal(dealId, Number(statusId), st ? st.name : (deal ? deal.status_name : ""));
     renderDbOrders();
     try {
         await clientsApi("setDealStatus", { crmId: Number(dealId), statusId: Number(statusId) });
         if (typeof showReadinessToast === "function") {
-            showReadinessToast(`№ ${deal.num || dealId} → ${deal.status_name || ""}`);
+            showReadinessToast(`№ ${deal?.num || dealId} → ${st?.name || ""}`);
         }
     } catch (e) {
         console.error("setDealStatus", e);
-        deal.status_id = prev.status_id; deal.status_name = prev.status_name;
+        if (prev) dbSetDealStatusLocal(dealId, prev.status_id, prev.status_name);
         renderDbOrders();
         alert("Не удалось сменить статус сделки в CRM.");
     }
 }
-function onDbDealStatusChange(sel, dealId) { if (sel.value) setDealStatus(dealId, Number(sel.value)); }
 
-// Статус сделки — цветная пилюля-селект (цвета из CRM, как в разделе «Заказы»).
-// Нет статуса → серый «Статус не установлен» (плейсхолдер selected + disabled).
 function dbStatusPillColors(st) {
     const bg = (st && st.bk_color) ? st.bk_color : "#dfdfdf";
     const fg = st ? (st.text_color === "white" ? "#fff" : "#1c1b19") : "#555";
     return { bg, fg };
 }
+// Статус сделки — цветная пилюля-кнопка, по клику открывается цветное меню статусов.
 function dbDealStatusSelectHtml(d) {
     const statuses = dbOrdersState.statuses || [];
     const cur = d.status_id != null ? Number(d.status_id) : null;
     const curSt = statuses.find(s => Number(s.id) === cur) || null;
     const { bg, fg } = dbStatusPillColors(curSt);
+    const label = curSt ? curSt.name : (d.status_name || "Статус не установлен");
     if (!statuses.length) {
-        return `<span class="dbk-status-pill" style="background:${bg};color:${fg}">${escapeHtml(d.status_name || "Статус не установлен")}</span>`;
+        return `<span class="dbk-status-pill" style="background:${bg};color:${fg}">${escapeHtml(label)}</span>`;
     }
-    const placeholderSel = (cur == null);
-    const placeholder = `<option value="" disabled${placeholderSel ? " selected" : ""}>Статус не установлен</option>`;
-    const extra = (cur != null && !curSt) ? `<option value="${cur}" selected>${escapeHtml(d.status_name || "—")}</option>` : "";
-    const opts = statuses.map(s => `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
-    return `<select class="dbk-status-pill" style="background:${bg};color:${fg}" onchange="onDbDealStatusChange(this, ${d.crm_deal_id})" onclick="event.stopPropagation()">${placeholder}${extra}${opts}</select>`;
+    return `<button type="button" class="dbk-status-pill" style="background:${bg};color:${fg}" onclick="dbOpenDealStatusMenu(event, ${d.crm_deal_id})">${escapeHtml(label)}</button>`;
+}
+
+// Цветное меню смены статуса (общий элемент в body, позиционируется под пилюлей).
+let dbStatusMenuDealId = null;
+function dbOpenDealStatusMenu(e, dealId) {
+    if (e) e.stopPropagation();
+    dbCloseStatusMenu();
+    dbStatusMenuDealId = dealId;
+    const statuses = dbOrdersState.statuses || [];
+    const deal = dbFindDeal(dealId);
+    const cur = deal && deal.status_id != null ? Number(deal.status_id) : null;
+    const menu = document.createElement("div");
+    menu.className = "dbk-status-menu";
+    menu.id = "dbStatusMenu";
+    menu.innerHTML = statuses.map(s => {
+        const { bg } = dbStatusPillColors(s);
+        return `<button type="button" class="dbk-status-opt${Number(s.id) === cur ? " is-cur" : ""}" onclick="dbPickDealStatus(${s.id})"><span class="dbk-status-swatch" style="background:${bg}"></span><span class="dbk-status-optname">${escapeHtml(s.name)}</span></button>`;
+    }).join("");
+    document.body.appendChild(menu);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mw = Math.max(220, Math.min(280, rect.width + 60));
+    let left = rect.left;
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    menu.style.width = mw + "px";
+    menu.style.left = Math.max(8, left) + "px";
+    // если снизу не влезает — открыть вверх
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 260 && rect.top > 260) menu.style.top = (rect.top - menu.offsetHeight - 4) + "px";
+    else menu.style.top = (rect.bottom + 4) + "px";
+    setTimeout(() => document.addEventListener("click", dbStatusMenuOutside), 0);
+}
+function dbStatusMenuOutside(ev) {
+    const menu = document.getElementById("dbStatusMenu");
+    if (menu && !menu.contains(ev.target)) dbCloseStatusMenu();
+}
+function dbCloseStatusMenu() {
+    const menu = document.getElementById("dbStatusMenu");
+    if (menu) menu.remove();
+    document.removeEventListener("click", dbStatusMenuOutside);
+    dbStatusMenuDealId = null;
+}
+function dbPickDealStatus(statusId) {
+    const id = dbStatusMenuDealId;
+    dbCloseStatusMenu();
+    if (id != null) setDealStatus(id, statusId);
 }
 
 // ---- Список заказов (стиль раздела «Заказы») ----
@@ -338,11 +487,19 @@ function dbListRowHtml(d) {
 function renderDbList() {
     const host = document.getElementById("dbOrdersBody");
     if (!host) return;
-    const deals = getDbFilteredDeals();
-    if (dbEmptyOrGuard(host, deals)) return;
+    if (dbEmptyMsg(host, dbOrdersState.deals.length)) return;
+    const deals = dbOrdersState.deals;
+    if (!deals.length) {
+        const filtered = dbOrdersState.query || dbFiltersActive();
+        host.innerHTML = `<div class="dbk-empty">${filtered ? "Ничего не найдено." : "Нет заказов в базе. Нажмите «⟳ Сделки», затем «⟳ Элементы»."}</div>`;
+        return;
+    }
     host.innerHTML = `
         <div class="crm-list-table">${dbListHead()}${deals.map(dbListRowHtml).join("")}</div>
-        <div class="dbk-count">Всего заказов: <b>${deals.length}</b></div>`;
+        <div class="dbk-listfoot">
+            <div class="dbk-count">Всего: <b>${dbOrdersState.total}</b> · стр. ${dbOrdersState.page} из ${dbOrdersState.pages}</div>
+            ${renderDbPager()}
+        </div>`;
 }
 
 // ---- Синхронизация ----
