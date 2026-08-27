@@ -423,11 +423,13 @@
     .adv-filters-popover-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
     .adv-filters-btn.has-active { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
 
-    /* Канбан тянется по высоте окна; столбики равной высоты, стретчатся. */
-    .dbk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; align-items: stretch; min-height: calc(100vh - 180px); }
-    .dbk-col { flex: 0 0 300px; width: 300px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; max-height: calc(100vh - 170px); }
+    /* Канбан тянется по высоте окна (высота доски задаётся JS с учётом zoom);
+       столбики равной высоты, стретчатся; тело столбика скроллится внутри. */
+    .dbk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px; align-items: stretch; min-height: 320px; }
+    .dbk-col { flex: 0 0 300px; width: 300px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
     .dbk-col--over { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--accent-tint); }
-    .dbk-col-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); border-radius: var(--r-md) var(--r-md) 0 0; position: sticky; top: 0; }
+    .dbk-col-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); border-radius: var(--r-md) var(--r-md) 0 0; cursor: grab; }
+    .dbk-col-head:active { cursor: grabbing; }
     .dbk-col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .dbk-col-count { flex: 0 0 auto; font-size: 12px; font-weight: 700; background: rgba(0,0,0,0.12); border-radius: 20px; padding: 1px 9px; }
     /* flex:1 + min-height → пустые столбики тоже большая drop-зона */
@@ -436,10 +438,8 @@
     .dbk-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; cursor: pointer; transition: box-shadow 0.15s ease, border-color 0.15s ease; }
     .dbk-card:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(29,88,198,0.12); }
     .dbk-card--dragging { opacity: 0.5; }
-    /* Полноэкранный канбан: контейнер во всю ширину, доска — во всю высоту окна. */
-    body.db-kanban-active #db-orders-container.container { max-width: 100%; padding: 12px 14px; }
-    body.db-kanban-active .dbk-board { min-height: calc(100vh - 150px); }
-    body.db-kanban-active .dbk-col { max-height: calc(100vh - 140px); }
+    /* Полноэкранный канбан: контейнер во всю ширину (высоту доски задаёт JS). */
+    body.db-kanban-active #db-orders-container.container { max-width: 100%; padding: 12px 14px; margin-bottom: 6px; }
     .dbk-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
     .dbk-card-num { font-size: 13px; font-weight: 700; color: var(--accent); }
     .dbk-card-amount { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -450,6 +450,19 @@
 
     .dbk-empty { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
     .dbk-empty--error { color: var(--danger); }
+    /* Баннер статуса фоновой синхронизации элементов */
+    .dbk-sync-banner { margin-bottom: 12px; padding: 10px 14px; border-radius: var(--r-md); border: 1px solid var(--border); font-size: 13px; }
+    .dbk-sync-banner.is-running { background: var(--accent-tint); border-color: #c9d6f5; color: var(--accent-strong); }
+    .dbk-sync-banner.is-done { background: #EAF7EE; border-color: #BFE6C9; color: #1B6B34; }
+    .dbk-sync-row { display: flex; align-items: center; gap: 8px; }
+    .dbk-sync-row > span:last-of-type { flex: 1 1 auto; }
+    .dbk-sync-close { flex: 0 0 auto; width: 22px; height: 22px; margin: 0; padding: 0; border: none; border-radius: 6px; background: transparent; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; opacity: 0.6; }
+    .dbk-sync-close:hover { opacity: 1; background: rgba(0,0,0,0.06); }
+    .dbk-sync-spin { flex: 0 0 auto; width: 14px; height: 14px; border: 2px solid rgba(29,88,198,0.3); border-top-color: var(--accent); border-radius: 50%; animation: dbkSpin 0.8s linear infinite; }
+    @keyframes dbkSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .dbk-sync-spin { animation: none; } }
+    .dbk-sync-bar { margin-top: 8px; height: 6px; border-radius: 3px; background: rgba(29,88,198,0.15); overflow: hidden; }
+    .dbk-sync-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
 
     /* Доп. поля сделки/элементов */
     .dbk-af { margin: 4px 0 18px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }

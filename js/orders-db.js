@@ -21,6 +21,17 @@ dbOrdersState.pages = 1;
 dbOrdersState.kanbanDeals = [];
 dbOrdersState.kanbanZoom = 1;
 try { const z = parseFloat(localStorage.getItem("dbKanbanZoom")); if (z >= 0.5 && z <= 1) dbOrdersState.kanbanZoom = z; } catch (_) {}
+dbOrdersState.colOrder = null;   // сохранённый порядок колонок (id статусов)
+try { const o = JSON.parse(localStorage.getItem("dbKanbanColOrder")); if (Array.isArray(o)) dbOrdersState.colOrder = o.map(Number).filter(Number.isFinite); } catch (_) {}
+
+// Текущий порядок колонок: сохранённый + недостающие статусы в конце.
+function dbGetColOrder() {
+    const saved = Array.isArray(dbOrdersState.colOrder) ? dbOrdersState.colOrder.slice() : [];
+    (dbOrdersState.statuses || []).forEach(s => {
+        if (s.id != null && !saved.includes(Number(s.id))) saved.push(Number(s.id));
+    });
+    return saved;
+}
 
 let dbDealsSearchTimer = null;
 
@@ -118,6 +129,7 @@ function openDbOrders(trigger) {
     updateDbViewToggle();
     updateDbSearchClearBtn();
     updateDbFiltersBtn();
+    refreshDbSyncStatus();   // показать/возобновить статус фоновой синхронизации элементов
     if (!dbOrdersState.loaded) loadDbDeals();
     else renderDbOrders();
 }
@@ -247,12 +259,19 @@ function setDbZoom(v) {
     try { localStorage.setItem("dbKanbanZoom", String(z)); } catch (_) {}
     const board = document.querySelector("#dbOrdersBody .dbk-board");
     if (board) board.style.zoom = z;
+    applyDbKanbanHeight();
     updateDbZoomUI();
 }
 function updateDbZoomUI() {
     const sel = document.getElementById("dbZoomSelect");
     if (sel) sel.value = String(dbOrdersState.kanbanZoom || 1);
 }
+// Пересчёт высоты канбана при ресайзе окна.
+window.addEventListener("resize", () => {
+    if (dbOrdersState.view === "kanban" && document.getElementById("db-orders-tab")?.classList.contains("active")) {
+        applyDbKanbanHeight();
+    }
+});
 
 // Колонки канбана: статусы CRM (в их порядке, только непустые) + прочие статусы из данных.
 function buildDbColumns(deals, statuses) {
@@ -276,10 +295,11 @@ function buildDbColumns(deals, statuses) {
         col.deals.push(d);
     });
     const cols = [];
-    // Все статусы из справочника показываем колонками — даже пустые (для перетаскивания).
-    order.forEach(id => { const c = byId.get(id); if (c) cols.push(c); });
-    // Прочие статусы (которых нет в справочнике) — только если в них есть сделки.
-    extra.forEach(id => { const c = byId.get(id); if (c && c.deals.length) cols.push(c); });
+    const seen = new Set();
+    // Порядок колонок — по сохранённому (перетаскиванием), все статусы даже пустые.
+    dbGetColOrder().forEach(id => { const c = byId.get(id); if (c) { cols.push(c); seen.add(id); } });
+    // Прочие статусы, которых нет в справочнике/порядке, — только если в них есть сделки.
+    extra.forEach(id => { if (!seen.has(id)) { const c = byId.get(id); if (c && c.deals.length) cols.push(c); } });
     return cols;
 }
 
@@ -331,12 +351,23 @@ function renderDbKanban() {
     // Drop-зона — весь столбик (наводить можно куда угодно в колонке, не только на карточки).
     host.innerHTML = `<div class="dbk-board" style="zoom:${zoom}">${cols.map(c => `
         <div class="dbk-col" data-status-id="${c.id}" ondragover="dbDragOver(event)" ondragleave="dbDragLeave(event)" ondrop="dbDrop(event, ${c.id})">
-            <div class="dbk-col-head"${dbColHeadStyle(c)}>
+            <div class="dbk-col-head" draggable="true" ondragstart="dbColDragStart(event, ${c.id})" ondragend="dbColDragEnd(event)"${dbColHeadStyle(c)} title="Перетащите, чтобы поменять колонки местами">
                 <span class="dbk-col-name">${escapeHtml(c.name)}</span>
                 <span class="dbk-col-count">${c.deals.length}</span>
             </div>
             <div class="dbk-col-body">${c.deals.map(dbDealCardHtml).join("")}</div>
         </div>`).join("")}</div>`;
+    applyDbKanbanHeight();
+}
+
+// Высота канбана: тянем доску до низа экрана (учитываем zoom, т.к. он масштабирует высоту).
+function applyDbKanbanHeight() {
+    const board = document.querySelector("#dbOrdersBody .dbk-board");
+    if (!board) return;
+    const zoom = dbOrdersState.kanbanZoom || 1;
+    const top = board.getBoundingClientRect().top;
+    const avail = window.innerHeight - top - 14;      // экранные px до низа
+    if (avail > 120) board.style.height = (avail / zoom) + "px";  // делим на zoom → после масштабирования заполнит
 }
 
 // ---- Drag-and-drop: смена статуса сделки перетаскиванием ----
@@ -361,11 +392,38 @@ function dbDragLeave(e) {
 function dbDrop(e, statusId) {
     e.preventDefault();
     if (e.currentTarget) e.currentTarget.classList.remove("dbk-col--over");
+    // Перенос КОЛОНКИ (drag за заголовок) — меняем порядок колонок.
+    if (dbColDragStatusId != null) {
+        const dragId = dbColDragStatusId; dbColDragStatusId = null;
+        dbReorderColumn(dragId, statusId);
+        return;
+    }
+    // Перенос СДЕЛКИ — смена статуса.
     const id = dbDragDealId; dbDragDealId = null;
     if (!id || !Number.isFinite(Number(statusId)) || Number(statusId) < 0) return;
     const deal = dbFindDeal(id);
     if (!deal || Number(deal.status_id) === Number(statusId)) return;
     setDealStatus(id, statusId);
+}
+
+// ---- Перетаскивание КОЛОНОК (порядок сохраняется в localStorage) ----
+let dbColDragStatusId = null;
+function dbColDragStart(e, statusId) {
+    e.stopPropagation();
+    dbColDragStatusId = Number(statusId);
+    dbDragDealId = null;
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", "col:" + statusId); } catch (_) {} }
+}
+function dbColDragEnd() { dbColDragStatusId = null; }
+function dbReorderColumn(dragId, targetId) {
+    dragId = Number(dragId); targetId = Number(targetId);
+    if (!Number.isFinite(dragId) || !Number.isFinite(targetId) || dragId === targetId) return;
+    let order = dbGetColOrder().filter(id => id !== dragId);
+    const ti = order.indexOf(targetId);
+    if (ti < 0) order.push(dragId); else order.splice(ti, 0, dragId);
+    dbOrdersState.colOrder = order;
+    try { localStorage.setItem("dbKanbanColOrder", JSON.stringify(order)); } catch (_) {}
+    renderDbKanban();
 }
 
 // Найти сделку во всех загруженных коллекциях (список + канбан).
@@ -532,55 +590,79 @@ async function syncDbDeals(btn) {
     }
 }
 
-// Бэкфилл элементов — фоновая задача на сервере, опрашиваем прогресс.
-let dbElementsPollTimer = null;
+// Бэкфилл элементов — фоновая задача. Прогресс/итог показываем баннером (переживает
+// перезагрузку страницы: статус хранится на сервере, опрашиваем при открытии раздела).
+let dbSyncStatusTimer = null;
+let dbSyncWasRunning = false;
 async function syncDbElements(btn) {
     if (!ensureActiveSession()) return;
-    const original = (btn && btn.dataset.orig) || (btn ? btn.innerHTML : "");
-    if (btn) { btn.dataset.orig = original; btn.disabled = true; btn.innerHTML = "Элементы…"; }
+    if (btn) { btn.disabled = true; }
     try {
         await clientsApi("syncDealElements", {});   // старт (возвращается сразу)
-        if (typeof showReadinessToast === "function") {
-            showReadinessToast("Синхронизация элементов запущена в фоне…");
-        }
-        pollDbElements(btn);
+        if (typeof showReadinessToast === "function") showReadinessToast("Синхронизация элементов запущена…");
+        dbSyncWasRunning = true;
+        refreshDbSyncStatus();
     } catch (e) {
         console.error("syncDbElements", e);
         alert("Не удалось запустить синхронизацию элементов.");
-        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
-
-async function pollDbElements(btn) {
+// Опрос статуса задачи + отрисовка баннера. Вызывается при открытии раздела и по таймеру.
+async function refreshDbSyncStatus() {
     try {
         const data = await clientsApi("elementsSyncStatus", {});
-        const job = data?.job || {};
-        if (job.running) {
-            if (btn) btn.innerHTML = `Элементы ${job.deals || 0}/${job.total || 0}`;
-            clearTimeout(dbElementsPollTimer);
-            dbElementsPollTimer = setTimeout(() => pollDbElements(btn), 3000);
-            return;
+        const job = data?.job || null;
+        renderDbSyncBanner(job);
+        if (job && job.running) {
+            dbSyncWasRunning = true;
+            clearTimeout(dbSyncStatusTimer);
+            dbSyncStatusTimer = setTimeout(refreshDbSyncStatus, 3000);
+        } else if (dbSyncWasRunning) {
+            // только что завершилось — обновим данные раздела
+            dbSyncWasRunning = false;
+            loadDbDeals();
         }
-        // завершено
-        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || "⟳ Элементы"; }
-        const samples = Array.isArray(job.errors) ? job.errors : [];
-        if (job.failed && samples.length) {
-            console.warn("Ошибки синхронизации элементов (образцы):", samples);
-        }
-        if (typeof showReadinessToast === "function") {
-            showReadinessToast(job.error
-                ? `Элементы: ошибка — ${job.error}`
-                : `Элементы готовы: ${job.elements || 0} по ${job.deals || 0} сделкам${job.failed ? `, ошибок ${job.failed}` : ""}`);
-        }
-        // при ошибках — показать первую причину (остальные в консоли/логах)
-        if (job.failed && samples.length) {
-            alert(`Часть элементов не загрузилась (${job.failed}).\nПример ошибки:\n${samples[0]}\n\nОстальные образцы — в консоли (F12) и в логах бэкенда.`);
-        }
-        await loadDbDeals();
-    } catch (e) {
-        console.error("pollDbElements", e);
-        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || "⟳ Элементы"; }
+    } catch (_) { /* нет сессии/сети — молча */ }
+}
+function dbDismissSyncBanner() {
+    const el = document.getElementById("dbSyncBanner");
+    if (el) el.remove();
+}
+function renderDbSyncBanner(job) {
+    const container = document.getElementById("db-orders-container");
+    const bodyEl = document.getElementById("dbOrdersBody");
+    if (!container || !bodyEl) return;
+    let el = document.getElementById("dbSyncBanner");
+    const empty = !job || (!job.running && !job.finishedAt && !job.startedAt);
+    if (empty) { if (el) el.remove(); if (dbOrdersState.view === "kanban") applyDbKanbanHeight(); return; }
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "dbSyncBanner";
+        container.insertBefore(el, bodyEl);
     }
+    if (job.running) {
+        const total = job.total || 0, done = job.deals || 0;
+        const pct = total ? Math.round(done / total * 100) : 0;
+        el.className = "dbk-sync-banner is-running";
+        el.innerHTML = `
+            <div class="dbk-sync-row">
+                <span class="dbk-sync-spin" aria-hidden="true"></span>
+                <span>Синхронизация элементов: <b>${done} / ${total}</b> сделок (${pct}%)${job.elements ? ` · элементов: ${job.elements}` : ""}${job.failed ? ` · ошибок: ${job.failed}` : ""} — идёт, можно закрыть вкладку</span>
+            </div>
+            <div class="dbk-sync-bar"><i style="width:${pct}%"></i></div>`;
+    } else {
+        el.className = "dbk-sync-banner is-done";
+        const t = job.finishedAt ? new Date(job.finishedAt).toLocaleString("ru-RU") : "";
+        const errText = job.error ? ` · ошибка: ${escapeHtml(job.error)}` : (job.failed ? ` · с ошибками: ${job.failed}` : "");
+        el.innerHTML = `
+            <div class="dbk-sync-row">
+                <span>✅ Элементы синхронизированы: <b>${job.elements || 0}</b> (по <b>${job.deals || 0}</b> сделкам)${t ? ` · завершено ${escapeHtml(t)}` : ""}${errText}</span>
+                <button type="button" class="dbk-sync-close" onclick="dbDismissSyncBanner()" title="Скрыть" aria-label="Скрыть">×</button>
+            </div>`;
+    }
+    if (dbOrdersState.view === "kanban") applyDbKanbanHeight();
 }
 
 // ---- Карточка заказа (сделка + элементы) ----
