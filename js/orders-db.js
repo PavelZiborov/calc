@@ -141,21 +141,46 @@ async function syncDbDeals(btn) {
     }
 }
 
+// Бэкфилл элементов — фоновая задача на сервере, опрашиваем прогресс.
+let dbElementsPollTimer = null;
 async function syncDbElements(btn) {
     if (!ensureActiveSession()) return;
-    const original = btn ? btn.innerHTML : "";
-    if (btn) { btn.disabled = true; btn.innerHTML = "Элементы…"; }
+    const original = (btn && btn.dataset.orig) || (btn ? btn.innerHTML : "");
+    if (btn) { btn.dataset.orig = original; btn.disabled = true; btn.innerHTML = "Элементы…"; }
     try {
-        const data = await clientsApi("syncDealElements", {});
+        await clientsApi("syncDealElements", {});   // старт (возвращается сразу)
         if (typeof showReadinessToast === "function") {
-            showReadinessToast(`Элементы: ${Number(data?.elements ?? 0)} по ${Number(data?.deals ?? 0)} сделкам${data?.failed ? `, ошибок ${data.failed}` : ""}`);
+            showReadinessToast("Синхронизация элементов запущена в фоне…");
+        }
+        pollDbElements(btn);
+    } catch (e) {
+        console.error("syncDbElements", e);
+        alert("Не удалось запустить синхронизацию элементов.");
+        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+}
+
+async function pollDbElements(btn) {
+    try {
+        const data = await clientsApi("elementsSyncStatus", {});
+        const job = data?.job || {};
+        if (job.running) {
+            if (btn) btn.innerHTML = `Элементы ${job.deals || 0}/${job.total || 0}`;
+            clearTimeout(dbElementsPollTimer);
+            dbElementsPollTimer = setTimeout(() => pollDbElements(btn), 3000);
+            return;
+        }
+        // завершено
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || "⟳ Элементы"; }
+        if (typeof showReadinessToast === "function") {
+            showReadinessToast(job.error
+                ? `Элементы: ошибка — ${job.error}`
+                : `Элементы готовы: ${job.elements || 0} по ${job.deals || 0} сделкам${job.failed ? `, ошибок ${job.failed}` : ""}`);
         }
         await loadDbDeals();
     } catch (e) {
-        console.error("syncDbElements", e);
-        alert("Не удалось синхронизировать элементы.");
-    } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+        console.error("pollDbElements", e);
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || "⟳ Элементы"; }
     }
 }
 
