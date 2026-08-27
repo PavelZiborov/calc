@@ -408,6 +408,9 @@
     .dbo-af-name { color: var(--text-muted); flex: 0 0 auto; }
     .dbo-af-val { color: var(--text); font-weight: 600; text-align: right; word-break: break-word; min-width: 0; }
     .dbo-af-val a { color: var(--accent); text-decoration: none; }
+    /* Информация по себестоимости — большое поле */
+    .dbo-costinfo-input { width: 100%; margin: 0; min-height: 90px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.45; font-family: inherit; resize: vertical; box-sizing: border-box; }
+    .dbo-costinfo-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,88,198,0.15); outline: none; }
 
     .dbo-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
     .dbo-meta { font-size: 14px; color: var(--text-muted); line-height: 1.75; }

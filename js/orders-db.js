@@ -567,8 +567,9 @@ function dbListHead() {
     </div>`;
 }
 // Содержимое сделки → каждая позиция с новой строки и номером «1)» (номер акцентным цветом).
+// Делим по переводу строки (в именах элементов бывает «; », по нему делить нельзя).
 function dbContentHtml(content) {
-    const items = String(content || "").split("; ").map(s => s.trim()).filter(Boolean);
+    const items = String(content || "").split("\n").map(s => s.trim()).filter(Boolean);
     if (!items.length) return "—";
     return `<div class="dbk-content-list">${items.map((it, i) =>
         `<div class="dbk-content-item"><span class="dbk-content-num">${i + 1})</span> ${escapeHtml(it)}</div>`).join("")}</div>`;
@@ -901,14 +902,23 @@ function renderDbDealCard(data, crmId) {
         ? elements.map(dbElementRow).join("")
         : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
 
-    // Вся дополнительная информация по сделке (все доп-поля с непустым значением).
-    const dealAf = dbAfWithValue(d.additional_fields);
+    // Вся доп-информация по сделке (кроме «Информации по себестоимости» — она отдельным полем).
+    const dealAf = dbAfWithValue(d.additional_fields).filter(f => Number(f?.id) !== 476);
     const dealAfBlock = dealAf.length ? `
         <div class="dbo-section">
             <div class="dbo-section-title">Дополнительная информация</div>
             <div class="dbo-af-list">${dealAf.map(f =>
                 `<div class="dbo-af-row"><span class="dbo-af-name">${escapeHtml(f.name || "")}</span><span class="dbo-af-val">${dbAfValueHtml(f.value)}</span></div>`).join("")}</div>
         </div>` : "";
+
+    // Информация по себестоимости (доп-поле 476) — большое редактируемое поле, сохраняется в CRM.
+    const costInfo = dbAfById(d.additional_fields, 476);
+    const costBlock = `
+        <div class="dbo-section">
+            <div class="dbo-section-title">Информация по себестоимости</div>
+            <textarea class="dbo-costinfo-input" rows="3" placeholder="Заметки по себестоимости заказа…"
+                onblur="dbSaveCostInfo(${crmId}, this.value)">${escapeHtml(costInfo)}</textarea>
+        </div>`;
 
     ov.innerHTML = `
         <div class="dbo-card" role="dialog" aria-modal="true">
@@ -940,6 +950,29 @@ function renderDbDealCard(data, crmId) {
                     </div>
                 </div>
                 ${dealAfBlock}
+                ${costBlock}
             </div>
         </div>`;
+}
+
+// Сохранение «Информации по себестоимости» (доп-поле 476) в CRM + локально.
+async function dbSaveCostInfo(crmId, value) {
+    const val = String(value ?? "");
+    const cur = dbAfById(dbCardData?.deal?.additional_fields, 476);
+    if (val === cur) return;   // без изменений — не дёргаем CRM
+    try {
+        await clientsApi("setDealField", { crmId: Number(crmId), fieldId: 476, value: val });
+        // обновим локальные данные карточки
+        if (dbCardData?.deal) {
+            let af = Array.isArray(dbCardData.deal.additional_fields) ? dbCardData.deal.additional_fields : [];
+            let found = false;
+            af = af.map(f => (Number(f?.id) === 476 ? (found = true, { ...f, value: val }) : f));
+            if (!found) af.push({ id: 476, name: "Информация по себестоимости", value: val });
+            dbCardData.deal.additional_fields = af;
+        }
+        if (typeof showReadinessToast === "function") showReadinessToast("Себестоимость сохранена");
+    } catch (e) {
+        console.error("dbSaveCostInfo", e);
+        alert("Не удалось сохранить информацию по себестоимости в CRM.");
+    }
 }
