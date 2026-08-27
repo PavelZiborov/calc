@@ -13,13 +13,98 @@ const dbOrdersState = {
     view: "list"      // list | kanban
 };
 try { const v = localStorage.getItem("dbOrdersView"); if (v === "list" || v === "kanban") dbOrdersState.view = v; } catch (_) {}
+dbOrdersState.filters = { statuses: new Set(), debtOnly: false };
 
 let dbDealsSearchTimer = null;
+
+// Фильтрация уже загруженных сделок (клиентская): статусы + «только с долгом».
+function getDbFilteredDeals() {
+    let list = dbOrdersState.deals || [];
+    const f = dbOrdersState.filters;
+    if (f.statuses && f.statuses.size) list = list.filter(d => f.statuses.has(Number(d.status_id)));
+    if (f.debtOnly) list = list.filter(d => (Number(d.debt) || 0) > 0.009);
+    return list;
+}
+function dbFiltersActive() {
+    const f = dbOrdersState.filters;
+    return (f.statuses && f.statuses.size > 0) || f.debtOnly;
+}
+function updateDbSearchClearBtn() {
+    const btn = document.getElementById("dbkSearchClearBtn");
+    const inp = document.getElementById("dbkSearchInput");
+    if (btn && inp) btn.hidden = !inp.value;
+}
+function clearDbSearch() {
+    const inp = document.getElementById("dbkSearchInput");
+    if (inp) inp.value = "";
+    dbOrdersState.query = "";
+    updateDbSearchClearBtn();
+    loadDbDeals();
+}
+// Кнопка фильтров — открыть/закрыть, наполнить статусы.
+function toggleDbFilters(e) {
+    if (e) e.stopPropagation();
+    const wrap = document.getElementById("dbFiltersWrap");
+    if (!wrap) return;
+    const open = wrap.classList.toggle("open");   // CSS: .adv-filters-popover-wrap.open .adv-filters-popover
+    const btn = document.getElementById("dbFiltersBtn");
+    if (btn) btn.setAttribute("aria-expanded", String(open));
+    if (open) {
+        renderDbFilterStatuses();
+        setTimeout(() => document.addEventListener("click", dbFiltersOutside), 0);
+    } else {
+        document.removeEventListener("click", dbFiltersOutside);
+    }
+}
+function dbFiltersOutside(e) {
+    const wrap = document.getElementById("dbFiltersWrap");
+    if (wrap && !wrap.contains(e.target)) {
+        wrap.classList.remove("open");
+        document.removeEventListener("click", dbFiltersOutside);
+    }
+}
+function renderDbFilterStatuses() {
+    const host = document.getElementById("dbFilterStatusList");
+    if (!host) return;
+    const sel = dbOrdersState.filters.statuses;
+    const items = (dbOrdersState.statuses || []).map(s =>
+        `<label class="dbk-filter-status"><input type="checkbox" value="${s.id}"${sel.has(Number(s.id)) ? " checked" : ""} onchange="applyDbFilters()"><span class="dbk-filter-dot" style="background:${escapeHtml(s.bk_color || "#dfdfdf")}"></span>${escapeHtml(s.name)}</label>`).join("");
+    host.innerHTML = items || `<div class="dbk-filter-empty">Нет статусов</div>`;
+}
+function applyDbFilters() {
+    const sel = new Set();
+    document.querySelectorAll("#dbFilterStatusList input[type=checkbox]:checked").forEach(c => sel.add(Number(c.value)));
+    const debt = document.getElementById("dbFilterDebtOnly");
+    dbOrdersState.filters.statuses = sel;
+    dbOrdersState.filters.debtOnly = !!(debt && debt.checked);
+    updateDbFiltersBtn();
+    renderDbOrders();
+}
+function resetDbFilters() {
+    dbOrdersState.filters.statuses = new Set();
+    dbOrdersState.filters.debtOnly = false;
+    const debt = document.getElementById("dbFilterDebtOnly");
+    if (debt) debt.checked = false;
+    const inp = document.getElementById("dbkSearchInput");
+    const hadQuery = !!dbOrdersState.query;
+    if (inp) inp.value = "";
+    dbOrdersState.query = "";
+    updateDbSearchClearBtn();
+    updateDbFiltersBtn();
+    renderDbFilterStatuses();
+    if (hadQuery) loadDbDeals(); else renderDbOrders();
+}
+function updateDbFiltersBtn() {
+    const btn = document.getElementById("dbFiltersBtn");
+    if (btn) btn.classList.toggle("has-active", dbFiltersActive());
+}
 
 function openDbOrders(trigger) {
     if (!ensureActiveSession()) return;
     switchTab("db-orders-tab", trigger || document.querySelector('.tab-btn[data-tab-target="db-orders-tab"]'));
     updateDbViewToggle();
+    updateDbSearchClearBtn();
+    updateDbFiltersBtn();
     if (!dbOrdersState.loaded) loadDbDeals();
     else renderDbOrders();
 }
@@ -65,6 +150,7 @@ async function loadDbDeals() {
 
 function onDbDealsSearchInput(value) {
     dbOrdersState.query = String(value || "");
+    updateDbSearchClearBtn();
     clearTimeout(dbDealsSearchTimer);
     dbDealsSearchTimer = setTimeout(() => loadDbDeals(), 350);
 }
@@ -119,23 +205,26 @@ function dbDealCardHtml(d) {
         </div>`;
 }
 
-function dbEmptyOrGuard(host) {
+function dbEmptyOrGuard(host, deals) {
     if (dbOrdersState.loading && !dbOrdersState.deals.length) {
         host.innerHTML = `<div class="dbk-empty">Загрузка заказов…</div>`; return true;
     }
     if (dbOrdersState.error) {
         host.innerHTML = `<div class="dbk-empty dbk-empty--error">${escapeHtml(dbOrdersState.error)}</div>`; return true;
     }
-    if (!dbOrdersState.deals.length) {
-        host.innerHTML = `<div class="dbk-empty">${dbOrdersState.query ? "Ничего не найдено." : "Нет заказов в базе. Нажмите «⟳ Сделки», затем «⟳ Элементы»."}</div>`; return true;
+    if (!deals.length) {
+        const filtered = dbOrdersState.query || dbFiltersActive();
+        host.innerHTML = `<div class="dbk-empty">${filtered ? "Ничего не найдено." : "Нет заказов в базе. Нажмите «⟳ Сделки», затем «⟳ Элементы»."}</div>`; return true;
     }
     return false;
 }
 
 function renderDbKanban() {
     const host = document.getElementById("dbOrdersBody");
-    if (!host || dbEmptyOrGuard(host)) return;
-    const cols = buildDbColumns(dbOrdersState.deals, dbOrdersState.statuses);
+    if (!host) return;
+    const deals = getDbFilteredDeals();
+    if (dbEmptyOrGuard(host, deals)) return;
+    const cols = buildDbColumns(deals, dbOrdersState.statuses);
     host.innerHTML = `<div class="dbk-board">${cols.map(c => `
         <div class="dbk-col">
             <div class="dbk-col-head"${dbColHeadStyle(c)}>
@@ -191,17 +280,28 @@ async function setDealStatus(dealId, statusId) {
         alert("Не удалось сменить статус сделки в CRM.");
     }
 }
-function onDbDealStatusChange(sel, dealId) { setDealStatus(dealId, Number(sel.value)); }
+function onDbDealStatusChange(sel, dealId) { if (sel.value) setDealStatus(dealId, Number(sel.value)); }
 
-// Селект статуса сделки (для списка).
+// Статус сделки — цветная пилюля-селект (цвета из CRM, как в разделе «Заказы»).
+// Нет статуса → серый «Статус не установлен» (плейсхолдер selected + disabled).
+function dbStatusPillColors(st) {
+    const bg = (st && st.bk_color) ? st.bk_color : "#dfdfdf";
+    const fg = st ? (st.text_color === "white" ? "#fff" : "#1c1b19") : "#555";
+    return { bg, fg };
+}
 function dbDealStatusSelectHtml(d) {
     const statuses = dbOrdersState.statuses || [];
     const cur = d.status_id != null ? Number(d.status_id) : null;
-    if (!statuses.length) return escapeHtml(d.status_name || "—");
-    const hasCur = statuses.some(s => Number(s.id) === cur);
-    const extra = (!hasCur && cur != null) ? `<option value="${cur}" selected>${escapeHtml(d.status_name || "—")}</option>` : "";
+    const curSt = statuses.find(s => Number(s.id) === cur) || null;
+    const { bg, fg } = dbStatusPillColors(curSt);
+    if (!statuses.length) {
+        return `<span class="dbk-status-pill" style="background:${bg};color:${fg}">${escapeHtml(d.status_name || "Статус не установлен")}</span>`;
+    }
+    const placeholderSel = (cur == null);
+    const placeholder = `<option value="" disabled${placeholderSel ? " selected" : ""}>Статус не установлен</option>`;
+    const extra = (cur != null && !curSt) ? `<option value="${cur}" selected>${escapeHtml(d.status_name || "—")}</option>` : "";
     const opts = statuses.map(s => `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
-    return `<select class="dbk-status-select" onchange="onDbDealStatusChange(this, ${d.crm_deal_id})" onclick="event.stopPropagation()">${extra}${opts}</select>`;
+    return `<select class="dbk-status-pill" style="background:${bg};color:${fg}" onchange="onDbDealStatusChange(this, ${d.crm_deal_id})" onclick="event.stopPropagation()">${placeholder}${extra}${opts}</select>`;
 }
 
 // ---- Список заказов (стиль раздела «Заказы») ----
@@ -225,8 +325,8 @@ function dbListRowHtml(d) {
         ? `<div class="dl-sum-note">Долг ${money(debt)} ₽</div>`
         : `<div class="dl-sum-note">Оплачено</div>`;
     return `
-        <div class="crm-item crm-item--list dbk-list-row" onclick="openDbDealCard(${d.crm_deal_id})">
-            <div class="dl-cell dl-num"><span class="dbk-card-num">№ ${escapeHtml(String(d.num ?? d.crm_deal_id ?? ""))}</span></div>
+        <div class="crm-item crm-item--list dbk-list-row">
+            <div class="dl-cell dl-num"><a class="dbk-num-link" onclick="openDbDealCard(${d.crm_deal_id})" title="Открыть заказ">№ ${escapeHtml(String(d.num ?? d.crm_deal_id ?? ""))}</a></div>
             <div class="dl-cell dl-client"><span class="dl-client-name">${escapeHtml(d.client_name || "—")}</span></div>
             <div class="dl-cell dl-content">${escapeHtml(d.content || "—")}</div>
             <div class="dl-cell dl-sum"><div class="dl-sum-total ${cls}">${money(amount)} ₽</div>${note}</div>
@@ -237,10 +337,12 @@ function dbListRowHtml(d) {
 }
 function renderDbList() {
     const host = document.getElementById("dbOrdersBody");
-    if (!host || dbEmptyOrGuard(host)) return;
+    if (!host) return;
+    const deals = getDbFilteredDeals();
+    if (dbEmptyOrGuard(host, deals)) return;
     host.innerHTML = `
-        <div class="crm-list-table">${dbListHead()}${dbOrdersState.deals.map(dbListRowHtml).join("")}</div>
-        <div class="dbk-count">Всего заказов: <b>${dbOrdersState.deals.length}</b></div>`;
+        <div class="crm-list-table">${dbListHead()}${deals.map(dbListRowHtml).join("")}</div>
+        <div class="dbk-count">Всего заказов: <b>${deals.length}</b></div>`;
 }
 
 // ---- Синхронизация ----
@@ -367,13 +469,15 @@ let dbCardElementStatuses = [];
 function dbElementStatusSelectHtml(e) {
     const statuses = dbCardElementStatuses || [];
     const cur = e.status_id != null ? Number(e.status_id) : null;
-    if (!statuses.length) return escapeHtml(e.status_name || "—");
-    const hasCur = statuses.some(s => Number(s.id) === cur);
-    const extra = (!hasCur && cur != null) ? `<option value="${cur}" selected>${escapeHtml(e.status_name || "—")}</option>` : "";
+    if (!statuses.length) return escapeHtml(e.status_name || "Не выбран");
+    const curSt = statuses.find(s => Number(s.id) === cur) || null;
+    // Нет статуса в CRM → плейсхолдер «Не выбран» (selected + disabled), а не первый попавшийся.
+    const placeholder = `<option value="" disabled${cur == null ? " selected" : ""}>Не выбран</option>`;
+    const extra = (cur != null && !curSt) ? `<option value="${cur}" selected>${escapeHtml(e.status_name || "—")}</option>` : "";
     const opts = statuses.map(s => `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
-    return `<select class="dbk-status-select" data-prev="${cur ?? ""}" onchange="onDbElementStatusChange(this, ${e.crm_element_id})">${extra}${opts}</select>`;
+    return `<select class="dbk-status-select" data-prev="${cur ?? ""}" onchange="onDbElementStatusChange(this, ${e.crm_element_id})">${placeholder}${extra}${opts}</select>`;
 }
-function onDbElementStatusChange(sel, elId) { setElementStatus(dbCardDealId, elId, Number(sel.value), sel); }
+function onDbElementStatusChange(sel, elId) { if (sel.value) setElementStatus(dbCardDealId, elId, Number(sel.value), sel); }
 async function setElementStatus(dealId, elId, statusId, sel) {
     const prev = sel ? sel.getAttribute("data-prev") : null;
     try {

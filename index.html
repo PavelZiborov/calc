@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=51">
+<link rel="stylesheet" href="css/app.css?v=52">
 </head>
 <body>
 
@@ -324,35 +324,56 @@
 
 <div id="db-orders-tab" class="tab-content">
     <div class="container" id="db-orders-container">
-        <div class="dbk-header">
-            <h2 class="dbk-title">Заказы <span class="dbk-subtitle">из своей базы (Heaven Print)</span></h2>
-            <div class="dbk-toolbar">
+        <div class="adv-search-header">
+            <div class="adv-toolbar-line">
                 <div class="dbk-viewtoggle" role="group" aria-label="Вид">
                     <button type="button" id="dbViewListBtn" class="dbk-view-btn" onclick="setDbView('list')">Список</button>
                     <button type="button" id="dbViewKanbanBtn" class="dbk-view-btn" onclick="setDbView('kanban')">Канбан</button>
                 </div>
-                <input type="text" id="dbkSearchInput" class="dbk-search" placeholder="Поиск: №, клиент, наименование…" oninput="onDbDealsSearchInput(this.value)">
-                <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
-                <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
+                <div class="adv-search-input-wrap">
+                    <input type="text" id="dbkSearchInput" class="adv-search-input" placeholder="Поиск…" oninput="onDbDealsSearchInput(this.value)">
+                    <button type="button" class="adv-search-clear-btn" id="dbkSearchClearBtn" onpointerdown="event.preventDefault()" onclick="clearDbSearch()" title="Очистить поле поиска" aria-label="Очистить поле поиска" hidden><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button>
+                </div>
+                <button type="button" class="adv-toolbar-icon-btn adv-search-submit" onclick="loadDbDeals()" title="Найти" aria-label="Найти"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg></button>
+                <div class="adv-toolbar-actions">
+                    <div class="adv-filters-popover-wrap" id="dbFiltersWrap">
+                        <button type="button" class="adv-toolbar-icon-btn adv-filters-btn" id="dbFiltersBtn" onclick="toggleDbFilters(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"/></svg></button>
+                        <div class="adv-filters-popover" id="dbFiltersPopover">
+                            <div class="adv-filters-popover-section">
+                                <label class="adv-filter-label">Статус</label>
+                                <div id="dbFilterStatusList" class="dbk-filter-statuses"></div>
+                            </div>
+                            <div class="adv-filters-popover-section">
+                                <label class="adv-pay-filter"><input type="checkbox" id="dbFilterDebtOnly" onchange="applyDbFilters()"><span>Только с долгом</span></label>
+                            </div>
+                            <div class="adv-filters-popover-actions">
+                                <button type="button" class="adv-filters-reset-btn" onclick="resetDbFilters()">Сбросить</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="adv-toolbar-icon-btn" onclick="resetDbFilters()" title="Сбросить все фильтры" aria-label="Сбросить все фильтры"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></button>
+                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
+                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
+                </div>
             </div>
         </div>
         <div id="dbOrdersBody"></div>
     </div>
 </div>
 
-<script src="js/config.js?v=51"></script>
-<script src="js/calculator-data.js?v=51"></script>
-<script src="js/calc-settings.js?v=51"></script>
-<script src="js/calc-settings-ui.js?v=51"></script>
-<script src="js/utils.js?v=51"></script>
-<script src="js/auth.js?v=51"></script>
-<script src="js/calculator.js?v=51"></script>
-<script src="js/crm.js?v=51"></script>
-<script src="js/element-editor.js?v=51"></script>
-<script src="js/kp-docx.js?v=51"></script>
-<script src="js/calc-sheet.js?v=51"></script>
-<script src="js/clients.js?v=51"></script>
-<script src="js/orders-db.js?v=51"></script>
-<script src="js/main.js?v=51"></script>
+<script src="js/config.js?v=52"></script>
+<script src="js/calculator-data.js?v=52"></script>
+<script src="js/calc-settings.js?v=52"></script>
+<script src="js/calc-settings-ui.js?v=52"></script>
+<script src="js/utils.js?v=52"></script>
+<script src="js/auth.js?v=52"></script>
+<script src="js/calculator.js?v=52"></script>
+<script src="js/crm.js?v=52"></script>
+<script src="js/element-editor.js?v=52"></script>
+<script src="js/kp-docx.js?v=52"></script>
+<script src="js/calc-sheet.js?v=52"></script>
+<script src="js/clients.js?v=52"></script>
+<script src="js/orders-db.js?v=52"></script>
+<script src="js/main.js?v=52"></script>
 </body>
 </html>

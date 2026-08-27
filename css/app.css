@@ -245,6 +245,8 @@
 
     /* ===== Раздел «Клиенты» ===== */
     #clients-container { max-width: min(1400px, 100%); }
+    /* «Заказы БД» — во всю ширину (как раздел «Заказы») для 7 колонок списка. */
+    #db-orders-container { max-width: min(1600px, 100%); }
     .clients-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
     .clients-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); }
     .clients-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -383,7 +385,20 @@
     .dbk-status-select { margin: 0; width: 100%; max-width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
     .dbk-status-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(29,88,198,0.15); outline: none; }
     .dbk-count { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
-    .dbk-list-row { cursor: pointer; }
+    /* Статус-пилюля списка (цвета из CRM, как в «Заказах») */
+    .dbk-status-pill { display: inline-block; width: 100%; max-width: 100%; margin: 0; padding: 5px 10px; border: none; border-radius: var(--r-pill, 999px); font-size: 11.5px; font-weight: 700; line-height: 1.3; text-align: center; text-transform: uppercase; letter-spacing: 0.02em; cursor: pointer; -webkit-appearance: none; appearance: none; }
+    .dbk-status-pill:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    /* Ссылка-№ (открытие заказа) */
+    .dbk-num-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: none; }
+    .dbk-num-link:hover { color: var(--accent-strong); text-decoration: underline; }
+    /* Фильтр-попап: статусы */
+    .dbk-filter-statuses { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+    .dbk-filter-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; padding: 3px 2px; }
+    .dbk-filter-status input { width: auto; margin: 0; flex: 0 0 auto; }
+    .dbk-filter-dot { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+    .dbk-filter-empty { font-size: 13px; color: var(--text-muted); }
+    .adv-filters-popover-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
+    .adv-filters-btn.has-active { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
 
     .dbk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
     .dbk-col { flex: 0 0 300px; width: 300px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
