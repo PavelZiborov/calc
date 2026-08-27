@@ -387,13 +387,27 @@
     .dbo-el-head span:nth-child(3), .dbo-el-head span:nth-child(4), .dbo-el-head span:nth-child(5) { text-align: right; }
     .dbo-el-row { padding: 11px 0; border-bottom: 1px dashed var(--border); }
     .dbo-el-row:last-child { border-bottom: none; }
-    .dbo-el-name { font-size: 14px; color: var(--accent); font-weight: 500; min-width: 0; }
-    .dbo-el-qty, .dbo-el-cost, .dbo-el-sum { text-align: right; font-variant-numeric: tabular-nums; }
+    .dbo-el-name { min-width: 0; }
+    .dbo-el-title { font-size: 14px; color: var(--accent); font-weight: 500; line-height: 1.3; }
+    .dbo-el-meta { margin-top: 4px; font-size: 12px; color: var(--text-muted); line-height: 1.35; }
+    .dbo-el-meta b { color: var(--text-2, var(--text)); font-weight: 600; }
+    .dbo-el-meta a { color: var(--accent); text-decoration: none; }
+    .dbo-el-qty, .dbo-el-cost, .dbo-el-sum { text-align: right; font-variant-numeric: tabular-nums; align-self: start; padding-top: 1px; }
     .dbo-el-qty { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
     .dbo-el-cost { color: var(--text-muted); font-size: 13px; }
     .dbo-el-sum { font-weight: 700; color: var(--text); font-size: 14px; }
-    .dbo-el-status .dbk-status-select { font-size: 11px; padding: 3px 5px; }
+    /* Кружок-статус элемента */
+    .dbo-el-status { align-self: start; }
+    .dbo-el-statusbtn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin: 0; padding: 0; border: 1.5px solid currentColor; border-radius: 50%; background: var(--surface); cursor: pointer; transition: background 0.12s ease; }
+    .dbo-el-statusbtn:hover { background: var(--surface-2); }
+    .dbo-el-statusbtn svg, .dbo-el-statusbtn .icn { width: 16px; height: 16px; }
     .dbo-el-empty { padding: 18px 0; text-align: center; color: var(--text-muted); font-size: 13px; }
+    /* Вся доп-информация по сделке */
+    .dbo-af-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px 20px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+    .dbo-af-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 3px 0; border-bottom: 1px dotted var(--border); }
+    .dbo-af-name { color: var(--text-muted); flex: 0 0 auto; }
+    .dbo-af-val { color: var(--text); font-weight: 600; text-align: right; word-break: break-word; min-width: 0; }
+    .dbo-af-val a { color: var(--accent); text-decoration: none; }
 
     .dbo-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
     .dbo-meta { font-size: 14px; color: var(--text-muted); line-height: 1.75; }

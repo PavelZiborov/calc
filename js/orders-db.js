@@ -462,6 +462,13 @@ function dbSetDealStatusLocal(dealId, statusId, statusName) {
     [dbOrdersState.deals, dbOrdersState.kanbanDeals].forEach(arr => (arr || []).forEach(d => {
         if (Number(d.crm_deal_id) === id) { d.status_id = statusId; d.status_name = statusName; }
     }));
+    // синхронизируем статус в открытой карточке заказа
+    if (dbCardData && Number(dbCardData.deal?.crm_deal_id) === id) {
+        dbCardData.deal.status_id = statusId;
+        dbCardData.deal.status_name = statusName;
+        const ov = document.getElementById("dbDealCardOverlay");
+        if (ov && ov.style.display !== "none") renderDbDealCard(dbCardData, dbCardDealId);
+    }
 }
 
 // ---- Смена статуса сделки (оптимистично + PUT в CRM через бэкенд) ----
@@ -703,6 +710,8 @@ function closeDbDealCard() {
     const ov = document.getElementById("dbDealCardOverlay");
     if (ov) ov.style.display = "none";
     document.removeEventListener("keydown", dbDealCardEsc);
+    dbCloseStatusMenu();
+    if (typeof dbCloseElStatusMenu === "function") dbCloseElStatusMenu();
 }
 
 async function openDbDealCard(crmId) {
@@ -748,29 +757,91 @@ function dbAfWithValue(fields) {
 let dbCardDealId = null;
 let dbCardElementStatuses = [];
 
-function dbElementStatusSelectHtml(e) {
-    const statuses = dbCardElementStatuses || [];
-    const cur = e.status_id != null ? Number(e.status_id) : null;
-    if (!statuses.length) return escapeHtml(e.status_name || "Не выбран");
-    const curSt = statuses.find(s => Number(s.id) === cur) || null;
-    // Нет статуса в CRM → плейсхолдер «Не выбран» (selected + disabled), а не первый попавшийся.
-    const placeholder = `<option value="" disabled${cur == null ? " selected" : ""}>Не выбран</option>`;
-    const extra = (cur != null && !curSt) ? `<option value="${cur}" selected>${escapeHtml(e.status_name || "—")}</option>` : "";
-    const opts = statuses.map(s => `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
-    return `<select class="dbk-status-select" data-prev="${cur ?? ""}" onchange="onDbElementStatusChange(this, ${e.crm_element_id})">${placeholder}${extra}${opts}</select>`;
+let dbCardData = null;   // текущие данные карточки (для оптимистичного апдейта статусов)
+
+function dbIcon(name) { return (typeof icon === "function") ? icon(name) : ""; }
+// Цвет/иконка статуса элемента по имени (как getStatusIcon в CRM).
+function dbElStatusColor(name, bkColor) {
+    if (bkColor) return bkColor;
+    const n = String(name || "").toLowerCase().trim();
+    if (!n || n === "без статуса") return "#95a5a6";
+    if (n === "печать") return "#2F6BD8";
+    if (n === "постпечать") return "#b06a1f";
+    if (n === "завершено") return "#1F9D55";
+    return "#7a766c";
 }
-function onDbElementStatusChange(sel, elId) { if (sel.value) setElementStatus(dbCardDealId, elId, Number(sel.value), sel); }
-async function setElementStatus(dealId, elId, statusId, sel) {
-    const prev = sel ? sel.getAttribute("data-prev") : null;
-    try {
-        await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: Number(statusId) });
-        if (sel) sel.setAttribute("data-prev", String(statusId));
-        if (typeof showReadinessToast === "function") showReadinessToast("Статус элемента обновлён");
-    } catch (e) {
-        console.error("setElementStatus", e);
-        if (sel && prev != null) sel.value = prev;
-        alert("Не удалось сменить статус элемента в CRM.");
-    }
+function dbElStatusIconName(name) {
+    const n = String(name || "").toLowerCase().trim();
+    if (!n || n === "без статуса") return "circle";
+    if (n === "печать") return "printer";
+    if (n === "постпечать") return "scissors";
+    if (n === "завершено") return "check";
+    return "box";
+}
+function dbElStatusMeta(e) {
+    const cur = e.status_id != null ? Number(e.status_id) : null;
+    const known = (dbCardElementStatuses || []).find(s => Number(s.id) === cur) || null;
+    const name = known ? known.name : (e.status_name || "");
+    return { name: name || "Без статуса", color: dbElStatusColor(name, known && known.bk_color), iconName: dbElStatusIconName(name) };
+}
+// Кружок-статус элемента (иконка, цвет по статусу) — по клику открывает меню.
+function dbElStatusBtn(e) {
+    const m = dbElStatusMeta(e);
+    return `<button type="button" class="dbo-el-statusbtn" style="color:${m.color};border-color:${m.color}" title="${escapeHtml(m.name)}" onclick="dbOpenElStatusMenu(event, ${e.crm_element_id})">${dbIcon(m.iconName)}</button>`;
+}
+
+let dbElStatusMenuElId = null;
+function dbOpenElStatusMenu(ev, elId) {
+    if (ev) ev.stopPropagation();
+    dbCloseStatusMenu();
+    dbCloseElStatusMenu();
+    dbElStatusMenuElId = elId;
+    const statuses = dbCardElementStatuses || [];
+    const el = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
+    const cur = el && el.status_id != null ? Number(el.status_id) : null;
+    const menu = document.createElement("div");
+    menu.className = "dbk-status-menu"; menu.id = "dbElStatusMenu";
+    menu.innerHTML = statuses.map(s => {
+        const c = dbElStatusColor(s.name, s.bk_color);
+        return `<button type="button" class="dbk-status-opt${Number(s.id) === cur ? " is-cur" : ""}" onclick="dbPickElStatus(${s.id})"><span class="dbk-status-swatch" style="background:${c}"></span><span class="dbk-status-optname">${escapeHtml(s.name)}</span></button>`;
+    }).join("");
+    document.body.appendChild(menu);
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const mw = 240;
+    let left = rect.left; if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    menu.style.width = mw + "px";
+    menu.style.left = Math.max(8, left) + "px";
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 260 && rect.top > 260) menu.style.top = (rect.top - menu.offsetHeight - 4) + "px";
+    else menu.style.top = (rect.bottom + 4) + "px";
+    setTimeout(() => document.addEventListener("click", dbElStatusMenuOutside), 0);
+}
+function dbElStatusMenuOutside(ev) {
+    const menu = document.getElementById("dbElStatusMenu");
+    if (menu && !menu.contains(ev.target)) dbCloseElStatusMenu();
+}
+function dbCloseElStatusMenu() {
+    const menu = document.getElementById("dbElStatusMenu");
+    if (menu) menu.remove();
+    document.removeEventListener("click", dbElStatusMenuOutside);
+    dbElStatusMenuElId = null;
+}
+function dbPickElStatus(statusId) {
+    const elId = dbElStatusMenuElId;
+    dbCloseElStatusMenu();
+    if (elId == null || !statusId) return;
+    const st = (dbCardElementStatuses || []).find(s => Number(s.id) === Number(statusId));
+    const el = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
+    const prev = el ? { status_id: el.status_id, status_name: el.status_name } : null;
+    if (el) { el.status_id = Number(statusId); el.status_name = st ? st.name : el.status_name; }
+    renderDbDealCard(dbCardData, dbCardDealId);
+    clientsApi("setElementStatus", { dealId: Number(dbCardDealId), elementId: Number(elId), statusId: Number(statusId) })
+        .then(() => { if (typeof showReadinessToast === "function") showReadinessToast("Статус элемента обновлён"); })
+        .catch(err => {
+            console.error("setElementStatus", err);
+            if (el && prev) { el.status_id = prev.status_id; el.status_name = prev.status_name; renderDbDealCard(dbCardData, dbCardDealId); }
+            alert("Не удалось сменить статус элемента в CRM.");
+        });
 }
 
 // Значение доп-поля по его id (из additional_fields сделки).
@@ -784,15 +855,24 @@ function money2(n) {
 }
 const DBO_USER_ICON = '<svg class="dbo-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg>';
 
-// Строка элемента: СТАТУС · НАЗВАНИЕ · КОЛ-ВО · СЕБЕС. · СУММА (как в детальной карточке).
+// Доп-инфо под элементом: «Название поля: значение · …»
+function dbElAfLine(e) {
+    const af = dbAfWithValue(e.additional_fields);
+    if (!af.length) return "";
+    return `<div class="dbo-el-meta">${af.map(f => `${escapeHtml(f.name)}: <b>${dbAfValueHtml(f.value)}</b>`).join(" · ")}</div>`;
+}
+// Строка элемента: СТАТУС(кружок) · НАЗВАНИЕ(+доп-инфо) · КОЛ-ВО · СЕБЕС. · СУММА.
 function dbElementRow(e) {
     const qty = Number(e.quantity) || 0;
     const cost = Number(e.cost) || 0;
     const total = Number(e.total) || 0;
     return `
         <div class="dbo-el-row">
-            <div class="dbo-el-status">${dbElementStatusSelectHtml(e)}</div>
-            <div class="dbo-el-name">${escapeHtml(e.category_and_name || e.name || "—")}</div>
+            <div class="dbo-el-status">${dbElStatusBtn(e)}</div>
+            <div class="dbo-el-name">
+                <div class="dbo-el-title">${escapeHtml(e.category_and_name || e.name || "—")}</div>
+                ${dbElAfLine(e)}
+            </div>
             <div class="dbo-el-qty">${qty} ${escapeHtml(e.units || "шт")}</div>
             <div class="dbo-el-cost">${cost ? money(cost) : "—"}</div>
             <div class="dbo-el-sum">${money2(total)}</div>
@@ -805,6 +885,7 @@ function renderDbDealCard(data, crmId) {
     const d = data?.deal || {};
     const elements = Array.isArray(data?.elements) ? data.elements : [];
     dbCardDealId = crmId;
+    dbCardData = data;
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
@@ -820,25 +901,13 @@ function renderDbDealCard(data, crmId) {
         ? elements.map(dbElementRow).join("")
         : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
 
-    // Доп-поля: информация по себестоимости + счёт.
-    const costInfo = dbAfById(d.additional_fields, 476);
-    const invNum = dbAfById(d.additional_fields, 477);
-    const invDate = dbAfById(d.additional_fields, 1105);
-    const invLink = dbAfById(d.additional_fields, 1104) || dbAfById(d.additional_fields, 1106);
-
-    const costBlock = costInfo ? `
+    // Вся дополнительная информация по сделке (все доп-поля с непустым значением).
+    const dealAf = dbAfWithValue(d.additional_fields);
+    const dealAfBlock = dealAf.length ? `
         <div class="dbo-section">
-            <div class="dbo-section-title">Информация по себестоимости</div>
-            <div class="dbo-costinfo">${escapeHtml(costInfo)}</div>
-        </div>` : "";
-    const invoiceBlock = (invNum || invDate || invLink) ? `
-        <div class="dbo-section">
-            <div class="dbo-section-title">Счёт</div>
-            <div class="dbo-invoice">
-                ${invNum ? `<span>№&nbsp;<b>${escapeHtml(invNum)}</b></span>` : ""}
-                ${invDate ? `<span>от ${escapeHtml(invDate)}</span>` : ""}
-                ${invLink ? `<a href="${escapeHtml(invLink)}" target="_blank" rel="noopener">Открыть счёт ↗</a>` : ""}
-            </div>
+            <div class="dbo-section-title">Дополнительная информация</div>
+            <div class="dbo-af-list">${dealAf.map(f =>
+                `<div class="dbo-af-row"><span class="dbo-af-name">${escapeHtml(f.name || "")}</span><span class="dbo-af-val">${dbAfValueHtml(f.value)}</span></div>`).join("")}</div>
         </div>` : "";
 
     ov.innerHTML = `
@@ -870,8 +939,7 @@ function renderDbDealCard(data, crmId) {
                         <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
                     </div>
                 </div>
-                ${costBlock}
-                ${invoiceBlock}
+                ${dealAfBlock}
             </div>
         </div>`;
 }
