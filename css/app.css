@@ -391,6 +391,10 @@
     /* Единый шрифт таблицы списка (как «Клиент»): №, содержимое, статус — 11.5px */
     .dbk-list-row .dl-cell { font-size: 11.5px; }
     .dbk-list-row .dl-content { font-size: 11.5px; color: var(--text); line-height: 1.35; }
+    /* Содержимое: каждая позиция с новой строки, номер акцентным цветом */
+    .dbk-content-list { display: flex; flex-direction: column; gap: 2px; }
+    .dbk-content-item { font-size: 11.5px; line-height: 1.35; color: var(--text); }
+    .dbk-content-num { color: var(--accent); font-weight: 700; margin-right: 2px; }
     .dbk-num-link { color: var(--accent); font-size: 11.5px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
     .dbk-num-link:hover { color: var(--accent-strong); text-decoration: underline; }
     /* Цветное меню смены статуса */
@@ -426,8 +430,13 @@
     /* Канбан тянется по высоте окна (высота доски задаётся JS с учётом zoom);
        столбики равной высоты, стретчатся; тело столбика скроллится внутри. */
     .dbk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px; align-items: stretch; min-height: 320px; }
-    .dbk-col { flex: 0 0 300px; width: 300px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .dbk-col { flex: 0 0 300px; width: 300px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; transition: margin 0.16s cubic-bezier(0.22,1,0.36,1); }
     .dbk-col--over { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--accent-tint); }
+    .dbk-col--col-dragging { opacity: 0.4; }
+    /* Анимированное место вставки колонки: открывается «щель» + акцентный бар по краю */
+    .dbk-col--insert-before { margin-left: 24px; box-shadow: inset 5px 0 0 var(--accent); }
+    .dbk-col--insert-after { margin-right: 24px; box-shadow: inset -5px 0 0 var(--accent); }
+    @media (prefers-reduced-motion: reduce) { .dbk-col { transition: none; } }
     .dbk-col-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); border-radius: var(--r-md) var(--r-md) 0 0; cursor: grab; }
     .dbk-col-head:active { cursor: grabbing; }
     .dbk-col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2177,6 +2186,17 @@
             border-radius: var(--r-md);
             overflow: hidden;
             background: var(--surface);
+        }
+        /* «Заказы БД»: № и Сумма уже, максимум места — содержимому. */
+        .crm-list-table.dbk-list-table {
+            grid-template-columns:
+                minmax(62px, max-content)  /* № — по ширине номера */
+                minmax(110px, 1fr)         /* клиент */
+                minmax(300px, 4fr)         /* содержимое — основное */
+                minmax(92px, max-content)  /* сумма/долг */
+                144px                      /* статус */
+                minmax(96px, auto)         /* ответственный */
+                minmax(80px, auto);        /* создано */
         }
         .crm-list-thead,
         .crm-item--list {

@@ -378,24 +378,41 @@ function dbDragStart(e, dealId) {
     if (e.currentTarget) e.currentTarget.classList.add("dbk-card--dragging");
 }
 function dbDragEnd(e) { if (e.currentTarget) e.currentTarget.classList.remove("dbk-card--dragging"); }
+function dbClearColMarkers() {
+    document.querySelectorAll(".dbk-col--insert-before, .dbk-col--insert-after")
+        .forEach(c => c.classList.remove("dbk-col--insert-before", "dbk-col--insert-after"));
+}
 function dbDragOver(e) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    if (e.currentTarget) e.currentTarget.classList.add("dbk-col--over");
+    const col = e.currentTarget;
+    if (!col) return;
+    if (dbColDragStatusId != null) {
+        // Перетаскивание КОЛОНКИ — показать анимированное место вставки (лево/право по курсору).
+        if (Number(col.dataset.statusId) === dbColDragStatusId) { dbClearColMarkers(); return; }
+        const rect = col.getBoundingClientRect();
+        const after = (e.clientX - rect.left) > rect.width / 2;
+        dbColDropAfter = after;
+        dbClearColMarkers();
+        col.classList.add(after ? "dbk-col--insert-after" : "dbk-col--insert-before");
+    } else {
+        col.classList.add("dbk-col--over");
+    }
 }
 function dbDragLeave(e) {
-    // не снимать подсветку при переходе на дочерний элемент (карточку) внутри столбика
+    // не снимать при переходе на дочерний элемент (карточку) внутри столбика
     if (e.currentTarget && !e.currentTarget.contains(e.relatedTarget)) {
-        e.currentTarget.classList.remove("dbk-col--over");
+        e.currentTarget.classList.remove("dbk-col--over", "dbk-col--insert-before", "dbk-col--insert-after");
     }
 }
 function dbDrop(e, statusId) {
     e.preventDefault();
-    if (e.currentTarget) e.currentTarget.classList.remove("dbk-col--over");
+    if (e.currentTarget) e.currentTarget.classList.remove("dbk-col--over", "dbk-col--insert-before", "dbk-col--insert-after");
     // Перенос КОЛОНКИ (drag за заголовок) — меняем порядок колонок.
     if (dbColDragStatusId != null) {
-        const dragId = dbColDragStatusId; dbColDragStatusId = null;
-        dbReorderColumn(dragId, statusId);
+        const dragId = dbColDragStatusId; const after = dbColDropAfter;
+        dbColDragStatusId = null; dbClearColMarkers();
+        dbReorderColumn(dragId, statusId, after);
         return;
     }
     // Перенос СДЕЛКИ — смена статуса.
@@ -408,19 +425,27 @@ function dbDrop(e, statusId) {
 
 // ---- Перетаскивание КОЛОНОК (порядок сохраняется в localStorage) ----
 let dbColDragStatusId = null;
+let dbColDropAfter = false;
 function dbColDragStart(e, statusId) {
     e.stopPropagation();
     dbColDragStatusId = Number(statusId);
     dbDragDealId = null;
     if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", "col:" + statusId); } catch (_) {} }
+    const col = e.currentTarget.closest(".dbk-col");
+    if (col) col.classList.add("dbk-col--col-dragging");
 }
-function dbColDragEnd() { dbColDragStatusId = null; }
-function dbReorderColumn(dragId, targetId) {
+function dbColDragEnd() {
+    dbColDragStatusId = null;
+    dbClearColMarkers();
+    document.querySelectorAll(".dbk-col--col-dragging").forEach(c => c.classList.remove("dbk-col--col-dragging"));
+}
+function dbReorderColumn(dragId, targetId, after) {
     dragId = Number(dragId); targetId = Number(targetId);
     if (!Number.isFinite(dragId) || !Number.isFinite(targetId) || dragId === targetId) return;
     let order = dbGetColOrder().filter(id => id !== dragId);
     const ti = order.indexOf(targetId);
-    if (ti < 0) order.push(dragId); else order.splice(ti, 0, dragId);
+    if (ti < 0) order.push(dragId);
+    else order.splice(after ? ti + 1 : ti, 0, dragId);
     dbOrdersState.colOrder = order;
     try { localStorage.setItem("dbKanbanColOrder", JSON.stringify(order)); } catch (_) {}
     renderDbKanban();
@@ -534,6 +559,13 @@ function dbListHead() {
         <div class="dl-cell dl-date">Создано</div>
     </div>`;
 }
+// Содержимое сделки → каждая позиция с новой строки и номером «1)» (номер акцентным цветом).
+function dbContentHtml(content) {
+    const items = String(content || "").split("; ").map(s => s.trim()).filter(Boolean);
+    if (!items.length) return "—";
+    return `<div class="dbk-content-list">${items.map((it, i) =>
+        `<div class="dbk-content-item"><span class="dbk-content-num">${i + 1})</span> ${escapeHtml(it)}</div>`).join("")}</div>`;
+}
 function dbListRowHtml(d) {
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
@@ -546,7 +578,7 @@ function dbListRowHtml(d) {
         <div class="crm-item crm-item--list dbk-list-row">
             <div class="dl-cell dl-num"><a class="dbk-num-link" onclick="openDbDealCard(${d.crm_deal_id})" title="Открыть заказ">№ ${escapeHtml(String(d.num ?? d.crm_deal_id ?? ""))}</a></div>
             <div class="dl-cell dl-client"><span class="dl-client-name">${escapeHtml(d.client_name || "—")}</span></div>
-            <div class="dl-cell dl-content">${escapeHtml(d.content || "—")}</div>
+            <div class="dl-cell dl-content">${dbContentHtml(d.content)}</div>
             <div class="dl-cell dl-sum"><div class="dl-sum-total ${cls}">${money(amount)} ₽</div>${note}</div>
             <div class="dl-cell dl-status">${dbDealStatusSelectHtml(d)}</div>
             <div class="dl-cell dl-resp">${escapeHtml(d.employee_name || "—")}</div>
@@ -564,7 +596,7 @@ function renderDbList() {
         return;
     }
     host.innerHTML = `
-        <div class="crm-list-table">${dbListHead()}${deals.map(dbListRowHtml).join("")}</div>
+        <div class="crm-list-table dbk-list-table">${dbListHead()}${deals.map(dbListRowHtml).join("")}</div>
         <div class="dbk-listfoot">
             <div class="dbk-count">Всего: <b>${dbOrdersState.total}</b> · стр. ${dbOrdersState.page} из ${dbOrdersState.pages}</div>
             ${renderDbPager()}
