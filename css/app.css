@@ -419,13 +419,15 @@
     .dbo-edit { background: var(--surface); border-radius: 14px; box-shadow: 0 16px 50px rgba(28,27,25,0.3); width: min(560px, 100%); max-height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
     .dbo-edit-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
     .dbo-edit-head h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text); }
-    .dbo-edit-body { padding: 18px 20px 4px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
-    .dbo-edit-body label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    .dbo-edit-wide { grid-column: 1 / -1; }
-    .dbo-edit-body input, .dbo-edit-body select { margin: 0; width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; font-weight: 400; background: var(--surface); color: var(--text); box-sizing: border-box; }
+    .dbo-edit-body { padding: 18px 20px 4px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+    .dbo-edit-body label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted); }
+    /* Ряд «как в PrintOffice»: ед.изм, кол-во, цена, себест., сумма — в одну строку */
+    .dbo-edit-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px 12px; }
+    .dbo-edit-body input, .dbo-edit-body select { margin: 0; width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; font-weight: 400; background: var(--surface); color: var(--text); box-sizing: border-box; text-transform: none; }
+    .dbo-edit-body .dbo-edit-name { font-size: 16px; font-weight: 600; }
     .dbo-edit-body input:focus, .dbo-edit-body select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,88,198,0.15); outline: none; }
-    .dbo-edit-note { padding: 10px 20px 0; font-size: 12px; color: var(--text-muted); }
-    .dbo-edit-actions { display: flex; gap: 10px; padding: 16px 20px; }
+    .dbo-edit-note { padding: 12px 20px 0; font-size: 12px; color: var(--text-muted); }
+    .dbo-edit-actions { display: flex; justify-content: center; gap: 12px; padding: 16px 20px 18px; }
     .dbo-btn { margin: 0; width: auto; padding: 9px 18px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
     .dbo-btn:hover { background: var(--surface-2); }
     .dbo-btn-primary { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }

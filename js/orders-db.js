@@ -769,11 +769,21 @@ function closeDbElEdit() {
     if (ov) ov.remove();
     document.removeEventListener("keydown", dbElEditEsc);
 }
+// Базовое имя без хвоста « / Категория» (категория выбирается отдельным дропдауном).
+function dbElBaseName(e) {
+    let n = String(e.name || e.category_and_name || "").trim();
+    const catId = e.category_id != null ? Number(e.category_id) : null;
+    const cat = (dbCardCategories || []).find(c => Number(c.id) === catId);
+    if (cat && cat.name && n.endsWith(" / " + cat.name)) {
+        n = n.slice(0, -(" / " + cat.name).length).trim();
+    }
+    return n;
+}
 function dbOpenElEdit(elId) {
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     if (!e) return;
     closeDbElEdit();
-    const name = e.name || e.category_and_name || "";
+    const name = dbElBaseName(e);
     const catId = e.category_id != null ? Number(e.category_id) : null;
     const catOpts = (dbCardCategories || []).map(c =>
         `<option value="${c.id}"${Number(c.id) === catId ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
@@ -793,18 +803,23 @@ function dbOpenElEdit(elId) {
             </div>
             <div class="dbo-edit-body">
                 <label class="dbo-edit-wide">Наименование
-                    <input type="text" id="dbEditName" value="${escapeHtml(name)}">
+                    <input type="text" id="dbEditName" class="dbo-edit-name" value="${escapeHtml(name)}">
                 </label>
                 <label class="dbo-edit-wide">Категория
                     <select id="dbEditCat">${catOpts || `<option value="">— нет категорий —</option>`}</select>
                 </label>
-                <label>Кол-во<input type="number" step="any" id="dbEditQty" value="${Number(e.quantity) || 0}"></label>
-                <label>Единица<input type="text" id="dbEditUnits" value="${escapeHtml(e.units || "шт")}"></label>
-                <label>Цена<input type="number" step="any" id="dbEditPrice" value="${Number(e.price) || 0}"></label>
-                <label>Сумма<input type="number" step="any" id="dbEditTotal" value="${Number(e.total) || 0}"></label>
-                <label>Себестоимость<input type="number" step="any" id="dbEditCost" value="${Number(e.cost) || 0}"></label>
-                <label>Себест. HQ<input type="number" step="any" id="dbEditCostHq" value="${escapeHtml(costHq)}"></label>
-                <label>Количество листов<input type="number" step="any" id="dbEditSheets" value="${escapeHtml(sheets)}"></label>
+                <div class="dbo-edit-row">
+                    <label>Ед.изм
+                        <input type="text" id="dbEditUnits" list="dbUnitsList" value="${escapeHtml(e.units || "шт")}">
+                        <datalist id="dbUnitsList"><option value="шт"></option><option value="услуга"></option></datalist>
+                    </label>
+                    <label>Кол-во<input type="number" step="any" id="dbEditQty" value="${Number(e.quantity) || 0}"></label>
+                    <label>Цена<input type="number" step="any" id="dbEditPrice" value="${Number(e.price) || 0}"></label>
+                    <label>Себестоимость<input type="number" step="any" id="dbEditCost" value="${Number(e.cost) || 0}"></label>
+                    <label>Сумма<input type="number" step="any" id="dbEditTotal" value="${Number(e.total) || 0}"></label>
+                </div>
+                <label class="dbo-edit-wide">Себестоимость HQ<input type="number" step="any" id="dbEditCostHq" value="${escapeHtml(costHq)}"></label>
+                <label class="dbo-edit-wide">Количество листов<input type="number" step="any" id="dbEditSheets" value="${escapeHtml(sheets)}"></label>
             </div>
             <div class="dbo-edit-note">Имя и категорию в PrintOffice нельзя менять напрямую — при их изменении позиция пересоздаётся (удаляется и создаётся заново).</div>
             <div class="dbo-edit-actions">
@@ -830,7 +845,7 @@ async function dbSaveElEdit(elId) {
     const costHq = String(val("dbEditCostHq") || "").trim();
     const sheets = String(val("dbEditSheets") || "").trim();
     // имя/категория изменились → пересоздание
-    const recreate = (name !== String(e.name || "").trim()) || (categoryId !== (e.category_id != null ? Number(e.category_id) : null));
+    const recreate = (name !== dbElBaseName(e)) || (categoryId !== (e.category_id != null ? Number(e.category_id) : null));
 
     const btn = document.getElementById("dbEditSaveBtn");
     if (btn) { btn.disabled = true; btn.textContent = recreate ? "Пересоздание…" : "Сохранение…"; }
