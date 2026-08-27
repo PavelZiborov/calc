@@ -9,22 +9,45 @@ const dbOrdersState = {
     loading: false,
     error: "",
     query: "",
-    loaded: false
+    loaded: false,
+    view: "list"      // list | kanban
 };
+try { const v = localStorage.getItem("dbOrdersView"); if (v === "list" || v === "kanban") dbOrdersState.view = v; } catch (_) {}
 
 let dbDealsSearchTimer = null;
 
 function openDbOrders(trigger) {
     if (!ensureActiveSession()) return;
     switchTab("db-orders-tab", trigger || document.querySelector('.tab-btn[data-tab-target="db-orders-tab"]'));
+    updateDbViewToggle();
     if (!dbOrdersState.loaded) loadDbDeals();
+    else renderDbOrders();
+}
+
+// Переключение Список/Канбан.
+function setDbView(view) {
+    if (view !== "list" && view !== "kanban") return;
+    dbOrdersState.view = view;
+    try { localStorage.setItem("dbOrdersView", view); } catch (_) {}
+    renderDbOrders();
+}
+function updateDbViewToggle() {
+    const l = document.getElementById("dbViewListBtn");
+    const k = document.getElementById("dbViewKanbanBtn");
+    if (l) l.classList.toggle("is-active", dbOrdersState.view === "list");
+    if (k) k.classList.toggle("is-active", dbOrdersState.view === "kanban");
+}
+function renderDbOrders() {
+    updateDbViewToggle();
+    if (dbOrdersState.view === "kanban") renderDbKanban();
+    else renderDbList();
 }
 
 async function loadDbDeals() {
     if (!ensureActiveSession()) return;
     dbOrdersState.loading = true;
     dbOrdersState.error = "";
-    renderDbKanban();
+    renderDbOrders();
     try {
         const data = await clientsApi("listDeals", { q: dbOrdersState.query || "" });
         dbOrdersState.deals = Array.isArray(data?.deals) ? data.deals : [];
@@ -36,7 +59,7 @@ async function loadDbDeals() {
         dbOrdersState.error = "Не удалось загрузить заказы. Проверьте бэкенд (/api/clients).";
     } finally {
         dbOrdersState.loading = false;
-        renderDbKanban();
+        renderDbOrders();
     }
 }
 
@@ -85,7 +108,7 @@ function dbDealCardHtml(d) {
     const debt = Number(d.debt) || 0;
     const debtBadge = debt > 0.009 ? `<span class="dbk-card-debt">долг ${money(debt)} ₽</span>` : "";
     return `
-        <div class="dbk-card" onclick="openDbDealCard(${d.crm_deal_id})" title="Открыть заказ">
+        <div class="dbk-card" draggable="true" ondragstart="dbDragStart(event, ${d.crm_deal_id})" ondragend="dbDragEnd(event)" onclick="openDbDealCard(${d.crm_deal_id})" title="Перетащите в колонку, чтобы сменить статус; клик — открыть">
             <div class="dbk-card-top">
                 <span class="dbk-card-num">№ ${num}</span>
                 <span class="dbk-card-amount">${money(d.amount)} ₽</span>
@@ -96,30 +119,128 @@ function dbDealCardHtml(d) {
         </div>`;
 }
 
-function renderDbKanban() {
-    const host = document.getElementById("dbKanbanBoard");
-    if (!host) return;
+function dbEmptyOrGuard(host) {
     if (dbOrdersState.loading && !dbOrdersState.deals.length) {
-        host.innerHTML = `<div class="dbk-empty">Загрузка заказов…</div>`;
-        return;
+        host.innerHTML = `<div class="dbk-empty">Загрузка заказов…</div>`; return true;
     }
     if (dbOrdersState.error) {
-        host.innerHTML = `<div class="dbk-empty dbk-empty--error">${escapeHtml(dbOrdersState.error)}</div>`;
-        return;
+        host.innerHTML = `<div class="dbk-empty dbk-empty--error">${escapeHtml(dbOrdersState.error)}</div>`; return true;
     }
     if (!dbOrdersState.deals.length) {
-        host.innerHTML = `<div class="dbk-empty">${dbOrdersState.query ? "Ничего не найдено." : "Нет заказов в базе. Нажмите «⟳ Сделки», затем «⟳ Элементы»."}</div>`;
-        return;
+        host.innerHTML = `<div class="dbk-empty">${dbOrdersState.query ? "Ничего не найдено." : "Нет заказов в базе. Нажмите «⟳ Сделки», затем «⟳ Элементы»."}</div>`; return true;
     }
+    return false;
+}
+
+function renderDbKanban() {
+    const host = document.getElementById("dbOrdersBody");
+    if (!host || dbEmptyOrGuard(host)) return;
     const cols = buildDbColumns(dbOrdersState.deals, dbOrdersState.statuses);
-    host.innerHTML = cols.map(c => `
+    host.innerHTML = `<div class="dbk-board">${cols.map(c => `
         <div class="dbk-col">
             <div class="dbk-col-head"${dbColHeadStyle(c)}>
                 <span class="dbk-col-name">${escapeHtml(c.name)}</span>
                 <span class="dbk-col-count">${c.deals.length}</span>
             </div>
-            <div class="dbk-col-body">${c.deals.map(dbDealCardHtml).join("")}</div>
-        </div>`).join("");
+            <div class="dbk-col-body" data-status-id="${c.id}" ondragover="dbDragOver(event)" ondragleave="dbDragLeave(event)" ondrop="dbDrop(event, ${c.id})">${c.deals.map(dbDealCardHtml).join("")}</div>
+        </div>`).join("")}</div>`;
+}
+
+// ---- Drag-and-drop: смена статуса сделки перетаскиванием ----
+let dbDragDealId = null;
+function dbDragStart(e, dealId) {
+    dbDragDealId = dealId;
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(dealId)); } catch (_) {} }
+    if (e.currentTarget) e.currentTarget.classList.add("dbk-card--dragging");
+}
+function dbDragEnd(e) { if (e.currentTarget) e.currentTarget.classList.remove("dbk-card--dragging"); }
+function dbDragOver(e) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    if (e.currentTarget) e.currentTarget.classList.add("dbk-col-body--over");
+}
+function dbDragLeave(e) { if (e.currentTarget) e.currentTarget.classList.remove("dbk-col-body--over"); }
+function dbDrop(e, statusId) {
+    e.preventDefault();
+    if (e.currentTarget) e.currentTarget.classList.remove("dbk-col-body--over");
+    const id = dbDragDealId; dbDragDealId = null;
+    if (!id || !Number.isFinite(Number(statusId)) || Number(statusId) < 0) return;
+    const deal = dbOrdersState.deals.find(d => Number(d.crm_deal_id) === Number(id));
+    if (!deal || Number(deal.status_id) === Number(statusId)) return;
+    setDealStatus(id, statusId);
+}
+
+// ---- Смена статуса сделки (оптимистично + PUT в CRM через бэкенд) ----
+async function setDealStatus(dealId, statusId) {
+    const deal = dbOrdersState.deals.find(d => Number(d.crm_deal_id) === Number(dealId));
+    if (!deal) return;
+    const prev = { status_id: deal.status_id, status_name: deal.status_name };
+    const st = (dbOrdersState.statuses || []).find(s => Number(s.id) === Number(statusId));
+    deal.status_id = Number(statusId);
+    deal.status_name = st ? st.name : deal.status_name;
+    renderDbOrders();
+    try {
+        await clientsApi("setDealStatus", { crmId: Number(dealId), statusId: Number(statusId) });
+        if (typeof showReadinessToast === "function") {
+            showReadinessToast(`№ ${deal.num || dealId} → ${deal.status_name || ""}`);
+        }
+    } catch (e) {
+        console.error("setDealStatus", e);
+        deal.status_id = prev.status_id; deal.status_name = prev.status_name;
+        renderDbOrders();
+        alert("Не удалось сменить статус сделки в CRM.");
+    }
+}
+function onDbDealStatusChange(sel, dealId) { setDealStatus(dealId, Number(sel.value)); }
+
+// Селект статуса сделки (для списка).
+function dbDealStatusSelectHtml(d) {
+    const statuses = dbOrdersState.statuses || [];
+    const cur = d.status_id != null ? Number(d.status_id) : null;
+    if (!statuses.length) return escapeHtml(d.status_name || "—");
+    const hasCur = statuses.some(s => Number(s.id) === cur);
+    const extra = (!hasCur && cur != null) ? `<option value="${cur}" selected>${escapeHtml(d.status_name || "—")}</option>` : "";
+    const opts = statuses.map(s => `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
+    return `<select class="dbk-status-select" onchange="onDbDealStatusChange(this, ${d.crm_deal_id})" onclick="event.stopPropagation()">${extra}${opts}</select>`;
+}
+
+// ---- Список заказов (стиль раздела «Заказы») ----
+function dbListHead() {
+    return `<div class="crm-list-thead" aria-hidden="true">
+        <div class="dl-cell dl-num">№</div>
+        <div class="dl-cell dl-client">Клиент</div>
+        <div class="dl-cell dl-content">Содержимое</div>
+        <div class="dl-cell dl-sum">Сумма / Долг</div>
+        <div class="dl-cell dl-status">Статус</div>
+        <div class="dl-cell dl-resp">Ответственный</div>
+        <div class="dl-cell dl-date">Создано</div>
+    </div>`;
+}
+function dbListRowHtml(d) {
+    const amount = Number(d.amount) || 0;
+    const debt = Number(d.debt) || 0;
+    const paid = Math.max(0, amount - debt);
+    const cls = debt <= 0.009 ? "is-ok" : (paid <= 0.009 ? "is-unpaid" : "is-partial");
+    const note = debt > 0.009
+        ? `<div class="dl-sum-note">Долг ${money(debt)} ₽</div>`
+        : `<div class="dl-sum-note">Оплачено</div>`;
+    return `
+        <div class="crm-item crm-item--list dbk-list-row" onclick="openDbDealCard(${d.crm_deal_id})">
+            <div class="dl-cell dl-num"><span class="dbk-card-num">№ ${escapeHtml(String(d.num ?? d.crm_deal_id ?? ""))}</span></div>
+            <div class="dl-cell dl-client"><span class="dl-client-name">${escapeHtml(d.client_name || "—")}</span></div>
+            <div class="dl-cell dl-content">${escapeHtml(d.content || "—")}</div>
+            <div class="dl-cell dl-sum"><div class="dl-sum-total ${cls}">${money(amount)} ₽</div>${note}</div>
+            <div class="dl-cell dl-status">${dbDealStatusSelectHtml(d)}</div>
+            <div class="dl-cell dl-resp">${escapeHtml(d.employee_name || "—")}</div>
+            <div class="dl-cell dl-date">${escapeHtml(d.created_at_crm || "")}</div>
+        </div>`;
+}
+function renderDbList() {
+    const host = document.getElementById("dbOrdersBody");
+    if (!host || dbEmptyOrGuard(host)) return;
+    host.innerHTML = `
+        <div class="crm-list-table">${dbListHead()}${dbOrdersState.deals.map(dbListRowHtml).join("")}</div>
+        <div class="dbk-count">Всего заказов: <b>${dbOrdersState.deals.length}</b></div>`;
 }
 
 // ---- Синхронизация ----
@@ -239,10 +360,36 @@ function dbAfWithValue(fields) {
     return Array.isArray(fields) ? fields.filter(f => String(f?.value ?? "").trim() !== "") : [];
 }
 
+// Статусы элементов и id сделки текущей карточки (для смены статуса элемента).
+let dbCardDealId = null;
+let dbCardElementStatuses = [];
+
+function dbElementStatusSelectHtml(e) {
+    const statuses = dbCardElementStatuses || [];
+    const cur = e.status_id != null ? Number(e.status_id) : null;
+    if (!statuses.length) return escapeHtml(e.status_name || "—");
+    const hasCur = statuses.some(s => Number(s.id) === cur);
+    const extra = (!hasCur && cur != null) ? `<option value="${cur}" selected>${escapeHtml(e.status_name || "—")}</option>` : "";
+    const opts = statuses.map(s => `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
+    return `<select class="dbk-status-select" data-prev="${cur ?? ""}" onchange="onDbElementStatusChange(this, ${e.crm_element_id})">${extra}${opts}</select>`;
+}
+function onDbElementStatusChange(sel, elId) { setElementStatus(dbCardDealId, elId, Number(sel.value), sel); }
+async function setElementStatus(dealId, elId, statusId, sel) {
+    const prev = sel ? sel.getAttribute("data-prev") : null;
+    try {
+        await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: Number(statusId) });
+        if (sel) sel.setAttribute("data-prev", String(statusId));
+        if (typeof showReadinessToast === "function") showReadinessToast("Статус элемента обновлён");
+    } catch (e) {
+        console.error("setElementStatus", e);
+        if (sel && prev != null) sel.value = prev;
+        alert("Не удалось сменить статус элемента в CRM.");
+    }
+}
+
 function dbElementRow(e) {
     const total = money(e.total);
     const qty = Number(e.quantity) || 0;
-    const status = String(e.status_name || "").trim();
     const af = dbAfWithValue(e.additional_fields);
     const afHtml = af.length
         ? `<div class="dbk-el-af">${af.map(f => `<span class="dbk-el-af-chip">${escapeHtml(f.name || "")}: ${dbAfValueHtml(f.value)}</span>`).join("")}</div>`
@@ -253,7 +400,7 @@ function dbElementRow(e) {
             <td>${escapeHtml(e.category_and_name || e.name || "—")}${afHtml}</td>
             <td class="clients-td-num">${qty}${e.units ? " " + escapeHtml(e.units) : ""}</td>
             <td class="clients-td-num">${total} ₽</td>
-            <td class="cc-deal-status">${status ? escapeHtml(status) : "—"}</td>
+            <td class="cc-deal-status">${dbElementStatusSelectHtml(e)}</td>
         </tr>`;
 }
 
@@ -262,14 +409,21 @@ function renderDbDealCard(data, crmId) {
     if (!ov) return;
     const d = data?.deal || {};
     const elements = Array.isArray(data?.elements) ? data.elements : [];
+    dbCardDealId = crmId;
+    dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
     const crmLink = `<a class="client-card-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener">В CRM ↗</a>`;
 
+    // Статус сделки — редактируемый (если справочник статусов загружен).
+    const dealStatusControl = (dbOrdersState.statuses && dbOrdersState.statuses.length)
+        ? dbDealStatusSelectHtml({ crm_deal_id: crmId, status_id: d.status_id, status_name: d.status_name })
+        : `<span class="cc-stat-value" style="font-size:15px">${escapeHtml(d.status_name || "—")}</span>`;
+
     const stats = `
         <div class="client-card-stats">
-            <div class="cc-stat"><span class="cc-stat-label">Статус</span><span class="cc-stat-value" style="font-size:15px">${escapeHtml(d.status_name || "—")}</span></div>
+            <div class="cc-stat"><span class="cc-stat-label">Статус</span>${dealStatusControl}</div>
             <div class="cc-stat"><span class="cc-stat-label">Сумма</span><span class="cc-stat-value">${money(amount)} ₽</span></div>
             <div class="cc-stat"><span class="cc-stat-label">Оплачено</span><span class="cc-stat-value">${money(paid)} ₽</span></div>
             <div class="cc-stat"><span class="cc-stat-label">Долг</span><span class="cc-stat-value ${debt > 0.009 ? "is-negative" : ""}">${money(debt)} ₽</span></div>

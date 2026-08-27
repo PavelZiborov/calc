@@ -373,6 +373,17 @@
     .dbk-btn { margin: 0; width: auto; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .dbk-btn-sync { background: var(--surface-2); color: var(--text-2); }
     .dbk-btn-sync:hover { background: var(--accent-tint); color: var(--accent-strong); }
+    /* Переключатель Список/Канбан */
+    .dbk-viewtoggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+    .dbk-view-btn { margin: 0; width: auto; padding: 8px 14px; border: none; background: var(--surface); color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .dbk-view-btn + .dbk-view-btn { border-left: 1px solid var(--border); }
+    .dbk-view-btn:hover { background: var(--surface-2); }
+    .dbk-view-btn.is-active { background: var(--accent-container); color: #fff; }
+    /* Селект статуса (список + карточка) */
+    .dbk-status-select { margin: 0; width: 100%; max-width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
+    .dbk-status-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(29,88,198,0.15); outline: none; }
+    .dbk-count { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+    .dbk-list-row { cursor: pointer; }
 
     .dbk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
     .dbk-col { flex: 0 0 300px; width: 300px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
@@ -383,6 +394,8 @@
 
     .dbk-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; cursor: pointer; transition: box-shadow 0.15s ease, border-color 0.15s ease; }
     .dbk-card:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(29,88,198,0.12); }
+    .dbk-card--dragging { opacity: 0.5; }
+    .dbk-col-body--over { background: var(--accent-tint); outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: var(--r-sm); }
     .dbk-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
     .dbk-card-num { font-size: 13px; font-weight: 700; color: var(--accent); }
     .dbk-card-amount { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }

@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=50">
+<link rel="stylesheet" href="css/app.css?v=51">
 </head>
 <body>
 
@@ -327,28 +327,32 @@
         <div class="dbk-header">
             <h2 class="dbk-title">Заказы <span class="dbk-subtitle">из своей базы (Heaven Print)</span></h2>
             <div class="dbk-toolbar">
+                <div class="dbk-viewtoggle" role="group" aria-label="Вид">
+                    <button type="button" id="dbViewListBtn" class="dbk-view-btn" onclick="setDbView('list')">Список</button>
+                    <button type="button" id="dbViewKanbanBtn" class="dbk-view-btn" onclick="setDbView('kanban')">Канбан</button>
+                </div>
                 <input type="text" id="dbkSearchInput" class="dbk-search" placeholder="Поиск: №, клиент, наименование…" oninput="onDbDealsSearchInput(this.value)">
                 <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
                 <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
             </div>
         </div>
-        <div id="dbKanbanBoard" class="dbk-board"></div>
+        <div id="dbOrdersBody"></div>
     </div>
 </div>
 
-<script src="js/config.js?v=50"></script>
-<script src="js/calculator-data.js?v=50"></script>
-<script src="js/calc-settings.js?v=50"></script>
-<script src="js/calc-settings-ui.js?v=50"></script>
-<script src="js/utils.js?v=50"></script>
-<script src="js/auth.js?v=50"></script>
-<script src="js/calculator.js?v=50"></script>
-<script src="js/crm.js?v=50"></script>
-<script src="js/element-editor.js?v=50"></script>
-<script src="js/kp-docx.js?v=50"></script>
-<script src="js/calc-sheet.js?v=50"></script>
-<script src="js/clients.js?v=50"></script>
-<script src="js/orders-db.js?v=50"></script>
-<script src="js/main.js?v=50"></script>
+<script src="js/config.js?v=51"></script>
+<script src="js/calculator-data.js?v=51"></script>
+<script src="js/calc-settings.js?v=51"></script>
+<script src="js/calc-settings-ui.js?v=51"></script>
+<script src="js/utils.js?v=51"></script>
+<script src="js/auth.js?v=51"></script>
+<script src="js/calculator.js?v=51"></script>
+<script src="js/crm.js?v=51"></script>
+<script src="js/element-editor.js?v=51"></script>
+<script src="js/kp-docx.js?v=51"></script>
+<script src="js/calc-sheet.js?v=51"></script>
+<script src="js/clients.js?v=51"></script>
+<script src="js/orders-db.js?v=51"></script>
+<script src="js/main.js?v=51"></script>
 </body>
 </html>
