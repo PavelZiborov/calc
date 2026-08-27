@@ -172,10 +172,18 @@ async function pollDbElements(btn) {
         }
         // завершено
         if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || "⟳ Элементы"; }
+        const samples = Array.isArray(job.errors) ? job.errors : [];
+        if (job.failed && samples.length) {
+            console.warn("Ошибки синхронизации элементов (образцы):", samples);
+        }
         if (typeof showReadinessToast === "function") {
             showReadinessToast(job.error
                 ? `Элементы: ошибка — ${job.error}`
                 : `Элементы готовы: ${job.elements || 0} по ${job.deals || 0} сделкам${job.failed ? `, ошибок ${job.failed}` : ""}`);
+        }
+        // при ошибках — показать первую причину (остальные в консоли/логах)
+        if (job.failed && samples.length) {
+            alert(`Часть элементов не загрузилась (${job.failed}).\nПример ошибки:\n${samples[0]}\n\nОстальные образцы — в консоли (F12) и в логах бэкенда.`);
         }
         await loadDbDeals();
     } catch (e) {
