@@ -821,13 +821,13 @@ function dbOpenElEdit(elId) {
                         <input type="text" id="dbEditUnits" list="dbUnitsList" value="${escapeHtml(e.units || "шт")}">
                         <datalist id="dbUnitsList"><option value="шт"></option><option value="услуга"></option></datalist>
                     </label>
-                    <label>Кол-во<input type="number" step="any" id="dbEditQty" value="${Number(e.quantity) || 0}" oninput="dbEditRecalc('qty')"></label>
-                    <label>Цена<input type="number" step="any" id="dbEditPrice" value="${Number(e.price) || 0}" oninput="dbEditRecalc('price')"></label>
-                    <label>Себестоимость<input type="number" step="any" id="dbEditCost" value="${Number(e.cost) || 0}"></label>
-                    <label>Сумма<input type="number" step="any" id="dbEditTotal" value="${Number(e.total) || 0}" oninput="dbEditRecalc('total')"></label>
+                    <label>Кол-во<input type="text" inputmode="decimal" id="dbEditQty" value="${Number(e.quantity) || 0}" oninput="dbCleanNum(this); dbEditRecalc('qty')"></label>
+                    <label>Цена<input type="text" inputmode="decimal" id="dbEditPrice" value="${Number(e.price) || 0}" oninput="dbCleanNum(this); dbEditRecalc('price')"></label>
+                    <label>Себестоимость<input type="text" inputmode="decimal" id="dbEditCost" value="${Number(e.cost) || 0}" oninput="dbCleanNum(this)" onblur="dbCostBlur(this)"></label>
+                    <label>Сумма<input type="text" inputmode="decimal" id="dbEditTotal" value="${Number(e.total) || 0}" oninput="dbCleanNum(this); dbEditRecalc('total')"></label>
                 </div>
-                <label class="dbo-edit-wide">Себестоимость HQ<input type="number" step="any" id="dbEditCostHq" value="${escapeHtml(costHq)}"></label>
-                <label class="dbo-edit-wide">Количество листов<input type="number" step="any" id="dbEditSheets" value="${escapeHtml(sheets)}"></label>
+                <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
+                <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
             </div>
             <div class="dbo-edit-note">Имя и категорию в PrintOffice нельзя менять напрямую — при их изменении позиция пересоздаётся (удаляется и создаётся заново).</div>
             <div class="dbo-edit-actions">
@@ -863,6 +863,21 @@ function dbEditRecalc(source) {
 function dbRound(n) {
     const r = Math.round((Number(n) || 0) * 100) / 100;
     return Number.isInteger(r) ? String(r) : String(r);
+}
+// Чистим число: убираем пробелы (в т.ч. неразрывные), запятую → точку, только цифры/точка/минус.
+// (в CRM нельзя записать «1 500» — пробел ломает число).
+function dbCleanNum(el) {
+    if (!el) return;
+    const v = String(el.value)
+        .replace(/[\s   ]/g, "")
+        .replace(",", ".")
+        .replace(/[^0-9.\-]/g, "");
+    if (el.value !== v) el.value = v;
+}
+// Себестоимость не может быть пустой — пусто → 0 (0 или любое число).
+function dbCostBlur(el) {
+    dbCleanNum(el);
+    if (!String(el.value).trim()) el.value = "0";
 }
 async function dbSaveElEdit(elId) {
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
