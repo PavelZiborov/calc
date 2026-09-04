@@ -1074,7 +1074,8 @@ function fillElementEditorFields(element) {
     const staffEditable = currentUser.role === "staff" && !currentElementEditor?.isLocked;
 
     if (costInput) {
-        costInput.value = cost != null ? Math.round(cost) : "";
+        // себестоимость по умолчанию 0 (не бывает пустой)
+        costInput.value = cost != null ? Math.round(cost) : "0";
         costInput.placeholder = "";
         costInput.readOnly = !staffEditable;
     }
@@ -1621,12 +1622,11 @@ function collectNewElementItemFromEditor(modal) {
         item.category_id = categoryId;
     }
 
-    if (costRaw !== "") {
-        const cost = Math.round(Number(costRaw));
-        if (Number.isFinite(cost)) {
-            item.cost = cost;
-            item.cost_total = cost;
-        }
+    // себестоимость всегда сохраняем (пусто → 0)
+    {
+        const cost = Math.round(Number(String(costRaw).replace(",", ".")) || 0);
+        item.cost = Number.isFinite(cost) ? cost : 0;
+        item.cost_total = item.cost;
     }
     if (costHqRaw !== "") {
         const costHq = Math.round(Number(costHqRaw));
@@ -1927,10 +1927,31 @@ function getElementEditorModal() {
     return modal;
 }
 
+// Чистим число: запятую → точку, убираем всё кроме цифр/точки/минуса
+// (в т.ч. пробелы, в CRM нельзя записать «1 500»).
+function eeCleanNum(el) {
+    if (!el) return;
+    const v = String(el.value).replace(",", ".").replace(/[^0-9.\-]/g, "");
+    if (el.value !== v) el.value = v;
+}
+
 function bindElementEditorEvents(modal) {
     const priceInput = modal.querySelector("#elementEditorPrice");
     const totalInput = modal.querySelector("#elementEditorTotal");
     const qtyInput = modal.querySelector("#elementEditorQty");
+    const costInput = modal.querySelector("#elementEditorCost");
+    const costHqInput = modal.querySelector("#elementEditorCostHq");
+    const sra3Input = modal.querySelector("#elementEditorSra3");
+
+    // Очистка пробелов у всех числовых полей — ДО пересчёта (регистрируем раньше).
+    [qtyInput, priceInput, totalInput, costInput, costHqInput, sra3Input].forEach(inp => {
+        inp?.addEventListener("input", () => eeCleanNum(inp));
+    });
+    // Себестоимость не может быть пустой: пусто → 0.
+    costInput?.addEventListener("blur", () => {
+        eeCleanNum(costInput);
+        if (!String(costInput.value).trim()) costInput.value = "0";
+    });
 
     qtyInput?.addEventListener("input", () => {
         const qty = Number(qtyInput.value) || 0;
