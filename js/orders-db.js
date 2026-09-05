@@ -710,6 +710,7 @@ function dbDealCardEsc(e) {
     if (e.key !== "Escape") return;
     // Если открыта форма позиции — Esc закрывает её (обрабатывает dbElEditEsc), не заказ.
     if (document.getElementById("dbElEditOverlay")) return;
+    if (document.getElementById("dbPayOverlay")) return;
     closeDbDealCard();
 }
 function closeDbDealCard() {
@@ -719,6 +720,7 @@ function closeDbDealCard() {
     dbCloseStatusMenu();
     if (typeof dbCloseElStatusMenu === "function") dbCloseElStatusMenu();
     if (typeof closeDbElEdit === "function") closeDbElEdit();
+    if (typeof closeDbPayModal === "function") closeDbPayModal();
 }
 
 async function openDbDealCard(crmId) {
@@ -766,6 +768,7 @@ let dbCardElementStatuses = [];
 
 let dbCardData = null;   // текущие данные карточки (для оптимистичного апдейта статусов)
 let dbCardCategories = []; // категории прайс-листа (для смены категории элемента)
+let dbCardPayMethods = []; // методы оплаты CRM (для ручного ввода оплат)
 
 // ---- Редактирование элемента (поля; имя/категорию — через пересоздание в CRM) ----
 function dbElEditEsc(e) { if (e.key === "Escape") closeDbElEdit(); }
@@ -1075,6 +1078,7 @@ function renderDbDealCard(data, crmId) {
     dbCardData = data;
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
     dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
+    if (Array.isArray(data?.payMethods) && data.payMethods.length) dbCardPayMethods = data.payMethods;
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
@@ -1132,7 +1136,7 @@ function renderDbDealCard(data, crmId) {
                     </div>
                     <div class="payment-summary dbo-totals">
                         <div class="payment-summary-row"><span class="payment-summary-label">Всего</span><span class="payment-summary-value">${money2(amount)}</span><span></span></div>
-                        <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span></span></div>
+                        <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span class="payment-actions">${debt > 0.009 ? `<button type="button" class="payment-action-btn payment-partial-btn" title="Добавить частичную сумму к оплате" aria-label="Добавить частичную сумму к оплате" onclick="dbOpenPayModal('partial')"><span class="payment-action-icon">+</span></button><button type="button" class="payment-action-btn payment-full-btn" title="Добавить всю сумму" aria-label="Добавить всю сумму" onclick="dbOpenPayModal('full')"><span class="payment-action-icon">+</span></button>` : ""}</span></div>
                         <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
                     </div>
                 </div>
@@ -1162,5 +1166,86 @@ async function dbSaveCostInfo(crmId, value) {
     } catch (e) {
         console.error("dbSaveCostInfo", e);
         alert("Не удалось сохранить информацию по себестоимости в CRM.");
+    }
+}
+
+// ——— Ручной ввод оплаты (дублируется в нашу БД и CRM PrintOffice) ———
+// mode: 'full' — сумма = остаток долга; 'part' — сумма пустая (вводит пользователь).
+function dbOpenPayModal(mode) {
+    const d = dbCardData?.deal;
+    if (!d) return;
+    closeDbPayModal();
+    const amount = Number(d.amount) || 0;
+    const debt = d.debt != null ? Number(d.debt) : Math.max(0, amount - (Number(d.paid) || 0));
+    const isFull = mode === "full";
+    dbPayDebt = debt;   // для проверки «не больше долга»
+    const prefill = isFull ? Number(debt).toFixed(2) : "";
+    // Метод оплаты по умолчанию — «Безнал (Р/С)», иначе первый доступный.
+    const methods = dbCardPayMethods || [];
+    const defId = (methods.find(m => /безнал/i.test(m.name)) || methods[0] || {}).id;
+    const methodOpts = methods.length
+        ? methods.map(m => `<option value="${m.id}"${Number(m.id) === Number(defId) ? " selected" : ""}>${escapeHtml(m.name)}</option>`).join("")
+        : `<option value="">— методы не загружены —</option>`;
+    const ov = document.createElement("div");
+    ov.id = "dbPayOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbPayModal()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit dbo-pay-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head">
+                <h3>Добавить оплату</h3>
+                <button class="dbo-close" onclick="closeDbPayModal()" aria-label="Закрыть">×</button>
+            </div>
+            <div class="dbo-edit-body">
+                <label class="dbo-edit-wide">Сумма
+                    <input type="text" inputmode="decimal" id="dbPayAmount" value="${prefill}" placeholder="0.00" oninput="dbCleanNum(this)"${isFull ? ' readonly style="background:var(--surface-2)"' : ''}>
+                </label>
+                <label class="dbo-edit-wide">Метод оплаты
+                    <select id="dbPayMethod">${methodOpts}</select>
+                </label>
+                <label class="dbo-edit-wide">Основание
+                    <textarea id="dbPayComment" rows="2" placeholder="Можно оставить пустым"></textarea>
+                </label>
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbPaySaveBtn" onclick="dbAddPayment()">Добавить оплату</button>
+                <button class="dbo-btn" onclick="closeDbPayModal()">Отмена</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    document.addEventListener("keydown", dbPayEsc);
+    setTimeout(() => { const t = document.getElementById("dbPayAmount"); if (t) { t.focus(); t.select(); } }, 0);
+}
+let dbPayDebt = 0;   // остаток долга на момент открытия модалки (для валидации)
+function dbPayEsc(e) { if (e.key === "Escape") closeDbPayModal(); }
+function closeDbPayModal() {
+    const ov = document.getElementById("dbPayOverlay");
+    if (ov) ov.remove();
+    document.removeEventListener("keydown", dbPayEsc);
+}
+async function dbAddPayment() {
+    const crmId = Number(dbCardDealId);
+    const amount = Number((document.getElementById("dbPayAmount")?.value || "").replace(",", "."));
+    const payMethodId = Number(document.getElementById("dbPayMethod")?.value);
+    const comment = String(document.getElementById("dbPayComment")?.value || "").trim();
+    if (!Number.isFinite(amount) || amount <= 0) { alert("Введите сумму оплаты (больше 0)."); return; }
+    if (amount - dbPayDebt > 0.009) { alert("Сумма оплаты больше долга."); return; }
+    if (!Number.isFinite(payMethodId)) { alert("Выберите метод оплаты."); return; }
+    const btn = document.getElementById("dbPaySaveBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Сохраняем…"; }
+    try {
+        const data = await clientsApi("addDealPayment", { crmId, payMethodId, amount, comment });
+        if (data?.deal && dbCardData) dbCardData.deal = data.deal;
+        if (Array.isArray(data?.payments) && dbCardData) dbCardData.payments = data.payments;
+        closeDbPayModal();
+        renderDbDealCard(dbCardData, dbCardDealId);
+        loadDbDeals();
+        if (typeof showReadinessToast === "function") showReadinessToast("Оплата добавлена");
+    } catch (e) {
+        console.error("dbAddPayment", e);
+        alert("Не удалось добавить оплату в CRM.");
+        if (btn) { btn.disabled = false; btn.textContent = "Добавить оплату"; }
     }
 }
