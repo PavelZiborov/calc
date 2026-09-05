@@ -1022,33 +1022,37 @@ function dbElAfLine(e) {
     if (!af.length) return "";
     return `<div class="dbo-el-meta">${af.map(f => `${escapeHtml(f.name)}: <b>${dbAfValueHtml(f.value)}</b>`).join(" · ")}</div>`;
 }
-// История оплат сделки.
+// История оплат сделки — второстепенный блок (мягкий, ненавязчивый).
+// Приход — зелёным, отмена — красным. У проведённых платежей — кнопка «Отмена».
 function dbPaymentsBlock(payments) {
     const list = Array.isArray(payments) ? payments : [];
     if (!list.length) {
-        return `<div class="dbo-section">
-            <div class="dbo-section-title">История оплат</div>
+        return `<details class="dbo-pay-section">
+            <summary class="dbo-pay-caption">История оплат <span class="dbo-pay-count">0</span></summary>
             <div class="dbo-pay-empty">Оплат пока нет.</div>
-        </div>`;
+        </details>`;
     }
     const rows = list.map(p => {
-        const rollback = p.is_billing === false || (p.rollback_pay_id != null && Number(p.rollback_pay_id) > 0);
         const amt = Number(p.amount) || 0;
-        return `<div class="dbo-pay-row${rollback ? " is-rollback" : ""}">
+        const isCancel = p.is_billing === false || amt < 0;      // отмена/списание
+        const cancelled = !isCancel && Number(p.rollback_pay_id) > 0; // платёж уже отменён
+        const canCancel = !isCancel && !cancelled && amt > 0.009;
+        const sign = amt > 0 ? "+" : "";
+        const cls = isCancel ? "is-cancel" : (cancelled ? "is-cancelled" : "is-income");
+        const payRef = p.crm_payment_id != null ? Number(p.crm_payment_id) : 0; // dph_id (id истории оплат)
+        return `<div class="dbo-pay-line ${cls}">
             <span class="dbo-pay-date">${escapeHtml(p.date_crm || "")}</span>
-            <span class="dbo-pay-amount">${money2(amt)} ₽</span>
+            <span class="dbo-pay-amount">${sign}${money2(amt)} ₽</span>
             <span class="dbo-pay-method">${escapeHtml(p.method_name || "—")}</span>
             <span class="dbo-pay-user">${escapeHtml(p.user_name || "")}</span>
-            <span class="dbo-pay-comment">${escapeHtml(p.comment || "")}${rollback ? ' <span class="dbo-pay-tag">отмена</span>' : ""}</span>
+            <span class="dbo-pay-comment">${escapeHtml(p.comment || "")}${isCancel ? ' <span class="dbo-pay-tag">отмена</span>' : ""}${cancelled ? ' <span class="dbo-pay-tag dbo-pay-tag--muted">отменён</span>' : ""}</span>
+            <span class="dbo-pay-act">${canCancel ? `<button type="button" class="dbo-pay-cancel" title="Отменить платёж" onclick="dbOpenPayCancel(${payRef}, ${amt}, '${encodeURIComponent(p.method_name || "")}', '${encodeURIComponent(p.date_crm || "")}')">Отмена</button>` : ""}</span>
         </div>`;
     }).join("");
-    return `<div class="dbo-section">
-        <div class="dbo-section-title">История оплат <span class="dbo-pay-count">(${list.length})</span></div>
-        <div class="dbo-pay-table">
-            <div class="dbo-pay-head"><span>Дата</span><span>Сумма</span><span>Метод</span><span>Менеджер</span><span>Комментарий</span></div>
-            ${rows}
-        </div>
-    </div>`;
+    return `<details class="dbo-pay-section" open>
+        <summary class="dbo-pay-caption">История оплат <span class="dbo-pay-count">${list.length}</span></summary>
+        <div class="dbo-pay-list">${rows}</div>
+    </details>`;
 }
 
 // Строка элемента: СТАТУС(кружок) · НАЗВАНИЕ(+доп-инфо) · КОЛ-ВО · СЕБЕС. · СУММА.
@@ -1247,5 +1251,66 @@ async function dbAddPayment() {
         console.error("dbAddPayment", e);
         alert("Не удалось добавить оплату в CRM.");
         if (btn) { btn.disabled = false; btn.textContent = "Добавить оплату"; }
+    }
+}
+
+// ——— Отмена (откат) платежа ———
+let dbPayCancelRef = 0;   // dph_id (id записи истории оплат), которую отменяем
+function dbOpenPayCancel(payRef, amount, methodEnc, dateEnc) {
+    if (!dbCardData?.deal) return;
+    closeDbPayModal();
+    dbPayCancelRef = Number(payRef) || 0;
+    const method = decodeURIComponent(methodEnc || "");
+    const date = decodeURIComponent(dateEnc || "");
+    const ov = document.createElement("div");
+    ov.id = "dbPayOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbPayModal()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit dbo-pay-modal dbo-pay-cancel-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head dbo-cancel-head">
+                <h3>↺ Отмена платёжной операции</h3>
+                <button class="dbo-close" onclick="closeDbPayModal()" aria-label="Закрыть">×</button>
+            </div>
+            <div class="dbo-edit-body">
+                <div class="dbo-cancel-info">
+                    ${date ? `<div><span>Дата платежа:</span><b>${escapeHtml(date)}</b></div>` : ""}
+                    <div><span>Сумма платежа:</span><b>${money2(Math.abs(Number(amount) || 0))} ₽</b></div>
+                    ${method ? `<div><span>Метод оплаты:</span><b>${escapeHtml(method)}</b></div>` : ""}
+                </div>
+                <label class="dbo-edit-wide">Основание <span class="dbo-req">(обязательное поле)</span>
+                    <textarea id="dbPayCancelComment" rows="3" placeholder="Причина отмены платежа"></textarea>
+                </label>
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-danger" id="dbPayCancelBtn" onclick="dbConfirmPayCancel()">Создать отмену операции</button>
+                <button class="dbo-btn" onclick="closeDbPayModal()">Отмена</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    document.addEventListener("keydown", dbPayEsc);
+    setTimeout(() => { const t = document.getElementById("dbPayCancelComment"); if (t) t.focus(); }, 0);
+}
+async function dbConfirmPayCancel() {
+    const crmId = Number(dbCardDealId);
+    const comment = String(document.getElementById("dbPayCancelComment")?.value || "").trim();
+    if (!comment) { alert("Укажите основание отмены (обязательное поле)."); return; }
+    if (!dbPayCancelRef) { alert("Не удалось определить платёж для отмены."); return; }
+    const btn = document.getElementById("dbPayCancelBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Отменяем…"; }
+    try {
+        const data = await clientsApi("revokeDealPayment", { crmId, dphId: dbPayCancelRef, comment });
+        if (data?.deal && dbCardData) dbCardData.deal = data.deal;
+        if (Array.isArray(data?.payments) && dbCardData) dbCardData.payments = data.payments;
+        closeDbPayModal();
+        renderDbDealCard(dbCardData, dbCardDealId);
+        loadDbDeals();
+        if (typeof showReadinessToast === "function") showReadinessToast("Платёж отменён");
+    } catch (e) {
+        console.error("dbConfirmPayCancel", e);
+        alert("Не удалось отменить платёж в CRM.");
+        if (btn) { btn.disabled = false; btn.textContent = "Создать отмену операции"; }
     }
 }

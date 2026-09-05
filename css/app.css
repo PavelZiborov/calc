@@ -446,21 +446,41 @@
     .dbo-invoice { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); }
     .dbo-invoice a { color: var(--accent); font-weight: 600; text-decoration: none; }
     .dbo-invoice a:hover { text-decoration: underline; }
-    /* История оплат */
-    .dbo-pay-count { color: var(--text-muted); font-weight: 500; }
-    .dbo-pay-empty { padding: 12px 14px; font-size: 13px; color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
-    .dbo-pay-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-    .dbo-pay-head, .dbo-pay-row { display: grid; grid-template-columns: 116px 96px 110px 120px minmax(0,1fr); gap: 10px; align-items: center; padding: 8px 12px; }
-    .dbo-pay-head { background: var(--surface-2); font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
-    .dbo-pay-head span:nth-child(2) { text-align: right; }
-    .dbo-pay-row { font-size: 13px; color: var(--text); border-top: 1px solid var(--border); }
-    .dbo-pay-date { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .dbo-pay-amount { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--success, #15803D); white-space: nowrap; }
-    .dbo-pay-method, .dbo-pay-user { color: var(--text-2, var(--text)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .dbo-pay-comment { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
-    .dbo-pay-row.is-rollback { background: #fdf3f3; }
-    .dbo-pay-row.is-rollback .dbo-pay-amount { color: var(--danger); }
-    .dbo-pay-tag { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 4px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    /* История оплат — второстепенный, мягкий блок */
+    .dbo-pay-section { margin-top: 16px; }
+    .dbo-pay-caption { font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; user-select: none; }
+    .dbo-pay-caption::-webkit-details-marker { display: none; }
+    .dbo-pay-caption::before { content: "›"; display: inline-block; transition: transform 0.15s ease; color: var(--text-muted); font-size: 14px; }
+    .dbo-pay-section[open] > .dbo-pay-caption::before { transform: rotate(90deg); }
+    .dbo-pay-count { color: var(--text-muted); font-weight: 500; opacity: 0.7; }
+    .dbo-pay-empty { padding: 6px 2px; font-size: 12px; color: var(--text-muted); }
+    .dbo-pay-list { margin-top: 6px; }
+    .dbo-pay-line { display: grid; grid-template-columns: 118px 92px 110px 118px minmax(0,1fr) 62px; gap: 10px; align-items: center; padding: 5px 2px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); }
+    .dbo-pay-line:first-child { border-top: none; }
+    .dbo-pay-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .dbo-pay-amount { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dbo-pay-method, .dbo-pay-user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-pay-comment { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-pay-line.is-income .dbo-pay-amount { color: var(--success, #15803D); }
+    .dbo-pay-line.is-cancel .dbo-pay-amount { color: var(--danger); }
+    .dbo-pay-line.is-cancelled { opacity: 0.6; }
+    .dbo-pay-line.is-cancelled .dbo-pay-amount { color: var(--text-muted); text-decoration: line-through; }
+    .dbo-pay-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; background: var(--danger); color: #fff; font-size: 9.5px; font-weight: 700; text-transform: uppercase; vertical-align: middle; }
+    .dbo-pay-tag--muted { background: var(--text-muted); }
+    .dbo-pay-act { text-align: right; }
+    .dbo-pay-cancel { margin: 0; padding: 2px 8px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--danger); font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .dbo-pay-cancel:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+    /* Модалка отмены платежа */
+    .dbo-btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .dbo-btn-danger:hover { background: var(--danger); filter: brightness(0.92); }
+    .dbo-cancel-head { background: #d9534f; color: #fff; margin: -1px -1px 0; border-radius: var(--r-md, 12px) var(--r-md, 12px) 0 0; padding: 12px 18px; }
+    .dbo-cancel-head h3 { color: #fff; }
+    .dbo-cancel-head .dbo-close { color: #fff; }
+    .dbo-cancel-info { display: grid; gap: 8px; margin-bottom: 6px; font-size: 14px; }
+    .dbo-cancel-info > div { display: flex; gap: 10px; }
+    .dbo-cancel-info span { color: var(--text-muted); min-width: 130px; }
+    .dbo-cancel-info b { color: var(--text); }
+    .dbo-req { color: var(--danger); font-weight: 600; }
 
     /* ---- Заказы БД: канбан ---- */
     .dbk-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
