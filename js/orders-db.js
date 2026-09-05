@@ -1559,48 +1559,41 @@ function dboApplyAssets(elementId, data) {
     dboRenderEditAssets(elementId);
 }
 
-// --- Настройки интеграции Яндекс.Диск ---
-async function dboOpenYandexSettings() {
+// --- Страница «Настройки» (в разделе аккаунта) + инлайн-форма Яндекс.Диска ---
+function openSettingsPage() {
     if (!ensureActiveSession()) return;
+    if (typeof toggleAuthModal === "function") toggleAuthModal(false);
+    if (typeof switchTab === "function") switchTab("settings-tab");
+    renderYandexSettingsInline();
+}
+async function renderYandexSettingsInline() {
+    const host = document.getElementById("settingsYandexHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка статуса…</p>`;
     let status = { yandexConfigured: false, previewDir: "", layoutsDir: "" };
     try { status = await clientsApi("getIntegrations", {}); } catch (_) {}
-    const ov = document.createElement("div");
-    ov.id = "dboYaOverlay";
-    ov.className = "client-card-overlay dbo-edit-overlay";
-    ov.setAttribute("onmousedown", "overlayDown(event)");
-    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) document.getElementById('dboYaOverlay')?.remove()");
-    ov.style.display = "flex";
-    ov.innerHTML = `
-        <div class="dbo-edit dbo-pay-modal" role="dialog" aria-modal="true">
-            <div class="dbo-edit-head"><h3>Интеграция с Яндекс.Диском</h3>
-                <button class="dbo-close" onclick="document.getElementById('dboYaOverlay')?.remove()">×</button></div>
-            <div class="dbo-edit-body">
-                <p class="dbo-ya-note">Макеты и превью хранятся на Яндекс.Диске в одном экземпляре
-                (<code>${escapeHtml(status.layoutsDir || "/printoffice24/layouts")}</code>,
-                <code>${escapeHtml(status.previewDir || "/printoffice24/preview")}</code>) и зеркалятся в PrintOffice.
-                Нужен OAuth-токен того же аккаунта Яндекс.Диска, к которому подключён PrintOffice.</p>
-                <div class="dbo-ya-status">Статус: <b class="${status.yandexConfigured ? "payment-ok" : "payment-alert"}">${status.yandexConfigured ? "подключено" : "не настроено"}</b></div>
-                <label class="dbo-edit-wide">OAuth-токен Яндекс.Диска
-                    <input type="password" id="dboYaToken" placeholder="${status.yandexConfigured ? "•••••• (задан) — введите новый, чтобы заменить" : "вставьте токен"}" autocomplete="off">
-                </label>
-                <p class="dbo-ya-hint">Токен хранится на сервере и не показывается обратно. Получить: <a href="https://yandex.ru/dev/disk/poligon/" target="_blank" rel="noopener">yandex.ru/dev/disk</a>.</p>
-            </div>
-            <div class="dbo-edit-actions">
-                <button class="dbo-btn dbo-btn-primary" onclick="dboSaveYandexToken()">Сохранить</button>
-                ${status.yandexConfigured ? `<button class="dbo-btn dbo-btn-danger" onclick="dboSaveYandexToken(true)">Отключить</button>` : ""}
-                <button class="dbo-btn" onclick="document.getElementById('dboYaOverlay')?.remove()">Закрыть</button>
-            </div>
+    host.innerHTML = `
+        <p class="dbo-ya-note">Макеты и превью хранятся на Яндекс.Диске в одном экземпляре
+        (<code>${escapeHtml(status.layoutsDir || "/printoffice24/layouts")}</code>,
+        <code>${escapeHtml(status.previewDir || "/printoffice24/preview")}</code>) и зеркалятся в PrintOffice.
+        Нужен OAuth-токен того же аккаунта Яндекс.Диска, к которому подключён PrintOffice.</p>
+        <div class="dbo-ya-status">Статус: <b class="${status.yandexConfigured ? "payment-ok" : "payment-alert"}">${status.yandexConfigured ? "подключено" : "не настроено"}</b></div>
+        <label class="dbo-edit-wide">OAuth-токен Яндекс.Диска
+            <input type="password" id="dboYaToken" placeholder="${status.yandexConfigured ? "•••••• (задан) — введите новый, чтобы заменить" : "вставьте токен"}" autocomplete="off">
+        </label>
+        <p class="dbo-ya-hint">Токен хранится на сервере и не показывается обратно. Получить: <a href="https://yandex.ru/dev/disk/poligon/" target="_blank" rel="noopener">yandex.ru/dev/disk</a>.</p>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dboSaveYandexToken()">Сохранить</button>
+            ${status.yandexConfigured ? `<button class="dbo-btn dbo-btn-danger" onclick="dboSaveYandexToken(true)">Отключить</button>` : ""}
         </div>`;
-    document.body.appendChild(ov);
-    setTimeout(() => document.getElementById("dboYaToken")?.focus(), 0);
 }
 async function dboSaveYandexToken(clear = false) {
     const token = clear ? "" : String(document.getElementById("dboYaToken")?.value || "").trim();
     if (!clear && !token) { alert("Введите токен."); return; }
     try {
         await clientsApi("setYandexToken", { token });
-        document.getElementById("dboYaOverlay")?.remove();
         if (typeof showReadinessToast === "function") showReadinessToast(clear ? "Интеграция отключена" : "Токен сохранён");
+        renderYandexSettingsInline();
     } catch (e) {
         console.error("dboSaveYandexToken", e);
         alert("Не удалось сохранить токен.");
