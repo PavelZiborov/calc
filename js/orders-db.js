@@ -831,6 +831,8 @@ function dbOpenElEdit(elId) {
                 </div>
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
+                <div class="dbo-assets-title dbo-assets-heading">Превью и макеты</div>
+                ${dboAssetsEditHtml(elId)}
             </div>
             <div class="dbo-edit-note">Имя и категорию в PrintOffice нельзя менять напрямую — при их изменении позиция пересоздаётся (удаляется и создаётся заново).</div>
             <div class="dbo-edit-actions">
@@ -841,6 +843,9 @@ function dbOpenElEdit(elId) {
     document.body.appendChild(ov);
     document.addEventListener("keydown", dbElEditEsc);
     setTimeout(() => { const t = document.getElementById("dbEditName"); if (t) { dbAutoGrow(t); t.focus(); } }, 0);
+    // Освежаем превью/макеты позиции (если карточка ещё не догрузила).
+    const cached = dboAssets.get(dboAssetKey(elId));
+    if (!cached || cached.status !== "ready") dboLoadElementAssets(elId).catch(() => {});
 }
 // Авто-высота textarea наименования (растёт вниз по мере ввода).
 function dbAutoGrow(el) {
@@ -1062,7 +1067,7 @@ function dbElementRow(e) {
     const total = Number(e.total) || 0;
     return `
         <div class="dbo-el-row">
-            <div class="dbo-el-status">${dbElStatusBtn(e)}</div>
+            <div class="dbo-el-status">${dbElStatusBtn(e)}<span class="element-preview-thumb dbo-el-thumb" data-el="${e.crm_element_id}"></span></div>
             <div class="dbo-el-name">
                 <div class="dbo-el-title dbo-el-title--edit" onclick="dbOpenElEdit(${e.crm_element_id})" title="Редактировать позицию">${escapeHtml(e.category_and_name || e.name || "—")}</div>
                 ${dbElAfLine(e)}
@@ -1149,6 +1154,8 @@ function renderDbDealCard(data, crmId) {
                 ${costBlock}
             </div>
         </div>`;
+    // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
+    dboLoadAllAssets(crmId, d.num, elements);
 }
 
 // Сохранение «Информации по себестоимости» (доп-поле 476) в CRM + локально.
@@ -1312,5 +1319,290 @@ async function dbConfirmPayCancel() {
         console.error("dbConfirmPayCancel", e);
         alert("Не удалось отменить платёж в CRM.");
         if (btn) { btn.disabled = false; btn.textContent = "Создать отмену операции"; }
+    }
+}
+
+// ============ Превью и макеты элементов (Яндекс.Диск + PrintOffice) ============
+// Файлы лежат в одном экземпляре на Я.Диске (/printoffice24/...), зеркалятся в CRM.
+// Загрузка двухфазная: бэкенд даёт presigned-URL → браузер грузит байты прямо на Я.Диск.
+const dboAssets = new Map();   // elementId -> { status:'loading'|'ready'|'error', preview, layouts }
+let dboAssetsDeal = { id: null, num: null };
+
+function dboAssetKey(elId) { return String(elId); }
+function dboIsImageUrl(u) { return typeof u === "string" && /^https?:\/\//i.test(u); }
+
+async function dboLoadAllAssets(dealId, dealNum, elements) {
+    dboAssetsDeal = { id: Number(dealId), num: String(dealNum ?? "") };
+    const ids = (elements || []).map(e => Number(e.crm_element_id)).filter(Number.isFinite);
+    for (const id of ids) {
+        if (!dboAssets.has(dboAssetKey(id))) dboAssets.set(dboAssetKey(id), { status: "loading", preview: null, layouts: [] });
+        dboUpdateThumb(id);
+    }
+    // последовательно, чтобы не долбить Я.Диск/CRM разом
+    for (const id of ids) {
+        await dboLoadElementAssets(id).catch(() => {});
+    }
+}
+
+async function dboLoadElementAssets(elementId) {
+    const key = dboAssetKey(elementId);
+    try {
+        const data = await clientsApi("getElementAssets", {
+            dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num || "")
+        });
+        dboAssets.set(key, { status: "ready", preview: data?.preview || null, layouts: Array.isArray(data?.layouts) ? data.layouts : [] });
+    } catch (e) {
+        const prev = dboAssets.get(key) || {};
+        dboAssets.set(key, { status: "error", preview: prev.preview || null, layouts: prev.layouts || [] });
+    }
+    dboUpdateThumb(elementId);
+    dboRenderEditAssets(elementId);
+}
+
+function dboUpdateThumb(elementId) {
+    const cached = dboAssets.get(dboAssetKey(elementId));
+    document.querySelectorAll(`.dbo-el-thumb[data-el="${elementId}"]`).forEach(thumb => {
+        thumb.classList.remove("has-preview", "is-loading", "is-error", "element-preview-thumb-clickable");
+        thumb.onclick = null;
+        thumb.innerHTML = "";
+        thumb.removeAttribute("title");
+        if (!cached || cached.status === "loading") { thumb.classList.add("is-loading"); return; }
+        const url = cached.preview?.thumbUrl || cached.preview?.url;
+        if (dboIsImageUrl(url)) {
+            thumb.classList.add("has-preview", "element-preview-thumb-clickable");
+            thumb.title = "Открыть превью";
+            const img = document.createElement("img");
+            img.src = url; img.alt = ""; img.referrerPolicy = "no-referrer";
+            thumb.appendChild(img);
+            thumb.onclick = (ev) => { ev.stopPropagation(); dboOpenLightbox(cached.preview.url || url); };
+        } else if (cached.status === "error") {
+            thumb.classList.add("is-error");
+        }
+    });
+}
+
+function dboOpenLightbox(url) {
+    if (!dboIsImageUrl(url)) return;
+    document.querySelectorAll(".preview-lightbox").forEach(el => el.remove());
+    const box = document.createElement("div");
+    box.className = "preview-lightbox";
+    box.innerHTML = `<button type="button" class="preview-lightbox-close" aria-label="Закрыть">&times;</button>
+        <img src="${escapeHtml(url)}" alt="Превью" referrerpolicy="no-referrer">`;
+    const close = () => { box.remove(); document.body.style.overflow = ""; document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    box.addEventListener("click", close);
+    box.querySelector(".preview-lightbox-close").addEventListener("click", (e) => { e.stopPropagation(); close(); });
+    box.querySelector("img").addEventListener("click", (e) => e.stopPropagation());
+    document.body.appendChild(box);
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+}
+
+// --- Блок «Превью и макеты» в форме редактирования позиции ---
+function dboAssetsEditHtml(elementId) {
+    return `<div class="dbo-assets" id="dboAssets_${elementId}">${dboAssetsInnerHtml(elementId)}</div>`;
+}
+function dboRenderEditAssets(elementId) {
+    const box = document.getElementById(`dboAssets_${elementId}`);
+    if (box) box.innerHTML = dboAssetsInnerHtml(elementId);
+}
+function dboAssetsInnerHtml(elementId) {
+    const cached = dboAssets.get(dboAssetKey(elementId)) || { status: "loading", preview: null, layouts: [] };
+    const busy = dboUploadBusy === elementId;
+    const preview = cached.preview;
+    const purl = preview?.thumbUrl || preview?.url;
+    const previewBox = dboIsImageUrl(purl)
+        ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer" onclick="dboOpenLightbox('${escapeHtml(preview.url || purl)}')" style="cursor:zoom-in">
+           <button type="button" class="dbo-asset-del" title="Удалить превью" onclick="dboDeletePreview(${elementId})">×</button>`
+        : `<span class="dbo-asset-empty">${cached.status === "loading" ? "загрузка…" : "нет превью"}</span>`;
+    const layouts = (cached.layouts || []).map(l => {
+        const icon = l.type === "link" ? "🔗" : "📄";
+        const del = l.isCanDelete !== false
+            ? `<button type="button" class="dbo-asset-del" title="Удалить макет" onclick="dboDeleteLayout(${elementId}, ${Number(l.id)})">×</button>` : "";
+        return `<div class="dbo-layout-item"><a href="${escapeHtml(l.url || "#")}" target="_blank" rel="noopener">${icon} ${escapeHtml(l.name || l.file_name || "файл")}</a>${del}</div>`;
+    }).join("") || `<div class="dbo-asset-empty">макетов нет</div>`;
+    return `
+        <div class="dbo-assets-row">
+            <div class="dbo-preview-box">${previewBox}</div>
+            <div class="dbo-layouts-col">
+                <div class="dbo-assets-title">Макеты</div>
+                <div class="dbo-layouts-list">${layouts}</div>
+                <div class="dbo-layout-add">
+                    <input type="url" id="dboLinkInput_${elementId}" placeholder="Ссылка на макет" class="dbo-edit-wide">
+                    <button type="button" class="dbo-btn" onclick="dboAddLayoutLink(${elementId})">+ ссылка</button>
+                    <label class="dbo-btn">📎 файл<input type="file" hidden multiple onchange="dboUploadLayout(${elementId}, this)"></label>
+                    <label class="dbo-btn">🖼 превью<input type="file" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)"></label>
+                </div>
+                ${busy ? `<div class="dbo-asset-progress">${escapeHtml(dboUploadLabel || "Загрузка…")}</div>` : ""}
+            </div>
+        </div>`;
+}
+
+let dboUploadBusy = null;    // elementId, пока идёт загрузка
+let dboUploadLabel = "";
+function dboSetBusy(elementId, label) { dboUploadBusy = elementId; dboUploadLabel = label || ""; dboRenderEditAssets(elementId); }
+function dboClearBusy(elementId) { dboUploadBusy = null; dboUploadLabel = ""; dboRenderEditAssets(elementId); }
+
+async function dboUploadPreview(elementId, input) {
+    const file = input?.files?.[0];
+    if (input) input.value = "";
+    if (!file) return;
+    if (!dboAssetsDeal.num) { alert("У сделки нет номера — загрузка на Я.Диск недоступна."); return; }
+    dboSetBusy(elementId, "Подготовка превью…");
+    try {
+        let up = file;
+        if (typeof compressPreviewImage === "function") { try { up = await compressPreviewImage(file); } catch (_) {} }
+        dboSetBusy(elementId, "Регистрация превью…");
+        const prep = await clientsApi("uploadElementPreview", {
+            dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num),
+            fileName: up.name || "preview.jpg", mimeType: up.type || "image/jpeg"
+        });
+        if (!prep?.uploadUrl) throw new Error("нет uploadUrl");
+        dboSetBusy(elementId, "Загрузка на Я.Диск…");
+        await uploadFileToYandexUrl(prep.uploadUrl, up, up.type || "image/jpeg");
+        dboSetBusy(elementId, "Сохранение…");
+        const data = await clientsApi("uploadElementPreview", {
+            dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num), uploadComplete: true
+        });
+        dboApplyAssets(elementId, data);
+    } catch (e) {
+        console.error("dboUploadPreview", e);
+        alert("Не удалось загрузить превью.");
+    } finally { dboClearBusy(elementId); dboUpdateThumb(elementId); }
+}
+
+async function dboUploadLayout(elementId, input) {
+    const files = [...(input?.files || [])];
+    if (input) input.value = "";
+    if (!files.length) return;
+    if (!dboAssetsDeal.num) { alert("У сделки нет номера — загрузка на Я.Диск недоступна."); return; }
+    dboSetBusy(elementId, "Загрузка макетов…");
+    try {
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const pfx = files.length > 1 ? `(${i + 1}/${files.length}) ` : "";
+            dboSetBusy(elementId, `${pfx}Регистрация…`);
+            const prep = await clientsApi("addElementLayout", {
+                dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num),
+                type: "file", fileName: file.name || "layout", mimeType: file.type || "application/octet-stream"
+            });
+            if (!prep?.uploadUrl) throw new Error("нет uploadUrl");
+            dboSetBusy(elementId, `${pfx}Загрузка на Я.Диск…`);
+            await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream");
+            dboSetBusy(elementId, `${pfx}Сохранение…`);
+            const data = await clientsApi("addElementLayout", {
+                dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num),
+                type: "file", uploadComplete: true
+            });
+            dboApplyAssets(elementId, data);
+        }
+    } catch (e) {
+        console.error("dboUploadLayout", e);
+        alert("Не удалось загрузить макет.");
+    } finally { dboClearBusy(elementId); }
+}
+
+async function dboAddLayoutLink(elementId) {
+    const inp = document.getElementById(`dboLinkInput_${elementId}`);
+    const url = String(inp?.value || "").trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) { alert("Ссылка должна начинаться с http:// или https://"); return; }
+    dboSetBusy(elementId, "Добавление ссылки…");
+    try {
+        const data = await clientsApi("addElementLayout", {
+            dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num || ""), type: "link", url
+        });
+        dboApplyAssets(elementId, data);
+    } catch (e) {
+        console.error("dboAddLayoutLink", e);
+        alert("Не удалось добавить ссылку на макет.");
+    } finally { dboClearBusy(elementId); }
+}
+
+async function dboDeletePreview(elementId) {
+    if (!confirm("Удалить превью позиции?")) return;
+    dboSetBusy(elementId, "Удаление превью…");
+    try {
+        const data = await clientsApi("deleteElementPreview", {
+            dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num || "")
+        });
+        dboApplyAssets(elementId, data);
+    } catch (e) {
+        console.error("dboDeletePreview", e);
+        alert("Не удалось удалить превью.");
+    } finally { dboClearBusy(elementId); dboUpdateThumb(elementId); }
+}
+
+async function dboDeleteLayout(elementId, layoutId) {
+    if (!confirm("Удалить макет?")) return;
+    dboSetBusy(elementId, "Удаление макета…");
+    try {
+        const data = await clientsApi("deleteElementLayout", {
+            dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), layoutId: Number(layoutId), dealNum: String(dboAssetsDeal.num || "")
+        });
+        dboApplyAssets(elementId, data);
+    } catch (e) {
+        console.error("dboDeleteLayout", e);
+        alert("Не удалось удалить макет.");
+    } finally { dboClearBusy(elementId); }
+}
+
+function dboApplyAssets(elementId, data) {
+    const key = dboAssetKey(elementId);
+    const prev = dboAssets.get(key) || {};
+    dboAssets.set(key, {
+        status: "ready",
+        preview: data?.preview !== undefined ? data.preview : prev.preview || null,
+        layouts: Array.isArray(data?.layouts) ? data.layouts : (prev.layouts || [])
+    });
+    dboUpdateThumb(elementId);
+    dboRenderEditAssets(elementId);
+}
+
+// --- Настройки интеграции Яндекс.Диск ---
+async function dboOpenYandexSettings() {
+    if (!ensureActiveSession()) return;
+    let status = { yandexConfigured: false, previewDir: "", layoutsDir: "" };
+    try { status = await clientsApi("getIntegrations", {}); } catch (_) {}
+    const ov = document.createElement("div");
+    ov.id = "dboYaOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) document.getElementById('dboYaOverlay')?.remove()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit dbo-pay-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head"><h3>Интеграция с Яндекс.Диском</h3>
+                <button class="dbo-close" onclick="document.getElementById('dboYaOverlay')?.remove()">×</button></div>
+            <div class="dbo-edit-body">
+                <p class="dbo-ya-note">Макеты и превью хранятся на Яндекс.Диске в одном экземпляре
+                (<code>${escapeHtml(status.layoutsDir || "/printoffice24/layouts")}</code>,
+                <code>${escapeHtml(status.previewDir || "/printoffice24/preview")}</code>) и зеркалятся в PrintOffice.
+                Нужен OAuth-токен того же аккаунта Яндекс.Диска, к которому подключён PrintOffice.</p>
+                <div class="dbo-ya-status">Статус: <b class="${status.yandexConfigured ? "payment-ok" : "payment-alert"}">${status.yandexConfigured ? "подключено" : "не настроено"}</b></div>
+                <label class="dbo-edit-wide">OAuth-токен Яндекс.Диска
+                    <input type="password" id="dboYaToken" placeholder="${status.yandexConfigured ? "•••••• (задан) — введите новый, чтобы заменить" : "вставьте токен"}" autocomplete="off">
+                </label>
+                <p class="dbo-ya-hint">Токен хранится на сервере и не показывается обратно. Получить: <a href="https://yandex.ru/dev/disk/poligon/" target="_blank" rel="noopener">yandex.ru/dev/disk</a>.</p>
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" onclick="dboSaveYandexToken()">Сохранить</button>
+                ${status.yandexConfigured ? `<button class="dbo-btn dbo-btn-danger" onclick="dboSaveYandexToken(true)">Отключить</button>` : ""}
+                <button class="dbo-btn" onclick="document.getElementById('dboYaOverlay')?.remove()">Закрыть</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    setTimeout(() => document.getElementById("dboYaToken")?.focus(), 0);
+}
+async function dboSaveYandexToken(clear = false) {
+    const token = clear ? "" : String(document.getElementById("dboYaToken")?.value || "").trim();
+    if (!clear && !token) { alert("Введите токен."); return; }
+    try {
+        await clientsApi("setYandexToken", { token });
+        document.getElementById("dboYaOverlay")?.remove();
+        if (typeof showReadinessToast === "function") showReadinessToast(clear ? "Интеграция отключена" : "Токен сохранён");
+    } catch (e) {
+        console.error("dboSaveYandexToken", e);
+        alert("Не удалось сохранить токен.");
     }
 }
