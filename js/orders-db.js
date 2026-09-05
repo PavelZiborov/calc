@@ -1019,6 +1019,35 @@ function dbElAfLine(e) {
     if (!af.length) return "";
     return `<div class="dbo-el-meta">${af.map(f => `${escapeHtml(f.name)}: <b>${dbAfValueHtml(f.value)}</b>`).join(" · ")}</div>`;
 }
+// История оплат сделки.
+function dbPaymentsBlock(payments) {
+    const list = Array.isArray(payments) ? payments : [];
+    if (!list.length) {
+        return `<div class="dbo-section">
+            <div class="dbo-section-title">История оплат</div>
+            <div class="dbo-pay-empty">Оплат пока нет.</div>
+        </div>`;
+    }
+    const rows = list.map(p => {
+        const rollback = p.is_billing === false || (p.rollback_pay_id != null && Number(p.rollback_pay_id) > 0);
+        const amt = Number(p.amount) || 0;
+        return `<div class="dbo-pay-row${rollback ? " is-rollback" : ""}">
+            <span class="dbo-pay-date">${escapeHtml(p.date_crm || "")}</span>
+            <span class="dbo-pay-amount">${money2(amt)} ₽</span>
+            <span class="dbo-pay-method">${escapeHtml(p.method_name || "—")}</span>
+            <span class="dbo-pay-user">${escapeHtml(p.user_name || "")}</span>
+            <span class="dbo-pay-comment">${escapeHtml(p.comment || "")}${rollback ? ' <span class="dbo-pay-tag">отмена</span>' : ""}</span>
+        </div>`;
+    }).join("");
+    return `<div class="dbo-section">
+        <div class="dbo-section-title">История оплат <span class="dbo-pay-count">(${list.length})</span></div>
+        <div class="dbo-pay-table">
+            <div class="dbo-pay-head"><span>Дата</span><span>Сумма</span><span>Метод</span><span>Менеджер</span><span>Комментарий</span></div>
+            ${rows}
+        </div>
+    </div>`;
+}
+
 // Строка элемента: СТАТУС(кружок) · НАЗВАНИЕ(+доп-инфо) · КОЛ-ВО · СЕБЕС. · СУММА.
 function dbElementRow(e) {
     const qty = Number(e.quantity) || 0;
@@ -1107,6 +1136,7 @@ function renderDbDealCard(data, crmId) {
                         <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
                     </div>
                 </div>
+                ${dbPaymentsBlock(data?.payments)}
                 ${dealAfBlock}
                 ${costBlock}
             </div>

@@ -446,6 +446,21 @@
     .dbo-invoice { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); }
     .dbo-invoice a { color: var(--accent); font-weight: 600; text-decoration: none; }
     .dbo-invoice a:hover { text-decoration: underline; }
+    /* История оплат */
+    .dbo-pay-count { color: var(--text-muted); font-weight: 500; }
+    .dbo-pay-empty { padding: 12px 14px; font-size: 13px; color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+    .dbo-pay-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .dbo-pay-head, .dbo-pay-row { display: grid; grid-template-columns: 116px 96px 110px 120px minmax(0,1fr); gap: 10px; align-items: center; padding: 8px 12px; }
+    .dbo-pay-head { background: var(--surface-2); font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+    .dbo-pay-head span:nth-child(2) { text-align: right; }
+    .dbo-pay-row { font-size: 13px; color: var(--text); border-top: 1px solid var(--border); }
+    .dbo-pay-date { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .dbo-pay-amount { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--success, #15803D); white-space: nowrap; }
+    .dbo-pay-method, .dbo-pay-user { color: var(--text-2, var(--text)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-pay-comment { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+    .dbo-pay-row.is-rollback { background: #fdf3f3; }
+    .dbo-pay-row.is-rollback .dbo-pay-amount { color: var(--danger); }
+    .dbo-pay-tag { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 4px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; }
 
     /* ---- Заказы БД: канбан ---- */
     .dbk-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
