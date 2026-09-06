@@ -587,6 +587,39 @@
     .adv-filters-popover-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
     .adv-filters-btn.has-active { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
 
+    /* ---- Заказы БД: инлайн-фильтры (десктоп) → одна кнопка (мобилка) ---- */
+    .db-filters { position: relative; display: inline-flex; align-items: center; }
+    .db-filters .db-filters-toggle { display: none; }
+    .db-filters-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .db-filter-select { margin: 0; width: auto; max-width: 190px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); font-size: 13px; color: var(--text); cursor: pointer; }
+    .db-filter-dd { position: relative; }
+    .db-filter-dd-btn { margin: 0; width: auto; padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; white-space: nowrap; }
+    .db-filter-dd-btn::after { content: "▾"; margin-left: 6px; font-size: 10px; color: var(--text-muted); }
+    .db-filter-dd-btn:hover { background: var(--surface-2); }
+    .db-filter-dd-btn.is-active { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
+    .db-filter-dd-btn.is-active::after { color: rgba(255,255,255,0.85); }
+    .db-filter-dd-panel { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: var(--z-dropdown, 1200); min-width: 220px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.16); }
+    .db-filter-dd.open .db-filter-dd-panel { display: block; }
+    .db-period-panel { min-width: 240px; }
+    .db-period-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .db-period-presets button { margin: 0; width: auto; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); font-size: 12px; cursor: pointer; }
+    .db-period-presets button:hover { background: var(--accent-tint); color: var(--accent-strong); }
+    .db-period-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--text-muted); margin: 6px 0; }
+    .db-period-field input { width: auto; margin: 0; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+    .db-period-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .db-period-actions .dbk-btn { padding: 6px 12px; }
+    .db-filter-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+    .db-filter-check input { width: auto; margin: 0; }
+
+    @media (max-width: 900px) {
+        .db-filters .db-filters-toggle { display: inline-flex; }
+        .db-filters-bar { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: var(--z-dropdown, 1200); flex-direction: column; align-items: stretch; gap: 10px; width: min(280px, 88vw); padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 14px 32px rgba(0,0,0,0.18); }
+        .db-filters.open .db-filters-bar { display: flex; }
+        .db-filter-select { max-width: none; }
+        .db-filter-dd, .db-filter-dd-btn { width: 100%; }
+        .db-filter-dd-panel { position: static; box-shadow: none; border: none; padding: 6px 0 0; min-width: 0; }
+    }
+
     /* Канбан тянется по высоте окна (высота доски задаётся JS с учётом zoom);
        столбики равной высоты, стретчатся; тело столбика скроллится внутри. */
     .dbk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px; align-items: stretch; min-height: 320px; }

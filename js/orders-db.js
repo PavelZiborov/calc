@@ -13,7 +13,8 @@ const dbOrdersState = {
     view: "list"      // list | kanban
 };
 try { const v = localStorage.getItem("dbOrdersView"); if (v === "list" || v === "kanban") dbOrdersState.view = v; } catch (_) {}
-dbOrdersState.filters = { statuses: new Set(), debtOnly: false };
+dbOrdersState.filters = { statuses: new Set(), debtOnly: false, employee: "", dateFrom: "", dateTo: "" };
+dbOrdersState.employees = [];
 dbOrdersState.page = 1;
 dbOrdersState.perPage = 100;
 dbOrdersState.total = 0;
@@ -35,6 +36,11 @@ function dbGetColOrder() {
 
 let dbDealsSearchTimer = null;
 
+// Дата сделки "dd-mm-yyyy" → Date (для клиентской фильтрации канбана по периоду).
+function dbParseCrmDate(s) {
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(s || "").trim());
+    return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+}
 // Клиентская фильтрация канбана (открытые сделки уже ограничены сервером).
 function getDbKanbanFiltered() {
     let list = dbOrdersState.kanbanDeals || [];
@@ -43,11 +49,23 @@ function getDbKanbanFiltered() {
     if (q) list = list.filter(d => (`${d.num || ""} ${d.client_name || ""} ${d.content || ""}`).toLowerCase().includes(q));
     if (f.statuses && f.statuses.size) list = list.filter(d => f.statuses.has(Number(d.status_id)));
     if (f.debtOnly) list = list.filter(d => (Number(d.debt) || 0) > 0.009);
+    if (f.employee) list = list.filter(d => String(d.employee_name || "") === f.employee);
+    if (f.dateFrom || f.dateTo) {
+        const from = f.dateFrom ? new Date(f.dateFrom) : null;
+        const to = f.dateTo ? new Date(f.dateTo) : null;
+        list = list.filter(d => {
+            const dt = dbParseCrmDate(d.created_at_crm);
+            if (!dt) return false;
+            if (from && dt < from) return false;
+            if (to && dt > to) return false;
+            return true;
+        });
+    }
     return list;
 }
 function dbFiltersActive() {
     const f = dbOrdersState.filters;
-    return (f.statuses && f.statuses.size > 0) || f.debtOnly;
+    return (f.statuses && f.statuses.size > 0) || f.debtOnly || !!f.employee || !!f.dateFrom || !!f.dateTo;
 }
 function updateDbSearchClearBtn() {
     const btn = document.getElementById("dbkSearchClearBtn");
@@ -66,28 +84,43 @@ function dbApplyQueryOrFilters() {
     if (dbOrdersState.view === "kanban") { renderDbKanban(); }
     else { dbOrdersState.page = 1; loadDbList(); }
 }
-// Кнопка фильтров — открыть/закрыть, наполнить статусы.
+// Мобильная кнопка «Фильтры»: показать/спрятать всю панель фильтров.
 function toggleDbFilters(e) {
     if (e) e.stopPropagation();
     const wrap = document.getElementById("dbFiltersWrap");
     if (!wrap) return;
-    const open = wrap.classList.toggle("open");   // CSS: .adv-filters-popover-wrap.open .adv-filters-popover
+    const open = wrap.classList.toggle("open");
     const btn = document.getElementById("dbFiltersBtn");
     if (btn) btn.setAttribute("aria-expanded", String(open));
-    if (open) {
-        renderDbFilterStatuses();
-        setTimeout(() => document.addEventListener("click", dbFiltersOutside), 0);
-    } else {
-        document.removeEventListener("click", dbFiltersOutside);
-    }
+    if (open) setTimeout(() => document.addEventListener("click", dbFiltersOutside), 0);
+    else { dbCloseDds(); document.removeEventListener("click", dbFiltersOutside); }
 }
 function dbFiltersOutside(e) {
     const wrap = document.getElementById("dbFiltersWrap");
     if (wrap && !wrap.contains(e.target)) {
         wrap.classList.remove("open");
+        dbCloseDds();
         document.removeEventListener("click", dbFiltersOutside);
     }
 }
+// Выпадающие фильтры (Статус / Период): открыть один, закрыть остальные.
+function dbCloseDds() { document.querySelectorAll("#dbFiltersBar .db-filter-dd.open").forEach(el => el.classList.remove("open")); }
+function dbToggleDd(e, which) {
+    if (e) e.stopPropagation();
+    const dd = document.querySelector(`#dbFiltersBar .db-filter-dd[data-dd="${which}"]`);
+    if (!dd) return;
+    const willOpen = !dd.classList.contains("open");
+    dbCloseDds();
+    if (willOpen) {
+        dd.classList.add("open");
+        setTimeout(() => document.addEventListener("click", dbDdOutside), 0);
+    }
+}
+function dbDdOutside(e) {
+    if (!e.target.closest(".db-filter-dd")) { dbCloseDds(); document.removeEventListener("click", dbDdOutside); }
+}
+// Наполнение фильтров (статусы + сотрудники) — вызывается после загрузки данных.
+function renderDbFilters() { renderDbFilterStatuses(); renderDbFilterEmployees(); dbUpdateFilterLabels(); updateDbFiltersBtn(); }
 function renderDbFilterStatuses() {
     const host = document.getElementById("dbFilterStatusList");
     if (!host) return;
@@ -96,26 +129,84 @@ function renderDbFilterStatuses() {
         `<label class="dbk-filter-status"><input type="checkbox" value="${s.id}"${sel.has(Number(s.id)) ? " checked" : ""} onchange="applyDbFilters()"><span class="dbk-filter-dot" style="background:${escapeHtml(s.bk_color || "#dfdfdf")}"></span>${escapeHtml(s.name)}</label>`).join("");
     host.innerHTML = items || `<div class="dbk-filter-empty">Нет статусов</div>`;
 }
+function renderDbFilterEmployees() {
+    const sel = document.getElementById("dbFilterEmployee");
+    if (!sel) return;
+    const cur = dbOrdersState.filters.employee || "";
+    const opts = ['<option value="">Все сотрудники</option>']
+        .concat((dbOrdersState.employees || []).map(n => `<option value="${escapeHtml(n)}"${n === cur ? " selected" : ""}>${escapeHtml(n)}</option>`));
+    sel.innerHTML = opts.join("");
+    sel.value = cur;
+}
+function dbUpdateFilterLabels() {
+    const f = dbOrdersState.filters;
+    const sBtn = document.getElementById("dbStatusDdBtn");
+    if (sBtn) sBtn.textContent = f.statuses && f.statuses.size ? `Статус · ${f.statuses.size}` : "Статус";
+    if (sBtn) sBtn.classList.toggle("is-active", !!(f.statuses && f.statuses.size));
+    const pBtn = document.getElementById("dbPeriodBtn");
+    if (pBtn) {
+        const fmt = iso => { const [y, m, d] = iso.split("-"); return `${d}.${m}.${y.slice(2)}`; };
+        pBtn.textContent = (f.dateFrom || f.dateTo)
+            ? `${f.dateFrom ? fmt(f.dateFrom) : "…"}–${f.dateTo ? fmt(f.dateTo) : "…"}` : "Период";
+        pBtn.classList.toggle("is-active", !!(f.dateFrom || f.dateTo));
+    }
+}
 function applyDbFilters() {
     const sel = new Set();
     document.querySelectorAll("#dbFilterStatusList input[type=checkbox]:checked").forEach(c => sel.add(Number(c.value)));
     const debt = document.getElementById("dbFilterDebtOnly");
+    const emp = document.getElementById("dbFilterEmployee");
     dbOrdersState.filters.statuses = sel;
     dbOrdersState.filters.debtOnly = !!(debt && debt.checked);
+    dbOrdersState.filters.employee = emp ? String(emp.value || "") : "";
+    dbUpdateFilterLabels();
     updateDbFiltersBtn();
     dbApplyQueryOrFilters();
 }
+// Период: пресеты + ручной ввод дат.
+function dbSetPeriodPreset(kind) {
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const today = new Date();
+    let from = null, to = today;
+    if (kind === "today") from = today;
+    else if (kind === "7") { from = new Date(); from.setDate(from.getDate() - 6); }
+    else if (kind === "30") { from = new Date(); from.setDate(from.getDate() - 29); }
+    else if (kind === "month") from = new Date(today.getFullYear(), today.getMonth(), 1);
+    const f = document.getElementById("dbFilterDateFrom");
+    const t = document.getElementById("dbFilterDateTo");
+    if (f) f.value = from ? iso(from) : "";
+    if (t) t.value = to ? iso(to) : "";
+    dbApplyPeriod();
+}
+function dbApplyPeriod() {
+    const f = document.getElementById("dbFilterDateFrom");
+    const t = document.getElementById("dbFilterDateTo");
+    dbOrdersState.filters.dateFrom = f && f.value ? f.value : "";
+    dbOrdersState.filters.dateTo = t && t.value ? t.value : "";
+    dbCloseDds();
+    dbUpdateFilterLabels();
+    updateDbFiltersBtn();
+    dbApplyQueryOrFilters();
+}
+function dbClearPeriod() {
+    const f = document.getElementById("dbFilterDateFrom");
+    const t = document.getElementById("dbFilterDateTo");
+    if (f) f.value = ""; if (t) t.value = "";
+    dbApplyPeriod();
+}
 function resetDbFilters() {
-    dbOrdersState.filters.statuses = new Set();
-    dbOrdersState.filters.debtOnly = false;
+    dbOrdersState.filters = { statuses: new Set(), debtOnly: false, employee: "", dateFrom: "", dateTo: "" };
     const debt = document.getElementById("dbFilterDebtOnly");
     if (debt) debt.checked = false;
+    const df = document.getElementById("dbFilterDateFrom");
+    if (df) df.value = "";
+    const dt = document.getElementById("dbFilterDateTo");
+    if (dt) dt.value = "";
     const inp = document.getElementById("dbkSearchInput");
     if (inp) inp.value = "";
     dbOrdersState.query = "";
     updateDbSearchClearBtn();
-    updateDbFiltersBtn();
-    renderDbFilterStatuses();
+    renderDbFilters();
     dbApplyQueryOrFilters();
 }
 function updateDbFiltersBtn() {
@@ -128,7 +219,7 @@ function openDbOrders(trigger) {
     switchTab("db-orders-tab", trigger || document.querySelector('.tab-btn[data-tab-target="db-orders-tab"]'));
     updateDbViewToggle();
     updateDbSearchClearBtn();
-    updateDbFiltersBtn();
+    renderDbFilters();
     refreshDbSyncStatus();   // показать/возобновить статус фоновой синхронизации элементов
     if (!dbOrdersState.loaded) loadDbDeals();
     else renderDbOrders();
@@ -177,14 +268,19 @@ async function loadDbList() {
             page: dbOrdersState.page,
             perPage: dbOrdersState.perPage,
             statusIds: f.statuses ? [...f.statuses] : [],
-            debtOnly: !!f.debtOnly
+            debtOnly: !!f.debtOnly,
+            employee: f.employee || "",
+            dateFrom: f.dateFrom || "",
+            dateTo: f.dateTo || ""
         });
         dbOrdersState.deals = Array.isArray(data?.deals) ? data.deals : [];
         if (Array.isArray(data?.statuses)) dbOrdersState.statuses = data.statuses;
+        if (Array.isArray(data?.employees)) dbOrdersState.employees = data.employees;
         dbOrdersState.total = Number(data?.total) || 0;
         dbOrdersState.pages = Number(data?.pages) || 1;
         dbOrdersState.page = Number(data?.page) || dbOrdersState.page;
         dbOrdersState.loaded = true;
+        renderDbFilters();
     } catch (e) {
         console.error("loadDbList", e);
         dbOrdersState.deals = [];
@@ -203,7 +299,11 @@ async function loadDbKanban() {
         const data = await clientsApi("listKanbanDeals", {});
         dbOrdersState.kanbanDeals = Array.isArray(data?.deals) ? data.deals : [];
         if (Array.isArray(data?.statuses)) dbOrdersState.statuses = data.statuses;
+        // Список сотрудников для фильтра — из загруженных сделок канбана.
+        const emp = [...new Set(dbOrdersState.kanbanDeals.map(d => String(d.employee_name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru"));
+        if (emp.length) dbOrdersState.employees = emp;
         dbOrdersState.loaded = true;
+        renderDbFilters();
     } catch (e) {
         console.error("loadDbKanban", e);
         dbOrdersState.kanbanDeals = [];

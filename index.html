@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=70">
+<link rel="stylesheet" href="css/app.css?v=71">
 </head>
 <body>
 
@@ -347,24 +347,37 @@
                             <option value="0.5">50%</option>
                         </select>
                     </div>
-                    <div class="adv-filters-popover-wrap" id="dbFiltersWrap">
-                        <button type="button" class="adv-toolbar-icon-btn adv-filters-btn" id="dbFiltersBtn" onclick="toggleDbFilters(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"/></svg></button>
-                        <div class="adv-filters-popover" id="dbFiltersPopover">
-                            <div class="adv-filters-popover-section">
-                                <label class="adv-filter-label">Статус</label>
-                                <div id="dbFilterStatusList" class="dbk-filter-statuses"></div>
+                    <div class="db-filters" id="dbFiltersWrap">
+                        <button type="button" class="adv-toolbar-icon-btn adv-filters-btn db-filters-toggle" id="dbFiltersBtn" onclick="toggleDbFilters(event)" title="Фильтры" aria-label="Фильтры" aria-expanded="false"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"/></svg></button>
+                        <div class="db-filters-bar" id="dbFiltersBar">
+                            <select id="dbFilterEmployee" class="db-filter-select" onchange="applyDbFilters()" aria-label="Сотрудник">
+                                <option value="">Все сотрудники</option>
+                            </select>
+                            <div class="db-filter-dd" data-dd="status">
+                                <button type="button" class="db-filter-dd-btn" id="dbStatusDdBtn" onclick="dbToggleDd(event, 'status')">Статус</button>
+                                <div class="db-filter-dd-panel" id="dbFilterStatusList"></div>
                             </div>
-                            <div class="adv-filters-popover-section">
-                                <label class="adv-pay-filter"><input type="checkbox" id="dbFilterDebtOnly" onchange="applyDbFilters()"><span>Только с долгом</span></label>
+                            <div class="db-filter-dd" data-dd="period">
+                                <button type="button" class="db-filter-dd-btn" id="dbPeriodBtn" onclick="dbToggleDd(event, 'period')">Период</button>
+                                <div class="db-filter-dd-panel db-period-panel">
+                                    <div class="db-period-presets">
+                                        <button type="button" onclick="dbSetPeriodPreset('today')">Сегодня</button>
+                                        <button type="button" onclick="dbSetPeriodPreset('7')">7 дней</button>
+                                        <button type="button" onclick="dbSetPeriodPreset('30')">30 дней</button>
+                                        <button type="button" onclick="dbSetPeriodPreset('month')">Этот месяц</button>
+                                    </div>
+                                    <label class="db-period-field">С<input type="date" id="dbFilterDateFrom"></label>
+                                    <label class="db-period-field">По<input type="date" id="dbFilterDateTo"></label>
+                                    <div class="db-period-actions">
+                                        <button type="button" class="dbk-btn dbk-btn-sync" onclick="dbApplyPeriod()">Применить</button>
+                                        <button type="button" class="dbk-btn" onclick="dbClearPeriod()">Очистить</button>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="adv-filters-popover-actions">
-                                <button type="button" class="adv-filters-reset-btn" onclick="resetDbFilters()">Сбросить</button>
-                            </div>
+                            <label class="db-filter-check"><input type="checkbox" id="dbFilterDebtOnly" onchange="applyDbFilters()"><span>Неоплаченные</span></label>
                         </div>
                     </div>
                     <button type="button" class="adv-toolbar-icon-btn" onclick="resetDbFilters()" title="Сбросить все фильтры" aria-label="Сбросить все фильтры"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></button>
-                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
-                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
                 </div>
             </div>
         </div>
@@ -388,23 +401,31 @@
                 <h3>Интеграция с Яндекс.Диском</h3>
                 <div id="settingsYandexHost"></div>
             </section>
+            <section class="settings-card">
+                <h3>Синхронизация «Заказы БД»</h3>
+                <p class="settings-card-note">Обычно данные приходят автоматически (вебхуки PrintOffice). Ручная синхронизация — на случай расхождений.</p>
+                <div class="settings-actions">
+                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
+                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
+                </div>
+            </section>
         </div>
     </div>
 </div>
 
-<script src="js/config.js?v=70"></script>
-<script src="js/calculator-data.js?v=70"></script>
-<script src="js/calc-settings.js?v=70"></script>
-<script src="js/calc-settings-ui.js?v=70"></script>
-<script src="js/utils.js?v=70"></script>
-<script src="js/auth.js?v=70"></script>
-<script src="js/calculator.js?v=70"></script>
-<script src="js/crm.js?v=70"></script>
-<script src="js/element-editor.js?v=70"></script>
-<script src="js/kp-docx.js?v=70"></script>
-<script src="js/calc-sheet.js?v=70"></script>
-<script src="js/clients.js?v=70"></script>
-<script src="js/orders-db.js?v=70"></script>
-<script src="js/main.js?v=70"></script>
+<script src="js/config.js?v=71"></script>
+<script src="js/calculator-data.js?v=71"></script>
+<script src="js/calc-settings.js?v=71"></script>
+<script src="js/calc-settings-ui.js?v=71"></script>
+<script src="js/utils.js?v=71"></script>
+<script src="js/auth.js?v=71"></script>
+<script src="js/calculator.js?v=71"></script>
+<script src="js/crm.js?v=71"></script>
+<script src="js/element-editor.js?v=71"></script>
+<script src="js/kp-docx.js?v=71"></script>
+<script src="js/calc-sheet.js?v=71"></script>
+<script src="js/clients.js?v=71"></script>
+<script src="js/orders-db.js?v=71"></script>
+<script src="js/main.js?v=71"></script>
 </body>
 </html>
