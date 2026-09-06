@@ -580,10 +580,14 @@
     .dbk-zoom-select { margin: 0; width: auto; border: none; background: transparent; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0 2px; }
     .dbk-zoom-select:focus { outline: none; }
     /* Фильтр-попап: статусы */
-    .dbk-filter-statuses { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
-    .dbk-filter-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; padding: 3px 2px; }
-    .dbk-filter-status input { width: auto; margin: 0; flex: 0 0 auto; }
-    .dbk-filter-dot { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+    .dbk-filter-statuses { display: flex; flex-direction: column; gap: 2px; max-height: 240px; overflow-y: auto; }
+    /* Компактный список статусов (по аналогии со статусами заказа): сбрасываем
+       глобальные label-стили (uppercase, margin-top, letter-spacing). */
+    .dbk-filter-status { display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 7px; border-radius: 6px; font-size: 12.5px; font-weight: 500; letter-spacing: normal; text-transform: none; line-height: 1.2; color: var(--text); cursor: pointer; }
+    .dbk-filter-status:hover { background: var(--surface-2); }
+    .dbk-filter-status input { width: 15px; height: 15px; margin: 0; flex: 0 0 auto; }
+    .dbk-filter-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+    #dbFilterStatusList { max-height: 340px; overflow-y: auto; }
     .dbk-filter-empty { font-size: 13px; color: var(--text-muted); }
     .adv-filters-popover-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
     .adv-filters-btn.has-active { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
@@ -624,7 +628,7 @@
     .db-filter-check:has(input:checked)::before { background: #fff; border-color: #fff; }
     .db-filter-check:has(input:checked)::after { border-color: var(--accent-container); }
     /* Ряд «Все открытые сделки» — вверху списка статусов, с отделителем */
-    .dbk-filter-open { font-weight: 700; padding-bottom: 7px; margin-bottom: 5px; border-bottom: 1px solid var(--border); }
+    .dbk-filter-open { font-weight: 600; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); border-radius: 0; }
     .dbk-filter-dot--open { background: transparent; border: 2px solid var(--accent); }
 
     @media (max-width: 900px) {
