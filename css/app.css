@@ -89,7 +89,7 @@
         z-index: 1100;
         display: flex;
         flex-direction: column;
-        width: 100%;
+        width: calc(100% + 40px);   /* full-bleed: тянем в оба поля body (padding 20px) */
         margin: -20px -20px 20px;
         padding: 0;
         background: var(--surface);
@@ -574,11 +574,11 @@
     .dbk-page:disabled { opacity: 0.4; cursor: default; }
     .dbk-page-ell { padding: 0 4px; color: var(--text-muted); }
     /* Масштаб канбана */
-    .dbk-zoom-wrap { display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; height: 36px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); }
-    .dbk-zoom-btn { margin: 0; width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px; background: transparent; color: var(--text); font-size: 18px; line-height: 1; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .dbk-zoom-wrap { display: inline-flex; align-items: center; gap: 2px; padding: 0 3px; height: 34px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); }
+    .dbk-zoom-btn { margin: 0; width: 24px; height: 24px; padding: 0; border: none; border-radius: 6px; background: transparent; color: var(--text); font-size: 17px; line-height: 1; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
     .dbk-zoom-btn:hover:not(:disabled) { background: var(--surface-2); }
     .dbk-zoom-btn:disabled { opacity: 0.35; cursor: default; }
-    .dbk-zoom-label { min-width: 40px; text-align: center; font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .dbk-zoom-label { min-width: 36px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
     /* Фильтр-попап: статусы */
     .dbk-filter-statuses { display: flex; flex-direction: column; gap: 2px; max-height: 240px; overflow-y: auto; }
     /* Компактный список статусов (по аналогии со статусами заказа): сбрасываем
@@ -598,13 +598,13 @@
     .db-filters-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     /* Единый вид всех контролов фильтра: высота, шрифт, рамка, радиус. */
     .db-filter-select, .db-filter-dd-btn, .db-filter-check {
-        margin: 0; height: 36px; box-sizing: border-box; display: inline-flex; align-items: center;
-        padding: 0 12px; border: 1px solid var(--border); border-radius: var(--r-sm);
-        background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px;
+        margin: 0; height: 34px; box-sizing: border-box; display: inline-flex; align-items: center;
+        padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-sm);
+        background: var(--surface); color: var(--text); font-family: inherit; font-size: 12.5px;
         font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
     }
     .db-filter-select:hover, .db-filter-dd-btn:hover, .db-filter-check:hover { background: var(--surface-2); }
-    .db-filter-select { width: auto; max-width: 190px; padding-right: 8px; }
+    .db-filter-select { width: auto; max-width: 170px; padding-right: 6px; }
     .db-filter-dd { position: relative; }
     .db-filter-dd-btn::after { content: "▾"; margin-left: 6px; font-size: 10px; color: var(--text-muted); }
     .db-filter-dd-btn.is-active { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
@@ -620,10 +620,10 @@
     .db-period-actions { display: flex; gap: 8px; margin-top: 10px; }
     .db-period-actions .dbk-btn { padding: 6px 12px; }
     /* «Неоплаченные» — чип-переключатель в едином стиле, с аккуратной галочкой */
-    .db-filter-check { position: relative; padding: 0 12px 0 32px; text-transform: none; user-select: none; }
+    .db-filter-check { position: relative; padding: 0 10px 0 28px; text-transform: none; user-select: none; }
     .db-filter-check input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
-    .db-filter-check::before { content: ""; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; border: 1.5px solid var(--border); border-radius: 4px; background: var(--surface); box-sizing: border-box; }
-    .db-filter-check::after { content: ""; position: absolute; left: 16px; top: 50%; width: 4px; height: 8px; border: solid transparent; border-width: 0 2px 2px 0; transform: translateY(-62%) rotate(45deg); }
+    .db-filter-check::before { content: ""; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; border: 1.5px solid var(--border); border-radius: 4px; background: var(--surface); box-sizing: border-box; }
+    .db-filter-check::after { content: ""; position: absolute; left: 13.5px; top: 50%; width: 4px; height: 8px; border: solid transparent; border-width: 0 2px 2px 0; transform: translateY(-62%) rotate(45deg); }
     .db-filter-check:has(input:checked) { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
     .db-filter-check:has(input:checked)::before { background: #fff; border-color: #fff; }
     .db-filter-check:has(input:checked)::after { border-color: var(--accent-container); }
