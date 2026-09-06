@@ -377,8 +377,8 @@ function renderDbPager() {
 
 // Масштаб канбана (100..50%), сохраняется в localStorage.
 function setDbZoom(v) {
-    let z = parseFloat(v);
-    if (!(z >= 0.5 && z <= 1)) z = 1;
+    let z = Math.round(parseFloat(v) * 10) / 10;
+    if (!(z >= 0.5 && z <= 1)) z = Math.min(1, Math.max(0.5, z || 1));
     dbOrdersState.kanbanZoom = z;
     try { localStorage.setItem("dbKanbanZoom", String(z)); } catch (_) {}
     const board = document.querySelector("#dbOrdersBody .dbk-board");
@@ -386,9 +386,19 @@ function setDbZoom(v) {
     applyDbKanbanHeight();
     updateDbZoomUI();
 }
+// Шаг масштаба кнопками −/+ (50%…100%, шаг 10%).
+function dbZoomStep(dir) {
+    const z = (dbOrdersState.kanbanZoom || 1) + (dir > 0 ? 0.1 : -0.1);
+    setDbZoom(z);
+}
 function updateDbZoomUI() {
-    const sel = document.getElementById("dbZoomSelect");
-    if (sel) sel.value = String(dbOrdersState.kanbanZoom || 1);
+    const z = dbOrdersState.kanbanZoom || 1;
+    const lbl = document.getElementById("dbZoomLabel");
+    if (lbl) lbl.textContent = Math.round(z * 100) + "%";
+    document.querySelectorAll("#dbZoomWrap .dbk-zoom-btn").forEach(b => {
+        const inc = /увеличить/i.test(b.getAttribute("aria-label") || "");
+        b.disabled = inc ? z >= 1 - 1e-9 : z <= 0.5 + 1e-9;
+    });
 }
 // Пересчёт высоты канбана при ресайзе окна.
 window.addEventListener("resize", () => {
@@ -433,20 +443,34 @@ function dbColHeadStyle(c) {
     return ` style="background:${escapeHtml(c.bk_color)};color:${fg}"`;
 }
 
+// Краткое описание для карточки канбана: начальные слова каждого элемента.
+function dbCardSummary(content, wordsPerEl = 3) {
+    const parts = String(content || "").split(/\n|;\s|·/).map(s => s.trim()).filter(Boolean);
+    return parts.map(p => {
+        const words = p.split(/\s+/).filter(Boolean).slice(0, wordsPerEl).join(" ");
+        return p.split(/\s+/).length > wordsPerEl ? words + "…" : words;
+    }).join(", ");
+}
+// Цвет суммы по оплате: зелёный — нет долга, оранжевый — частичная оплата, красный — не оплачено.
+function dbAmountPayClass(d) {
+    const amount = Number(d.amount) || 0;
+    const debt = Number(d.debt) || 0;
+    const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
+    if (debt <= 0.009) return "dbk-amt-paid";
+    if (paid > 0.009) return "dbk-amt-partial";
+    return "dbk-amt-debt";
+}
 function dbDealCardHtml(d) {
     const num = escapeHtml(String(d.num ?? d.crm_deal_id ?? ""));
-    const els = Number(d.elements_count) || 0;
-    const debt = Number(d.debt) || 0;
-    const debtBadge = debt > 0.009 ? `<span class="dbk-card-debt">долг ${money(debt)} ₽</span>` : "";
+    const summary = dbCardSummary(d.content);
     return `
         <div class="dbk-card" draggable="true" ondragstart="dbDragStart(event, ${d.crm_deal_id})" ondragend="dbDragEnd(event)" onclick="openDbDealCard(${d.crm_deal_id})" title="Перетащите в колонку, чтобы сменить статус; клик — открыть">
             <div class="dbk-card-top">
                 <span class="dbk-card-num">№ ${num}</span>
-                <span class="dbk-card-amount">${money(d.amount)} ₽</span>
+                <span class="dbk-card-amount ${dbAmountPayClass(d)}">${money(d.amount)} ₽</span>
             </div>
             <div class="dbk-card-client">${escapeHtml(d.client_name || "—")}</div>
-            ${d.content ? `<div class="dbk-card-content">${escapeHtml(d.content)}</div>` : ""}
-            <div class="dbk-card-meta">${els ? `<span>${els} элем.</span>` : "<span></span>"}${debtBadge}</div>
+            ${summary ? `<div class="dbk-card-content">${escapeHtml(summary)}</div>` : ""}
         </div>`;
 }
 
@@ -482,6 +506,32 @@ function renderDbKanban() {
             <div class="dbk-col-body">${c.deals.map(dbDealCardHtml).join("")}</div>
         </div>`).join("")}</div>`;
     applyDbKanbanHeight();
+    dbSetupBoardPan(document.querySelector("#dbOrdersBody .dbk-board"));
+}
+
+// Панорамирование доски мышью (замена горизонтальному скроллбару):
+// зажать в пустой области/промежутке и тянуть в стороны. Карточки/заголовки — свой drag.
+function dbSetupBoardPan(board) {
+    if (!board || board.dataset.panBound === "1") return;
+    board.dataset.panBound = "1";
+    let panning = false, startX = 0, startScroll = 0;
+    board.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest(".dbk-card, .dbk-col-head, button, a, input, select, textarea")) return;
+        panning = true;
+        startX = e.clientX;
+        startScroll = board.scrollLeft;
+        board.classList.add("dbk-board--panning");
+        e.preventDefault();
+    });
+    window.addEventListener("mousemove", (e) => {
+        if (!panning) return;
+        const dx = (e.clientX - startX) / (dbOrdersState.kanbanZoom || 1);
+        board.scrollLeft = startScroll - dx;
+    });
+    const stop = () => { if (panning) { panning = false; board.classList.remove("dbk-board--panning"); } };
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("mouseleave", stop);
 }
 
 // Высота канбана: тянем доску до низа экрана (учитываем zoom, т.к. он масштабирует высоту).

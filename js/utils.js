@@ -36,6 +36,8 @@ function switchTab(id, trigger = null) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     target.classList.add('active');
+    // Полноэкранный режим канбана (блокировка скролла страницы) — только на вкладке «Заказы БД».
+    if (id !== "db-orders-tab") document.body.classList.remove("db-kanban-active");
 
     const activeBtn = trigger
         || (typeof event !== "undefined" ? event.currentTarget : null)
