@@ -524,6 +524,30 @@
     /* История оплат — без серой плашки */
     .dbo-pay-section { background: transparent; }
 
+    /* Информация о связанных счетах */
+    .dbo-invoice-card { padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); display: flex; flex-direction: column; gap: 9px; }
+    .dbo-inv-row { display: flex; align-items: baseline; gap: 12px; }
+    .dbo-inv-label { flex: 0 0 150px; color: var(--text-muted); font-size: 13px; }
+    .dbo-inv-value { min-width: 0; word-break: break-word; }
+    .dbo-inv-edit { border-bottom: 1px dashed var(--border); cursor: text; padding: 0 2px; font-weight: 600; }
+    .dbo-inv-edit:hover { background: var(--accent-tint); border-bottom-color: var(--accent); }
+    .dbo-inv-empty { color: var(--text-muted); font-weight: 400; }
+    .dbo-inv-input { margin: 0; width: 130px; max-width: 100%; padding: 2px 6px; border: 1px solid var(--accent); border-radius: 5px; font-size: 14px; font-family: inherit; box-sizing: border-box; }
+    .dbo-inv-input-wide { width: 100%; }
+    .dbo-inv-linkwrap { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+    .dbo-inv-link { color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-inv-link:hover { text-decoration: underline; }
+    .dbo-inv-editbtn { margin: 0; width: 26px; height: 26px; flex: 0 0 auto; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-muted); font-size: 12px; cursor: pointer; }
+    .dbo-inv-editbtn:hover { background: var(--accent-tint); color: var(--accent); border-color: var(--accent); }
+    .dbo-inv-actions { margin-top: 4px; }
+    .dbo-inv-actions .dbo-btn { width: auto; margin: 0; padding: 9px 18px; cursor: pointer; }
+    .dbo-inv-req-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+    .dbo-inv-req { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .dbo-inv-req:hover { background: var(--surface-2); }
+    .dbo-inv-req input { width: auto; margin: 2px 0 0; flex: 0 0 auto; }
+    .dbo-inv-req-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .dbo-inv-req-inn { color: var(--text-muted); font-size: 12px; }
+
     /* ---- Мобильная версия попапов «Заказы БД» ---- */
     @media (max-width: 640px) {
         .client-card-overlay { padding: 0; align-items: stretch; }
@@ -561,6 +585,11 @@
         /* Итоги на всю ширину */
         .dbo-mid { gap: 12px; }
         .payment-summary { width: 100%; }
+        /* Информация о счетах — метка над значением, поля 16px */
+        .dbo-inv-row { flex-wrap: wrap; gap: 4px 12px; }
+        .dbo-inv-label { flex-basis: 100%; }
+        .dbo-inv-input { font-size: 16px; }
+        .dbo-inv-req { font-size: 14px; }
     }
     .dbo-ya-note { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
     .dbo-ya-note code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }

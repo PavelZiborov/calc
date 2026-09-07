@@ -885,6 +885,7 @@ function dbDealCardEsc(e) {
     // Если открыта форма позиции — Esc закрывает её (обрабатывает dbElEditEsc), не заказ.
     if (document.getElementById("dbElEditOverlay")) return;
     if (document.getElementById("dbPayOverlay")) return;
+    if (document.getElementById("dbInvOverlay")) return;
     closeDbDealCard();
 }
 function closeDbDealCard() {
@@ -895,6 +896,7 @@ function closeDbDealCard() {
     if (typeof dbCloseElStatusMenu === "function") dbCloseElStatusMenu();
     if (typeof closeDbElEdit === "function") closeDbElEdit();
     if (typeof closeDbPayModal === "function") closeDbPayModal();
+    if (typeof dbCloseInvoice === "function") dbCloseInvoice();
 }
 
 async function openDbDealCard(crmId) {
@@ -1311,8 +1313,10 @@ function renderDbDealCard(data, crmId) {
         ? elements.map(dbElementRow).join("")
         : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
 
-    // Вся доп-информация по сделке (кроме «Информации по себестоимости» — она отдельным полем).
-    const dealAf = dbAfWithValue(d.additional_fields).filter(f => Number(f?.id) !== 476);
+    // «Информация о связанных счетах» — поля счёта (допполя PrintOffice), редактируемые.
+    const invoiceBlock = dbInvoiceBlock(d, crmId);
+    // Прочие доп-поля (кроме себестоимости 476 и полей счёта) — как есть.
+    const dealAf = dbAfWithValue(d.additional_fields).filter(f => Number(f?.id) !== 476 && !DBO_INVOICE_FIELDS.includes(Number(f?.id)));
     const dealAfBlock = dealAf.length ? `
         <div class="dbo-section">
             <div class="dbo-section-title">Дополнительная информация</div>
@@ -1359,6 +1363,7 @@ function renderDbDealCard(data, crmId) {
                     </div>
                 </div>
                 ${dbPaymentsBlock(data?.payments)}
+                ${invoiceBlock}
                 ${dealAfBlock}
                 ${costBlock}
             </div>
@@ -1386,6 +1391,183 @@ async function dbSaveCostInfo(crmId, value) {
     } catch (e) {
         console.error("dbSaveCostInfo", e);
         alert("Не удалось сохранить информацию по себестоимости в CRM.");
+    }
+}
+
+// ============ «Информация о связанных счетах» (допполя PrintOffice) ============
+// Поля счёта: 477 номер, 1105 дата, 560 ИНН, 1104 ссылка на счёт, 1106 ссылка-привью.
+const DBO_INVOICE_FIELDS = [477, 1105, 560, 1104, 1106];
+function dbShortUrl(u) {
+    const s = String(u || "").trim();
+    if (!s) return "";
+    try { const x = new URL(s); const t = x.host + x.pathname; return t.length > 34 ? t.slice(0, 32) + "…" : t; }
+    catch { return s.length > 34 ? s.slice(0, 32) + "…" : s; }
+}
+// Инлайн-редактируемое текстовое поле (клик → ввод → сохранение в PrintOffice).
+function dbInvEditable(fieldId, value, placeholder) {
+    const v = String(value || "").trim();
+    const inner = v ? escapeHtml(v) : `<span class="dbo-inv-empty">${escapeHtml(placeholder || "—")}</span>`;
+    return `<span class="dbo-inv-edit" data-af="${fieldId}" data-val="${escapeHtml(v)}" tabindex="0" role="button" title="Нажмите, чтобы изменить" onclick="dbInvEditStart(this)">${inner}</span>`;
+}
+function dbInvLinkRow(label, fieldId, url) {
+    const u = String(url || "").trim();
+    const linkHtml = u
+        ? `<a href="${escapeHtml(u)}" target="_blank" rel="noopener" class="dbo-inv-link" title="${escapeHtml(u)}">${escapeHtml(dbShortUrl(u))} ↗</a>`
+        : `<span class="dbo-inv-empty">нет ссылки</span>`;
+    return `<div class="dbo-inv-row">
+        <span class="dbo-inv-label">${escapeHtml(label)}</span>
+        <span class="dbo-inv-linkwrap" data-af="${fieldId}" data-url="${escapeHtml(u)}">
+            ${linkHtml}
+            <button type="button" class="dbo-inv-editbtn" title="Редактировать ссылку" onclick="dbInvEditLink(this)">✎</button>
+        </span></div>`;
+}
+function dbInvoiceBlock(d, crmId) {
+    const af = d.additional_fields;
+    const num = dbAfById(af, 477), date = dbAfById(af, 1105), inn = dbAfById(af, 560);
+    const link = dbAfById(af, 1104), prev = dbAfById(af, 1106);
+    return `
+        <div class="dbo-section">
+            <div class="dbo-section-title">Информация о связанных счетах</div>
+            <div class="dbo-invoice-card">
+                <div class="dbo-inv-row">
+                    <span class="dbo-inv-label">Счёт</span>
+                    <span class="dbo-inv-value">№&nbsp;${dbInvEditable(477, num, "—")} от ${dbInvEditable(1105, date, "—")}</span>
+                </div>
+                <div class="dbo-inv-row">
+                    <span class="dbo-inv-label">ИНН контрагента</span>
+                    <span class="dbo-inv-value">${dbInvEditable(560, inn, "—")}</span>
+                </div>
+                ${dbInvLinkRow("Ссылка на счёт", 1104, link)}
+                ${dbInvLinkRow("Ссылка-привью", 1106, prev)}
+                <div class="dbo-inv-actions">
+                    <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbOpenInvoiceCreate(${crmId})">Создать счёт</button>
+                </div>
+            </div>
+        </div>`;
+}
+function dbInvResetVal(el, v) { el.innerHTML = v ? escapeHtml(v) : `<span class="dbo-inv-empty">—</span>`; el.dataset.val = v; }
+function dbInvEditStart(el) {
+    if (el.querySelector("input")) return;
+    const cur = el.dataset.val || "";
+    el.innerHTML = `<input class="dbo-inv-input" value="${escapeHtml(cur)}">`;
+    const inp = el.querySelector("input");
+    inp.focus(); inp.select();
+    let done = false;
+    const finish = async (save) => {
+        if (done) return; done = true;
+        const fieldId = Number(el.dataset.af);
+        const v = inp.value.trim();
+        if (!save || v === cur) { dbInvResetVal(el, cur); return; }
+        el.textContent = "…";
+        const ok = await dbSaveAf(fieldId, v);
+        dbInvResetVal(el, ok ? v : cur);
+    };
+    inp.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+    });
+    inp.addEventListener("blur", () => finish(true));
+}
+function dbInvEditLink(btn) {
+    const wrap = btn.closest(".dbo-inv-linkwrap");
+    if (!wrap || wrap.querySelector("input")) return;
+    const fieldId = Number(wrap.dataset.af);
+    const cur = wrap.dataset.url || "";
+    wrap.innerHTML = `<input class="dbo-inv-input dbo-inv-input-wide" value="${escapeHtml(cur)}" placeholder="https://…">
+        <button type="button" class="dbo-inv-editbtn" title="Сохранить" onclick="dbInvSaveLink(${fieldId}, this)">✓</button>`;
+    const inp = wrap.querySelector("input");
+    inp.focus();
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); dbInvSaveLink(fieldId, inp); } if (e.key === "Escape") renderDbDealCard(dbCardData, dbCardDealId); });
+}
+async function dbInvSaveLink(fieldId, el) {
+    const wrap = el.closest(".dbo-inv-linkwrap");
+    const v = wrap.querySelector("input").value.trim();
+    const ok = await dbSaveAf(fieldId, v);
+    if (ok) renderDbDealCard(dbCardData, dbCardDealId);
+}
+// Сохранение доп-поля сделки в PrintOffice + локально.
+async function dbSaveAf(fieldId, value) {
+    try {
+        await clientsApi("setDealField", { crmId: Number(dbCardDealId), fieldId: Number(fieldId), value: String(value) });
+        if (dbCardData?.deal) {
+            let af = Array.isArray(dbCardData.deal.additional_fields) ? dbCardData.deal.additional_fields : [];
+            let found = false;
+            af = af.map(f => (Number(f?.id) === Number(fieldId) ? (found = true, { ...f, value: String(value) }) : f));
+            if (!found) af.push({ id: Number(fieldId), value: String(value) });
+            dbCardData.deal.additional_fields = af;
+        }
+        if (typeof showReadinessToast === "function") showReadinessToast("Сохранено в PrintOffice");
+        return true;
+    } catch (e) {
+        console.error("dbSaveAf", fieldId, e);
+        alert("Не удалось сохранить в PrintOffice.");
+        return false;
+    }
+}
+// «Создать счёт» → выбор реквизитов клиента → выставление в МоеДело.
+async function dbOpenInvoiceCreate(crmId) {
+    if (!ensureActiveSession()) return;
+    const clientId = Number(dbCardData?.deal?.client_crm_id);
+    const ov = document.createElement("div");
+    ov.id = "dbInvOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) document.getElementById('dbInvOverlay')?.remove()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit dbo-pay-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head"><h3>Создать счёт</h3>
+                <button class="dbo-close" onclick="document.getElementById('dbInvOverlay')?.remove()">×</button></div>
+            <div class="dbo-edit-body">
+                <p class="dbo-ya-note">Выберите реквизиты плательщика — счёт будет создан в МоеДело и записан в сделку.</p>
+                <div id="dbInvReqList" class="dbo-inv-req-list"><div class="dbo-asset-empty">Загрузка реквизитов…</div></div>
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbInvCreateBtn" onclick="dbConfirmInvoice(${crmId})" disabled>Создать счёт</button>
+                <button class="dbo-btn" onclick="document.getElementById('dbInvOverlay')?.remove()">Отмена</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    document.addEventListener("keydown", dbInvEsc);
+    try {
+        const data = await clientsApi("getClientRequisites", { clientId });
+        const list = Array.isArray(data?.requisites) ? data.requisites : [];
+        const host = document.getElementById("dbInvReqList");
+        if (!host) return;
+        if (!list.length) { host.innerHTML = `<div class="dbo-asset-empty">У клиента нет реквизитов в PrintOffice — добавьте их в карточке клиента.</div>`; return; }
+        host.innerHTML = list.map((r, i) =>
+            `<label class="dbo-inv-req"><input type="radio" name="dbInvReq" value="${escapeHtml(r.inn)}"${i === 0 ? " checked" : ""} onchange="dbInvReqPicked()">
+                <span class="dbo-inv-req-body"><b>${escapeHtml(r.name || r.title)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span></label>`).join("");
+        const btn = document.getElementById("dbInvCreateBtn");
+        if (btn) btn.disabled = false;
+    } catch (e) {
+        console.error("getClientRequisites", e);
+        const host = document.getElementById("dbInvReqList");
+        if (host) host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить реквизиты клиента.</div>`;
+    }
+}
+function dbInvEsc(e) { if (e.key === "Escape") dbCloseInvoice(); }
+function dbCloseInvoice() { document.getElementById("dbInvOverlay")?.remove(); document.removeEventListener("keydown", dbInvEsc); }
+function dbInvReqPicked() {
+    const b = document.getElementById("dbInvCreateBtn");
+    if (b) b.disabled = !document.querySelector('input[name="dbInvReq"]:checked');
+}
+async function dbConfirmInvoice(crmId) {
+    const inn = document.querySelector('input[name="dbInvReq"]:checked')?.value;
+    if (!inn) { alert("Выберите реквизиты."); return; }
+    const btn = document.getElementById("dbInvCreateBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Создаём счёт…"; }
+    try {
+        const data = await clientsApi("createInvoice", { dealId: Number(crmId), inn });
+        if (data?.deal && dbCardData) dbCardData.deal = data.deal;
+        dbCloseInvoice();
+        renderDbDealCard(dbCardData, dbCardDealId);
+        loadDbDeals();
+        if (typeof showReadinessToast === "function") showReadinessToast(`Счёт №${data?.invoice?.number || ""} создан`);
+    } catch (e) {
+        console.error("createInvoice", e);
+        alert("Не удалось создать счёт: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = "Создать счёт"; }
     }
 }
 
@@ -1817,6 +1999,38 @@ function openSettingsPage() {
     if (typeof toggleAuthModal === "function") toggleAuthModal(false);
     if (typeof switchTab === "function") switchTab("settings-tab");
     renderYandexSettingsInline();
+    renderMoedeloSettingsInline();
+}
+async function renderMoedeloSettingsInline() {
+    const host = document.getElementById("settingsMoedeloHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка статуса…</p>`;
+    let status = { moedeloConfigured: false };
+    try { status = await clientsApi("getIntegrations", {}); } catch (_) {}
+    host.innerHTML = `
+        <p class="dbo-ya-note">Выставление счетов клиентам через МоеДело (кнопка «Создать счёт» в карточке заказа).
+        Нужен API-ключ из личного кабинета МоеДело.</p>
+        <div class="dbo-ya-status">Статус: <b class="${status.moedeloConfigured ? "payment-ok" : "payment-alert"}">${status.moedeloConfigured ? "подключено" : "не настроено"}</b></div>
+        <label class="dbo-edit-wide">API-ключ МоеДело (md-api-key)
+            <input type="password" id="dboMdToken" placeholder="${status.moedeloConfigured ? "•••••• (задан) — введите новый, чтобы заменить" : "вставьте ключ"}" autocomplete="off">
+        </label>
+        <p class="dbo-ya-hint">Ключ хранится на сервере и не показывается обратно. Настройки → Интеграция → API в кабинете МоеДело.</p>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dboSaveMoedeloToken()">Сохранить</button>
+            ${status.moedeloConfigured ? `<button class="dbo-btn dbo-btn-danger" onclick="dboSaveMoedeloToken(true)">Отключить</button>` : ""}
+        </div>`;
+}
+async function dboSaveMoedeloToken(clear = false) {
+    const token = clear ? "" : String(document.getElementById("dboMdToken")?.value || "").trim();
+    if (!clear && !token) { alert("Введите ключ."); return; }
+    try {
+        await clientsApi("setMoedeloToken", { token });
+        if (typeof showReadinessToast === "function") showReadinessToast(clear ? "Интеграция отключена" : "Ключ сохранён");
+        renderMoedeloSettingsInline();
+    } catch (e) {
+        console.error("dboSaveMoedeloToken", e);
+        alert("Не удалось сохранить ключ.");
+    }
 }
 async function renderYandexSettingsInline() {
     const host = document.getElementById("settingsYandexHost");
