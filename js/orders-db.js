@@ -995,8 +995,15 @@ function dbOpenElEdit(elId) {
                 </label>
                 <div class="dbo-edit-row">
                     <label>Ед.изм
-                        <input type="text" id="dbEditUnits" list="dbUnitsList" value="${escapeHtml(e.units || "шт")}">
-                        <datalist id="dbUnitsList"><option value="шт"></option><option value="услуга"></option></datalist>
+                        <div class="dbo-units" id="dbUnitsWrap">
+                            <button type="button" class="dbo-units-btn" id="dbUnitsBtn" onclick="dbToggleUnits(event)"><span id="dbUnitsBtnText">${escapeHtml(e.units || "шт")}</span><span class="dbo-units-caret">▾</span></button>
+                            <div class="dbo-units-menu" id="dbUnitsMenu" hidden>
+                                <button type="button" class="dbo-units-opt" onclick="dbPickUnit('шт')">шт</button>
+                                <button type="button" class="dbo-units-opt" onclick="dbPickUnit('услуга')">услуга</button>
+                                <input type="text" class="dbo-units-custom" placeholder="Своё значение" maxlength="32" oninput="dbUnitsCustom(this.value)">
+                            </div>
+                            <input type="hidden" id="dbEditUnits" value="${escapeHtml(e.units || "шт")}">
+                        </div>
                     </label>
                     <label>Кол-во<input type="text" inputmode="decimal" id="dbEditQty" value="${Number(e.quantity) || 0}" oninput="dbCleanNum(this); dbEditRecalc('qty')"></label>
                     <label>Цена<input type="text" inputmode="decimal" id="dbEditPrice" value="${Number(e.price) || 0}" oninput="dbCleanNum(this); dbEditRecalc('price')"></label>
@@ -1027,6 +1034,34 @@ function dbAutoGrow(el) {
     el.style.height = "auto";
     el.style.height = Math.max(el.scrollHeight, 40) + "px";
 }
+// Дропдаун единиц измерения (как в разделе «Заказы» по API): пресеты + своё значение.
+function dbToggleUnits(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById("dbUnitsMenu");
+    if (!menu) return;
+    const open = menu.hidden;
+    menu.hidden = !open;
+    if (open) setTimeout(() => document.addEventListener("click", dbUnitsOutside), 0);
+    else document.removeEventListener("click", dbUnitsOutside);
+}
+function dbUnitsOutside(e) {
+    const wrap = document.getElementById("dbUnitsWrap");
+    if (wrap && !wrap.contains(e.target)) { const m = document.getElementById("dbUnitsMenu"); if (m) m.hidden = true; document.removeEventListener("click", dbUnitsOutside); }
+}
+function dbSetUnitsValue(v) {
+    const val = String(v || "").trim() || "шт";
+    const hid = document.getElementById("dbEditUnits");
+    const txt = document.getElementById("dbUnitsBtnText");
+    if (hid) hid.value = val;
+    if (txt) txt.textContent = val;
+}
+function dbPickUnit(v) {
+    dbSetUnitsValue(v);
+    const menu = document.getElementById("dbUnitsMenu");
+    if (menu) menu.hidden = true;
+    document.removeEventListener("click", dbUnitsOutside);
+}
+function dbUnitsCustom(v) { dbSetUnitsValue(v); }
 let dbEditCostPerUnit = 0;
 // Пересчёт цен на лету: кол-во/цена → сумма и себест.; сумма → цена.
 function dbEditRecalc(source) {
@@ -1585,10 +1620,12 @@ function dboAssetsInnerHtml(elementId) {
     const busy = dboUploadBusy === elementId;
     const preview = cached.preview;
     const purl = preview?.thumbUrl || preview?.url;
-    const previewBox = dboIsImageUrl(purl)
-        ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer" onclick="dboOpenLightbox('${escapeHtml(preview.url || purl)}')" style="cursor:zoom-in">
-           <button type="button" class="dbo-asset-del" title="Удалить превью" onclick="dboDeletePreview(${elementId})">×</button>`
-        : `<span class="dbo-asset-empty">${cached.status === "loading" ? "загрузка…" : "нет превью"}</span>`;
+    // Область превью — кликабельна и принимает перетаскивание (загрузка/замена превью).
+    const hasPreview = dboIsImageUrl(purl);
+    const previewInner = hasPreview
+        ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">
+           <button type="button" class="dbo-asset-del" title="Удалить превью" onclick="event.stopPropagation(); dboDeletePreview(${elementId})">×</button>`
+        : `<span class="dbo-asset-empty">${cached.status === "loading" ? "загрузка…" : "＋ превью"}</span>`;
     const layouts = (cached.layouts || []).map(l => {
         const icon = l.type === "link" ? "🔗" : "📄";
         const del = l.isCanDelete !== false
@@ -1597,19 +1634,38 @@ function dboAssetsInnerHtml(elementId) {
     }).join("") || `<div class="dbo-asset-empty">макетов нет</div>`;
     return `
         <div class="dbo-assets-row">
-            <div class="dbo-preview-box">${previewBox}</div>
-            <div class="dbo-layouts-col">
+            <div class="dbo-preview-box dbo-drop" title="Нажмите или перетащите изображение"
+                 onclick="document.getElementById('dboPreviewInput_${elementId}').click()"
+                 ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropPreview(event, ${elementId})">
+                ${previewInner}
+                <input type="file" id="dboPreviewInput_${elementId}" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)">
+            </div>
+            <div class="dbo-layouts-col dbo-drop" ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropLayout(event, ${elementId})">
                 <div class="dbo-assets-title">Макеты</div>
                 <div class="dbo-layouts-list">${layouts}</div>
                 <div class="dbo-layout-add">
                     <input type="url" id="dboLinkInput_${elementId}" placeholder="Ссылка на макет" class="dbo-edit-wide">
                     <button type="button" class="dbo-btn" onclick="dboAddLayoutLink(${elementId})">+ ссылка</button>
                     <label class="dbo-btn">📎 файл<input type="file" hidden multiple onchange="dboUploadLayout(${elementId}, this)"></label>
-                    <label class="dbo-btn">🖼 превью<input type="file" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)"></label>
                 </div>
+                <div class="dbo-layout-drophint">Перетащите файлы макетов сюда</div>
                 ${busy ? `<div class="dbo-asset-progress">${escapeHtml(dboUploadLabel || "Загрузка…")}</div>` : ""}
             </div>
         </div>`;
+}
+// Перетаскивание файлов в области превью/макетов.
+function dboDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("dbo-drop-active"); }
+function dboDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove("dbo-drop-active"); }
+function dboDropPreview(e, elementId) {
+    e.preventDefault(); e.currentTarget.classList.remove("dbo-drop-active");
+    const f = [...(e.dataTransfer?.files || [])].filter(x => x && /^image\//.test(x.type))[0];
+    if (f) dboUploadPreviewFile(elementId, f);
+    else alert("Для превью нужен файл-изображение (JPG, PNG, WebP, GIF).");
+}
+function dboDropLayout(e, elementId) {
+    e.preventDefault(); e.currentTarget.classList.remove("dbo-drop-active");
+    const files = [...(e.dataTransfer?.files || [])].filter(x => x && x.size > 0);
+    if (files.length) dboUploadLayoutFiles(elementId, files);
 }
 
 let dboUploadBusy = null;    // elementId, пока идёт загрузка
@@ -1617,9 +1673,13 @@ let dboUploadLabel = "";
 function dboSetBusy(elementId, label) { dboUploadBusy = elementId; dboUploadLabel = label || ""; dboRenderEditAssets(elementId); }
 function dboClearBusy(elementId) { dboUploadBusy = null; dboUploadLabel = ""; dboRenderEditAssets(elementId); }
 
-async function dboUploadPreview(elementId, input) {
+// Загрузка превью из <input> (клик) — делегирует на файловый core.
+function dboUploadPreview(elementId, input) {
     const file = input?.files?.[0];
     if (input) input.value = "";
+    if (file) dboUploadPreviewFile(elementId, file);
+}
+async function dboUploadPreviewFile(elementId, file) {
     if (!file) return;
     if (!dboAssetsDeal.num) { alert("У сделки нет номера — загрузка на Я.Диск недоступна."); return; }
     dboSetBusy(elementId, "Подготовка превью…");
@@ -1640,17 +1700,25 @@ async function dboUploadPreview(elementId, input) {
         });
         dboApplyAssets(elementId, data);
     } catch (e) {
-        console.error("dboUploadPreview", e);
+        console.error("dboUploadPreviewFile", e);
         alert("Не удалось загрузить превью.");
     } finally { dboClearBusy(elementId); dboUpdateThumb(elementId); }
 }
 
-async function dboUploadLayout(elementId, input) {
+// Загрузка макетов из <input> (клик) — делегирует на файловый core.
+function dboUploadLayout(elementId, input) {
     const files = [...(input?.files || [])];
     if (input) input.value = "";
+    if (files.length) dboUploadLayoutFiles(elementId, files);
+}
+async function dboUploadLayoutFiles(elementId, files) {
+    files = [...(files || [])].filter(f => f && f.size > 0);
     if (!files.length) return;
     if (!dboAssetsDeal.num) { alert("У сделки нет номера — загрузка на Я.Диск недоступна."); return; }
+    // Было ли уже превью до загрузки (чтобы авто-превью из PDF ставить только при первом макете).
+    const hadPreview = !!dboAssets.get(dboAssetKey(elementId))?.preview;
     dboSetBusy(elementId, "Загрузка макетов…");
+    let firstPdf = null;
     try {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -1669,9 +1737,19 @@ async function dboUploadLayout(elementId, input) {
                 type: "file", uploadComplete: true
             });
             dboApplyAssets(elementId, data);
+            if (!firstPdf && typeof isPdfFile === "function" && isPdfFile(file)) firstPdf = file;
+        }
+        // Авто-превью из первого PDF-макета — если превью ещё не было (как в разделе по API).
+        if (firstPdf && !hadPreview && !dboAssets.get(dboAssetKey(elementId))?.preview
+            && typeof renderPdfFirstPageToImageFile === "function") {
+            try {
+                dboSetBusy(elementId, "Генерация превью из PDF…");
+                const img = await renderPdfFirstPageToImageFile(firstPdf, "preview");
+                if (img) await dboUploadPreviewFile(elementId, img);
+            } catch (e) { console.warn("auto preview from PDF failed", e); }
         }
     } catch (e) {
-        console.error("dboUploadLayout", e);
+        console.error("dboUploadLayoutFiles", e);
         alert("Не удалось загрузить макет.");
     } finally { dboClearBusy(elementId); }
 }

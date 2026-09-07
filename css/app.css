@@ -507,6 +507,61 @@
     .dbo-layout-add .dbo-btn { width: auto; margin: 0; padding: 6px 10px; font-size: 13px; cursor: pointer; }
     .dbo-layout-add label.dbo-btn { display: inline-flex; align-items: center; }
     .dbo-asset-progress { margin-top: 8px; font-size: 12px; color: var(--accent-strong, var(--accent)); }
+    /* Единицы измерения — компактный дропдаун (как в «Заказы» по API) */
+    .dbo-units { position: relative; }
+    .dbo-units-btn { margin: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 14px; cursor: pointer; text-align: left; text-transform: none; font-weight: 400; }
+    .dbo-units-caret { color: var(--text-muted); font-size: 10px; flex: 0 0 auto; }
+    .dbo-units-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 10; min-width: 170px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.16); display: flex; flex-direction: column; gap: 2px; }
+    .dbo-units-menu[hidden] { display: none; }
+    .dbo-units-opt { margin: 0; width: 100%; text-align: left; padding: 7px 10px; border: none; border-radius: 6px; background: transparent; color: var(--text); font-size: 14px; cursor: pointer; text-transform: none; font-weight: 400; }
+    .dbo-units-opt:hover { background: var(--surface-2); }
+    .dbo-units-custom { margin: 4px 0 0; width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    /* Drop-зоны превью и макетов */
+    .dbo-preview-box { cursor: pointer; }
+    .dbo-preview-box .dbo-asset-empty { pointer-events: none; font-size: 13px; color: var(--accent); font-weight: 600; }
+    .dbo-drop-active { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--accent-tint) !important; }
+    .dbo-layout-drophint { margin-top: 6px; font-size: 11px; color: var(--text-muted); opacity: 0.7; }
+    /* История оплат — без серой плашки */
+    .dbo-pay-section { background: transparent; }
+
+    /* ---- Мобильная версия попапов «Заказы БД» ---- */
+    @media (max-width: 640px) {
+        .client-card-overlay { padding: 0; align-items: stretch; }
+        .dbo-card, .dbo-edit { width: 100%; max-width: 100%; max-height: 100vh; max-height: 100dvh; border-radius: 0; }
+        .dbo-pay-modal, .dbo-pay-cancel-modal { width: 100%; max-width: 100%; }
+        /* iOS не зумит при фокусе, если размер шрифта поля ≥ 16px */
+        .dbo-edit-body input, .dbo-edit-body select, .dbo-edit-body textarea,
+        .dbo-costinfo-input, .dbo-units-btn, .dbo-units-opt, .dbo-units-custom,
+        .dbo-layout-add input[type="url"], .dbo-af-edit input { font-size: 16px; }
+        .dbo-edit-body .dbo-edit-name { font-size: 16px; }
+        .dbo-head { padding: 14px 16px 12px; flex-wrap: wrap; }
+        .dbo-num { font-size: 19px; }
+        .dbo-head-right { gap: 6px; }
+        .dbo-head-right .dbk-status-pill { min-width: 0; }
+        .dbo-body { padding: 14px 16px 18px; }
+        .dbo-edit-body { padding: 12px 16px 2px; }
+        .dbo-edit-head, .dbo-edit-note { padding-left: 16px; padding-right: 16px; }
+        .dbo-edit-actions { padding: 12px 16px 16px; }
+        /* Поля позиции — по 2 в ряд */
+        .dbo-edit-row { grid-template-columns: repeat(2, 1fr); }
+        /* Строка элемента: прячем «Себес.», оставляем Статус · Название · Кол-во · Сумма */
+        .dbo-elements { padding: 2px 12px 6px; }
+        .dbo-el-head, .dbo-el-row { grid-template-columns: 28px minmax(0,1fr) auto auto; gap: 8px; }
+        .dbo-el-head span:nth-child(4), .dbo-el-cost { display: none; }
+        .dbo-el-head span:nth-child(1) { font-size: 0; }  /* «Статус» не влезает в 28px — прячем подпись */
+        .dbo-el-statusbtn { width: 26px; height: 26px; }
+        /* Доп-поля — в один столбец */
+        .dbo-af-list { grid-template-columns: 1fr; padding: 10px 12px; }
+        /* История оплат: прячем метод и менеджера, оставляем дату · сумму · комментарий · отмену */
+        .dbo-pay-line { grid-template-columns: auto auto minmax(0,1fr) auto; gap: 8px; }
+        .dbo-pay-method, .dbo-pay-user { display: none; }
+        /* Превью и макеты — в столбик */
+        .dbo-assets-row { flex-direction: column; }
+        .dbo-layouts-col { width: 100%; }
+        /* Итоги на всю ширину */
+        .dbo-mid { gap: 12px; }
+        .payment-summary { width: 100%; }
+    }
     .dbo-ya-note { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
     .dbo-ya-note code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
     .dbo-ya-status { font-size: 13px; margin-bottom: 12px; }
