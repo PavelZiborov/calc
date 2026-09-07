@@ -3229,6 +3229,10 @@ function renderDealNotifyBody(dealId, state) {
     const selectedContact = hasSelection
         ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId))
         : null;
+    // Telegram выбран как способ отправки? (для показа кнопки подписки на строке контакта)
+    const storedChannels = getStoredNotifyChannels(dealId);
+    const selTgNick = selectedContact ? contactTelegramNick(selectedContact) : "";
+    const tgSelected = hasSelection && (storedChannels ? storedChannels.includes("telegram") : !!selTgNick);
     // Пункты кастомного дропдауна. Кнопка удаления — прямо в списке (только у ручных контактов).
     const ddOptionsHtml = data.contacts.map(contact => {
         const isSel = contact.contactId != null && Number(contact.contactId) === Number(selectedId);
@@ -3261,9 +3265,9 @@ function renderDealNotifyBody(dealId, state) {
                         <button type="button" class="deal-notify-dd-add" onclick="openDealContactForm(${dealId})">+ Добавить</button>
                         ${clientId ? `<a class="deal-notify-dd-crm" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" onclick="closeAllNotifyDropdowns()" title="Добавить контакт в карточке клиента в CRM">Добавить в CRM ↗</a>` : ""}
                     </div>
-                    <button type="button" class="deal-notify-dd-tg" onclick="copyTelegramSubscribeLink(${dealId})" title="Скопировать ссылку: клиент перейдёт, нажмёт «Старт» и подпишется на Telegram-уведомления">${icon("telegram")} Ссылка для подписки клиента в Telegram</button>
                 </div>
             </div>
+            <button type="button" class="deal-notify-tg-sub" id="dealTgSub-${dealId}" onclick="copyTelegramSubscribeLink(${dealId})"${tgSelected ? "" : " hidden"} title="Скопировать приглашение (номер заказа, состав и ссылку на бота). Клиент перейдёт, нажмёт «Старт» — и получит уведомление о готовности, даже без @ника">${icon("telegram")} Ссылка для подписки</button>
         </div>
         ${sentBadge}
         ${hasSelection ? renderDealNotifyChannels(selectedContact, dealId) : ""}
@@ -3400,20 +3404,38 @@ function maskRuPhone(input) {
 // Бот для уведомлений о готовности.
 const TELEGRAM_BOT_USERNAME = "HeavenPrint_bot";
 
-// Ссылка-приглашение: клиент переходит, жмёт «Старт» (deep-link ?start=…) и бот
-// ловит его username→chat_id (ветка /start в боте). Дальше менеджер выбирает контакт
-// по нику и шлёт уведомление. Кнопка просто копирует ссылку для ручной отправки.
+// Ссылка-приглашение: клиент переходит, жмёт «Старт» (deep-link ?start=deal_<id>)
+// и бот ловит его chat_id, привязывая к этой сделке. Это работает даже если у клиента
+// НЕТ @ника в Telegram (по нику отправить через Bot API нельзя, только по chat_id).
+// Кнопка копирует готовый текст-приглашение (номер заказа + состав + ссылка на бота).
+function buildTelegramSubscribeText(dealId) {
+    const link = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=deal_${dealId}`;
+    const deal = (typeof dealsCache !== "undefined") ? dealsCache.get(String(dealId)) : null;
+    const num = (typeof getDealNum === "function" ? getDealNum(dealId) : "") || (deal?.num ?? dealId);
+    const els = Array.isArray(deal?.elements) ? deal.elements : [];
+    const positions = els
+        .map(el => String((typeof getElementName === "function" ? getElementName(el) : el?.name) || "").trim())
+        .filter(Boolean)
+        .map((name, i) => `${i + 1}. ${name}`);
+    const lines = [`Здравствуйте! Ваш заказ № ${num}.`];
+    if (positions.length) { lines.push("", "Состав заказа:", ...positions); }
+    lines.push(
+        "",
+        "Подпишитесь на нашего Telegram-бота — и мы автоматически пришлём уведомление, как только заказ будет готов:",
+        link
+    );
+    return { text: lines.join("\n"), link };
+}
 function copyTelegramSubscribeLink(dealId) {
-    // Без payload: клиенту нужен только «Старт» для подписки; id сделки боту не нужен.
-    const link = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
+    const { text, link } = buildTelegramSubscribeText(dealId);
     const ok = () => {
-        if (typeof showReadinessToast === "function") showReadinessToast("Ссылка для подписки скопирована — отправьте её клиенту");
-        else alert("Ссылка скопирована:\n" + link);
+        if (typeof showReadinessToast === "function") showReadinessToast("Приглашение с ссылкой скопировано — отправьте клиенту");
+        else alert("Скопировано:\n\n" + text);
     };
     if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(link).then(ok, () => prompt("Скопируйте ссылку для клиента:", link));
+        navigator.clipboard.writeText(text).then(ok, () => prompt("Скопируйте приглашение для клиента:", text));
     } else {
-        prompt("Скопируйте ссылку для клиента:", link);
+        prompt("Скопируйте приглашение для клиента:", text);
     }
 }
 
@@ -3433,6 +3455,9 @@ function onNotifyChannelToggle(dealId) {
     const channels = getCheckedChannels(section);
     saveNotifyChannels(dealId, channels);          // localStorage — мгновенно для UI/ручной отправки
     saveNotifyChannelsToServer(dealId, channels);  // в БД — чтобы КРОН слал в выбранные каналы
+    // Кнопка «Ссылка для подписки» на строке контакта — только когда выбран Telegram.
+    const tgBtn = document.getElementById(`dealTgSub-${dealId}`);
+    if (tgBtn) tgBtn.hidden = !channels.includes("telegram");
 }
 
 // Сохраняем выбор каналов в БД (deal_contacts.notify_channels), чтобы серверный
@@ -3460,10 +3485,11 @@ function renderDealNotifyChannels(contact, dealId) {
     const hasEmail = !!email;
     const hasTg = !!tg;
     const emailLabel = hasEmail ? escapeHtml(email) : "нет почты";
-    const tgLabel = hasTg ? `@${escapeHtml(tg)}` : "нет ника";
+    // Telegram доступен даже без @ника: клиент подписывается по ссылке, бот берёт chat_id.
+    const tgLabel = hasTg ? `@${escapeHtml(tg)}` : "по подписке в боте (ник не нужен) — дайте клиенту ссылку";
     const stored = getStoredNotifyChannels(dealId);
     const emailChecked = hasEmail && (stored ? stored.includes("email") : true);
-    const tgChecked = hasTg && (stored ? stored.includes("telegram") : true);
+    const tgChecked = stored ? stored.includes("telegram") : hasTg;
 
     // Один раз за сессию синхронизируем состояние чекбоксов с БД.
     // Без этого крон читает дефолт «email,telegram» даже если пользователь убрал галочку.
@@ -3481,8 +3507,8 @@ function renderDealNotifyChannels(contact, dealId) {
             <label class="deal-notify-ch-label${hasEmail ? "" : " is-disabled"}" title="${emailLabel}">
                 <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "" : "disabled"} ${emailChecked ? "checked" : ""} onchange="onNotifyChannelToggle(${dealId})"> ${icon("mail")} Email
             </label>
-            <label class="deal-notify-ch-label${hasTg ? "" : " is-disabled"}" title="${tgLabel}">
-                <input type="checkbox" class="deal-notify-ch" value="telegram" ${hasTg ? "" : "disabled"} ${tgChecked ? "checked" : ""} onchange="onNotifyChannelToggle(${dealId})"> ${icon("telegram")} Telegram
+            <label class="deal-notify-ch-label" title="${tgLabel}">
+                <input type="checkbox" class="deal-notify-ch" value="telegram" ${tgChecked ? "checked" : ""} onchange="onNotifyChannelToggle(${dealId})"> ${icon("telegram")} Telegram${hasTg ? "" : ` <span class="deal-notify-ch-hint">(по подписке)</span>`}
             </label>
         </div>`;
 }
