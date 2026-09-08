@@ -1505,9 +1505,10 @@ async function dbSaveAf(fieldId, value) {
     }
 }
 // «Создать счёт» → выбор реквизитов клиента → выставление в МоеДело.
+let dbInvClientId = null;   // клиент открытой модалки «Создать счёт»
 async function dbOpenInvoiceCreate(crmId) {
     if (!ensureActiveSession()) return;
-    const clientId = Number(dbCardData?.deal?.client_crm_id);
+    dbInvClientId = Number(dbCardData?.deal?.client_crm_id);
     const ov = document.createElement("div");
     ov.id = "dbInvOverlay";
     ov.className = "client-card-overlay dbo-edit-overlay";
@@ -1519,8 +1520,16 @@ async function dbOpenInvoiceCreate(crmId) {
             <div class="dbo-edit-head"><h3>Создать счёт</h3>
                 <button class="dbo-close" onclick="document.getElementById('dbInvOverlay')?.remove()">×</button></div>
             <div class="dbo-edit-body">
-                <p class="dbo-ya-note">Выберите реквизиты плательщика — счёт будет создан в МоеДело и записан в сделку.</p>
+                <p class="dbo-ya-note">Выберите реквизиты плательщика — счёт будет создан в МоеДело и записан в сделку. Реквизиты хранятся в нашей базе.</p>
                 <div id="dbInvReqList" class="dbo-inv-req-list"><div class="dbo-asset-empty">Загрузка реквизитов…</div></div>
+                <details class="dbo-inv-addwrap">
+                    <summary class="dbo-inv-addtoggle">+ Добавить реквизит</summary>
+                    <div class="dbo-inv-addform">
+                        <input type="text" id="dbInvAddInn" inputmode="numeric" placeholder="ИНН (10 или 12 цифр)" maxlength="12">
+                        <input type="text" id="dbInvAddName" placeholder="Наименование (ООО «…»)">
+                        <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbAddRequisite()">Добавить</button>
+                    </div>
+                </details>
             </div>
             <div class="dbo-edit-actions">
                 <button class="dbo-btn dbo-btn-primary" id="dbInvCreateBtn" onclick="dbConfirmInvoice(${crmId})" disabled>Создать счёт</button>
@@ -1529,21 +1538,45 @@ async function dbOpenInvoiceCreate(crmId) {
         </div>`;
     document.body.appendChild(ov);
     document.addEventListener("keydown", dbInvEsc);
+    dbLoadRequisites();
+}
+function dbRenderRequisites(list, selectInn) {
+    const host = document.getElementById("dbInvReqList");
+    if (!host) return;
+    if (!list.length) { host.innerHTML = `<div class="dbo-asset-empty">Реквизитов пока нет — добавьте вручную ниже.</div>`; }
+    else {
+        host.innerHTML = list.map((r, i) => {
+            const checked = selectInn ? (r.inn === selectInn) : (i === 0);
+            return `<label class="dbo-inv-req"><input type="radio" name="dbInvReq" value="${escapeHtml(r.inn)}"${checked ? " checked" : ""} onchange="dbInvReqPicked()">
+                <span class="dbo-inv-req-body"><b>${escapeHtml(r.name || r.title)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span></label>`;
+        }).join("");
+    }
+    dbInvReqPicked();
+}
+async function dbLoadRequisites(selectInn) {
     try {
-        const data = await clientsApi("getClientRequisites", { clientId });
-        const list = Array.isArray(data?.requisites) ? data.requisites : [];
-        const host = document.getElementById("dbInvReqList");
-        if (!host) return;
-        if (!list.length) { host.innerHTML = `<div class="dbo-asset-empty">У клиента нет реквизитов в PrintOffice — добавьте их в карточке клиента.</div>`; return; }
-        host.innerHTML = list.map((r, i) =>
-            `<label class="dbo-inv-req"><input type="radio" name="dbInvReq" value="${escapeHtml(r.inn)}"${i === 0 ? " checked" : ""} onchange="dbInvReqPicked()">
-                <span class="dbo-inv-req-body"><b>${escapeHtml(r.name || r.title)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span></label>`).join("");
-        const btn = document.getElementById("dbInvCreateBtn");
-        if (btn) btn.disabled = false;
+        const data = await clientsApi("getClientRequisites", { clientId: dbInvClientId });
+        dbRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : [], selectInn);
     } catch (e) {
         console.error("getClientRequisites", e);
         const host = document.getElementById("dbInvReqList");
-        if (host) host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить реквизиты клиента.</div>`;
+        if (host) host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить реквизиты.</div>`;
+    }
+}
+async function dbAddRequisite() {
+    const inn = String(document.getElementById("dbInvAddInn")?.value || "").replace(/\D/g, "");
+    const name = String(document.getElementById("dbInvAddName")?.value || "").trim();
+    if (!/^\d{10}$|^\d{12}$/.test(inn)) { alert("ИНН должен содержать 10 или 12 цифр."); return; }
+    try {
+        const data = await clientsApi("addClientRequisite", { clientId: dbInvClientId, inn, name });
+        dbRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : [], inn);
+        const i = document.getElementById("dbInvAddInn"); if (i) i.value = "";
+        const n = document.getElementById("dbInvAddName"); if (n) n.value = "";
+        const w = document.querySelector(".dbo-inv-addwrap"); if (w) w.open = false;
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизит добавлен");
+    } catch (e) {
+        console.error("addClientRequisite", e);
+        alert("Не удалось добавить реквизит: " + String(e.message || e));
     }
 }
 function dbInvEsc(e) { if (e.key === "Escape") dbCloseInvoice(); }
