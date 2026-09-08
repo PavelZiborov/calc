@@ -398,9 +398,161 @@ function renderClientCard(data, crmId) {
             <div class="client-card-body">
                 ${stats}
                 ${data?.crmError ? `<div class="client-card-warn">Свежие данные из CRM недоступны — показаны сохранённые.</div>` : ""}
+                ${clientCardRequisitesBlock()}
                 ${dealsBlock}
             </div>
         </div>`;
+    ccLoadRequisites(crmId);
+}
+
+// ==================== Реквизиты клиента в карточке ====================
+let ccReqClientId = null;
+function clientCardRequisitesBlock() {
+    return `
+        <div class="cc-req-section cc-req-widget">
+            <div class="dbo-inv-req-head">
+                <span>Реквизиты клиента</span>
+                <button type="button" class="dbo-inv-refresh" onclick="ccReqRefresh(this)" title="Подтянуть реквизиты из PrintOffice (на переходный период)">⟳ Обновить из PrintOffice</button>
+            </div>
+            <div id="ccReqList" class="dbo-inv-req-list"><div class="dbo-asset-empty">Загрузка реквизитов…</div></div>
+            <details class="dbo-inv-addwrap">
+                <summary class="dbo-inv-addtoggle">+ Добавить реквизит из МоеДело</summary>
+                <div class="dbo-inv-addform">
+                    <div class="dbo-inv-search-row">
+                        <input type="text" id="ccReqSearchInput" placeholder="ИНН или название контрагента" onkeydown="if(event.key==='Enter'){event.preventDefault();ccReqSearch()}">
+                        <button type="button" class="dbo-btn" onclick="ccReqSearch()">Найти</button>
+                    </div>
+                    <div id="ccReqSearchResults" class="dbo-inv-search-results"></div>
+                    <div class="dbo-inv-create-hint">Нет нужного в МоеДело? Создайте новый контрагент:</div>
+                    <div class="dbo-inv-create-row">
+                        <input type="text" id="ccReqAddInn" inputmode="numeric" placeholder="ИНН (10 или 12 цифр)" maxlength="12" onblur="reqInnAutoFill(this, document.getElementById('ccReqAddName'), document.getElementById('ccReqAddForm'))">
+                        <input type="text" id="ccReqAddName" placeholder="Наименование (подставится по ИНН)">
+                        <select id="ccReqAddForm" class="dbo-inv-formsel" title="Организационная форма">
+                            <option value="">форма: авто</option>
+                            <option value="UL">Юр. лицо</option>
+                            <option value="IP">ИП</option>
+                            <option value="FL">Физлицо</option>
+                        </select>
+                        <button type="button" class="dbo-btn dbo-btn-primary" onclick="ccReqCreate()">Создать в МоеДело и привязать</button>
+                    </div>
+                </div>
+            </details>
+        </div>`;
+}
+const CC_REQ_SRC = { printoffice: "PrintOffice", moedelo: "МоеДело", manual: "вручную" };
+function ccRenderRequisites(list) {
+    const host = document.getElementById("ccReqList");
+    if (!host) return;
+    if (!Array.isArray(list) || !list.length) {
+        host.innerHTML = `<div class="dbo-asset-empty">Реквизитов пока нет — найдите в МоеДело или обновите из PrintOffice.</div>`;
+        return;
+    }
+    host.innerHTML = list.map(r => {
+        const src = CC_REQ_SRC[r.source] || r.source || "";
+        return `<div class="dbo-inv-req">
+            <span class="dbo-inv-req-body"><b>${escapeHtml(r.name || r.inn)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}${src ? " · " + escapeHtml(src) : ""}</span></span>
+            <button type="button" class="dbo-inv-reqdel" title="Удалить реквизит" onclick="ccReqDelete('${escapeHtml(r.inn)}',this)">×</button>
+        </div>`;
+    }).join("");
+}
+async function ccLoadRequisites(crmId) {
+    ccReqClientId = Number(crmId);
+    try {
+        const data = await clientsApi("getClientRequisites", { clientId: ccReqClientId });
+        ccRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : []);
+    } catch (e) {
+        console.error("getClientRequisites", e);
+        const host = document.getElementById("ccReqList");
+        if (host) host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить реквизиты.</div>`;
+    }
+}
+async function ccReqRefresh(btn) {
+    const old = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Обновляем…"; }
+    try {
+        const data = await clientsApi("refreshClientRequisites", { clientId: ccReqClientId });
+        ccRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : []);
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизиты обновлены из PrintOffice");
+    } catch (e) {
+        console.error("refreshClientRequisites", e);
+        alert("Не удалось обновить реквизиты: " + String(e.message || e));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = old || "⟳ Обновить из PrintOffice"; }
+    }
+}
+async function ccReqSearch() {
+    const query = String(document.getElementById("ccReqSearchInput")?.value || "").trim();
+    const host = document.getElementById("ccReqSearchResults");
+    if (!host) return;
+    if (query.length < 3) { host.innerHTML = `<div class="dbo-asset-empty">Введите ИНН или минимум 3 символа названия.</div>`; return; }
+    const digitsOnly = !/[^\d\s]/.test(query);
+    if (digitsOnly) { const i = document.getElementById("ccReqAddInn"); if (i && !i.value) i.value = query.replace(/\D/g, ""); }
+    else { const n = document.getElementById("ccReqAddName"); if (n && !n.value) n.value = query; }
+    host.innerHTML = `<div class="dbo-asset-empty">Поиск в МоеДело…</div>`;
+    try {
+        const data = await clientsApi("searchMoedeloKontragents", { query });
+        const results = Array.isArray(data?.results) ? data.results : [];
+        if (!results.length) { host.innerHTML = `<div class="dbo-asset-empty">В МоеДело не найдено — создайте контрагента ниже.</div>`; return; }
+        host.innerHTML = results.map(r => `<div class="dbo-inv-hit">
+            <span class="dbo-inv-hit-body"><b>${escapeHtml(r.name || r.inn)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span>
+            <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccReqBind('${escapeHtml(r.inn)}', this)" data-name="${escapeHtml(r.name || '')}">Привязать</button>
+        </div>`).join("");
+    } catch (e) {
+        console.error("searchMoedeloKontragents", e);
+        host.innerHTML = `<div class="dbo-asset-empty">Не удалось выполнить поиск: ${escapeHtml(String(e.message || e))}</div>`;
+    }
+}
+async function ccReqBind(inn, btn) {
+    const name = btn?.getAttribute("data-name") || "";
+    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    try {
+        const data = await clientsApi("bindMoedeloKontragent", { clientId: ccReqClientId, inn, name });
+        ccRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : []);
+        const w = document.querySelector(".cc-req-section .dbo-inv-addwrap"); if (w) w.open = false;
+        const s = document.getElementById("ccReqSearchResults"); if (s) s.innerHTML = "";
+        const q = document.getElementById("ccReqSearchInput"); if (q) q.value = "";
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизит привязан");
+    } catch (e) {
+        console.error("bindMoedeloKontragent", e);
+        alert("Не удалось привязать: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = "Привязать"; }
+    }
+}
+async function ccReqCreate() {
+    const inn = String(document.getElementById("ccReqAddInn")?.value || "").replace(/\D/g, "");
+    const name = String(document.getElementById("ccReqAddName")?.value || "").trim();
+    const form = String(document.getElementById("ccReqAddForm")?.value || "");
+    if (!/^\d{10}$|^\d{12}$/.test(inn)) { alert("ИНН должен содержать 10 или 12 цифр."); return; }
+    if (!name) { alert("Укажите наименование контрагента."); return; }
+    const btn = document.querySelector(".cc-req-section .dbo-inv-create-row .dbo-btn-primary");
+    if (btn) { btn.disabled = true; btn.textContent = "Создаём в МоеДело…"; }
+    try {
+        const data = await clientsApi("createMoedeloKontragent", { clientId: ccReqClientId, inn, name, form });
+        ccRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : []);
+        const i = document.getElementById("ccReqAddInn"); if (i) i.value = "";
+        const n = document.getElementById("ccReqAddName"); if (n) n.value = "";
+        const s = document.getElementById("ccReqSearchResults"); if (s) s.innerHTML = "";
+        const w = document.querySelector(".cc-req-section .dbo-inv-addwrap"); if (w) w.open = false;
+        if (typeof showReadinessToast === "function") showReadinessToast("Контрагент создан в МоеДело и привязан");
+    } catch (e) {
+        console.error("createMoedeloKontragent", e);
+        alert("Не удалось создать контрагента: " + String(e.message || e));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Создать в МоеДело и привязать"; }
+    }
+}
+async function ccReqDelete(inn, btn) {
+    if (!confirm("Удалить этот реквизит у клиента? (в МоеДело и PrintOffice он останется)")) return;
+    if (btn) btn.disabled = true;
+    try {
+        const data = await clientsApi("deleteClientRequisite", { clientId: ccReqClientId, inn });
+        ccRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : []);
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизит удалён");
+    } catch (e) {
+        console.error("deleteClientRequisite", e);
+        alert("Не удалось удалить реквизит: " + String(e.message || e));
+        if (btn) btn.disabled = false;
+    }
 }
 
 // Синхронизация всех сделок CRM → БД. reopenCrmId — переоткрыть карточку после.

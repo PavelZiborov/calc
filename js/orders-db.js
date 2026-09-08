@@ -1536,8 +1536,8 @@ async function dbOpenInvoiceCreate(crmId) {
                         <div id="dbInvSearchResults" class="dbo-inv-search-results"></div>
                         <div class="dbo-inv-create-hint">Нет нужного в МоеДело? Создайте новый контрагент:</div>
                         <div class="dbo-inv-create-row">
-                            <input type="text" id="dbInvAddInn" inputmode="numeric" placeholder="ИНН (10 или 12 цифр)" maxlength="12">
-                            <input type="text" id="dbInvAddName" placeholder="Наименование (ООО «…»)">
+                            <input type="text" id="dbInvAddInn" inputmode="numeric" placeholder="ИНН (10 или 12 цифр)" maxlength="12" onblur="reqInnAutoFill(this, document.getElementById('dbInvAddName'), document.getElementById('dbInvAddForm'))">
+                            <input type="text" id="dbInvAddName" placeholder="Наименование (подставится по ИНН)">
                             <select id="dbInvAddForm" class="dbo-inv-formsel" title="Организационная форма">
                                 <option value="">форма: авто</option>
                                 <option value="UL">Юр. лицо</option>
@@ -1566,7 +1566,8 @@ function dbRenderRequisites(list, selectInn) {
         host.innerHTML = list.map((r, i) => {
             const checked = selectInn ? (r.inn === selectInn) : (i === 0);
             return `<label class="dbo-inv-req"><input type="radio" name="dbInvReq" value="${escapeHtml(r.inn)}"${checked ? " checked" : ""} onchange="dbInvReqPicked()">
-                <span class="dbo-inv-req-body"><b>${escapeHtml(r.name || r.title)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span></label>`;
+                <span class="dbo-inv-req-body"><b>${escapeHtml(r.name || r.title)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span>
+                <button type="button" class="dbo-inv-reqdel" title="Удалить реквизит" onclick="event.preventDefault();event.stopPropagation();dbDeleteRequisite('${escapeHtml(r.inn)}',this)">×</button></label>`;
         }).join("");
     }
     dbInvReqPicked();
@@ -1579,6 +1580,48 @@ async function dbLoadRequisites(selectInn) {
         console.error("getClientRequisites", e);
         const host = document.getElementById("dbInvReqList");
         if (host) host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить реквизиты.</div>`;
+    }
+}
+// Автозаполнение названия по ИНН через DaData (ЕГРЮЛ/ЕГРИП). Общий помощник для обеих форм.
+let _dadataHintShown = false;
+async function reqInnAutoFill(innEl, nameEl, formEl) {
+    if (!innEl || !nameEl) return;
+    const inn = String(innEl.value || "").replace(/\D/g, "");
+    if (!/^\d{10}$|^\d{12}$/.test(inn)) return;
+    if (nameEl.value.trim()) return;   // не перезатираем введённое вручную
+    const ph = nameEl.getAttribute("placeholder") || "";
+    nameEl.setAttribute("placeholder", "Ищем по ИНН…");
+    try {
+        const data = await clientsApi("lookupInn", { inn });
+        if (data?.found && data?.name) {
+            nameEl.value = data.name;
+            if (formEl && data.form && !formEl.value) formEl.value = data.form;
+        } else if (data && data.found === false) {
+            if (typeof showReadinessToast === "function") showReadinessToast("По этому ИНН в ЕГРЮЛ/ЕГРИП ничего не найдено");
+        }
+    } catch (e) {
+        console.warn("lookupInn", String(e.message || e));
+        if (!_dadataHintShown && /DaData/i.test(String(e.message || e))) {
+            _dadataHintShown = true;
+            if (typeof showReadinessToast === "function") showReadinessToast("Подключите DaData в Настройках — и название подставится по ИНН");
+        }
+    } finally {
+        nameEl.setAttribute("placeholder", ph);
+    }
+}
+// Удалить привязанный реквизит (только из нашей БД).
+async function dbDeleteRequisite(inn, btn) {
+    if (!confirm("Удалить этот реквизит у клиента? (в МоеДело и PrintOffice он останется)")) return;
+    if (btn) btn.disabled = true;
+    try {
+        const cur = document.querySelector('input[name="dbInvReq"]:checked')?.value || "";
+        const data = await clientsApi("deleteClientRequisite", { clientId: dbInvClientId, inn });
+        dbRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : [], cur === inn ? "" : cur);
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизит удалён");
+    } catch (e) {
+        console.error("deleteClientRequisite", e);
+        alert("Не удалось удалить реквизит: " + String(e.message || e));
+        if (btn) btn.disabled = false;
     }
 }
 // Поиск контрагентов в МоеДело по ИНН или названию.
@@ -2120,6 +2163,38 @@ function openSettingsPage() {
     if (typeof switchTab === "function") switchTab("settings-tab");
     renderYandexSettingsInline();
     renderMoedeloSettingsInline();
+    renderDadataSettingsInline();
+}
+async function renderDadataSettingsInline() {
+    const host = document.getElementById("settingsDadataHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка статуса…</p>`;
+    let status = { dadataConfigured: false };
+    try { status = await clientsApi("getIntegrations", {}); } catch (_) {}
+    host.innerHTML = `
+        <p class="dbo-ya-note">Автозаполнение названия контрагента по ИНН (ЕГРЮЛ/ЕГРИП) при добавлении реквизита.
+        Нужен бесплатный API-ключ DaData (тариф до 10 000 запросов/день).</p>
+        <div class="dbo-ya-status">Статус: <b class="${status.dadataConfigured ? "payment-ok" : "payment-alert"}">${status.dadataConfigured ? "подключено" : "не настроено"}</b></div>
+        <label class="dbo-edit-wide">API-ключ DaData (Token)
+            <input type="password" id="dboDadataToken" placeholder="${status.dadataConfigured ? "•••••• (задан) — введите новый, чтобы заменить" : "вставьте ключ"}" autocomplete="off">
+        </label>
+        <p class="dbo-ya-hint">Ключ хранится на сервере и не показывается обратно. Регистрация и ключ — на dadata.ru → Личный кабинет → API-интеграция.</p>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dboSaveDadataToken()">Сохранить</button>
+            ${status.dadataConfigured ? `<button class="dbo-btn dbo-btn-danger" onclick="dboSaveDadataToken(true)">Отключить</button>` : ""}
+        </div>`;
+}
+async function dboSaveDadataToken(clear = false) {
+    const token = clear ? "" : String(document.getElementById("dboDadataToken")?.value || "").trim();
+    if (!clear && !token) { alert("Введите ключ."); return; }
+    try {
+        await clientsApi("setDadataToken", { token });
+        if (typeof showReadinessToast === "function") showReadinessToast(clear ? "Интеграция отключена" : "Ключ сохранён");
+        renderDadataSettingsInline();
+    } catch (e) {
+        console.error("dboSaveDadataToken", e);
+        alert("Не удалось сохранить ключ.");
+    }
 }
 async function renderMoedeloSettingsInline() {
     const host = document.getElementById("settingsMoedeloHost");

@@ -550,8 +550,12 @@
     .dbo-inv-req { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; }
     .dbo-inv-req:hover { background: var(--surface-2); }
     .dbo-inv-req input { width: auto; margin: 2px 0 0; flex: 0 0 auto; }
-    .dbo-inv-req-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .dbo-inv-req-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
     .dbo-inv-req-inn { color: var(--text-muted); font-size: 12px; }
+    .dbo-inv-reqdel { flex: 0 0 auto; width: 24px; height: 24px; line-height: 1; padding: 0; border: none; background: none;
+        color: var(--text-muted); font-size: 19px; cursor: pointer; border-radius: 6px; margin: -2px -2px 0 0; }
+    .dbo-inv-reqdel:hover:not(:disabled) { background: var(--surface-2); color: var(--danger, #d33); }
+    .dbo-inv-reqdel:disabled { opacity: .5; cursor: default; }
     .dbo-inv-addwrap { margin-top: 8px; }
     .dbo-inv-addtoggle { font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; list-style: none; padding: 4px 0; user-select: none; }
     .dbo-inv-addtoggle::-webkit-details-marker { display: none; }
@@ -570,6 +574,10 @@
     .dbo-inv-create-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .dbo-inv-create-row input { flex: 1 1 140px; min-width: 110px; }
     .dbo-inv-formsel { flex: 0 0 auto; }
+    /* Реквизиты в карточке клиента (переиспользуют .dbo-inv-* стили) */
+    .cc-req-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .cc-req-widget .dbo-inv-req { cursor: default; }
+    .cc-req-widget .dbo-inv-req:hover { background: transparent; }
 
     /* ---- Мобильная версия попапов «Заказы БД» ---- */
     @media (max-width: 640px) {
@@ -579,7 +587,8 @@
         /* iOS не зумит при фокусе, если размер шрифта поля ≥ 16px */
         .dbo-edit-body input, .dbo-edit-body select, .dbo-edit-body textarea,
         .dbo-costinfo-input, .dbo-units-btn, .dbo-units-opt, .dbo-units-custom,
-        .dbo-layout-add input[type="url"], .dbo-af-edit input { font-size: 16px; }
+        .dbo-layout-add input[type="url"], .dbo-af-edit input,
+        .cc-req-widget input, .cc-req-widget select { font-size: 16px; }
         .dbo-edit-body .dbo-edit-name { font-size: 16px; }
         .dbo-head { padding: 14px 16px 12px; flex-wrap: wrap; }
         .dbo-num { font-size: 19px; }
