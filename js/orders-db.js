@@ -1521,6 +1521,10 @@ async function dbOpenInvoiceCreate(crmId) {
                 <button class="dbo-close" onclick="document.getElementById('dbInvOverlay')?.remove()">×</button></div>
             <div class="dbo-edit-body">
                 <p class="dbo-ya-note">Выберите реквизиты плательщика — счёт будет создан в МоеДело и записан в сделку. Реквизиты хранятся в нашей базе.</p>
+                <div class="dbo-inv-req-head">
+                    <span>Реквизиты клиента</span>
+                    <button type="button" class="dbo-inv-refresh" onclick="dbRefreshRequisites(this)" title="Подтянуть реквизиты из PrintOffice (на переходный период)">⟳ Обновить из PrintOffice</button>
+                </div>
                 <div id="dbInvReqList" class="dbo-inv-req-list"><div class="dbo-asset-empty">Загрузка реквизитов…</div></div>
                 <details class="dbo-inv-addwrap">
                     <summary class="dbo-inv-addtoggle">+ Добавить реквизит</summary>
@@ -1577,6 +1581,23 @@ async function dbAddRequisite() {
     } catch (e) {
         console.error("addClientRequisite", e);
         alert("Не удалось добавить реквизит: " + String(e.message || e));
+    }
+}
+// Принудительно подтянуть реквизиты клиента из PrintOffice (переходный период).
+// Дедуп на бэкенде — существующие не дублируются; выбор сохраняем.
+async function dbRefreshRequisites(btn) {
+    const cur = document.querySelector('input[name="dbInvReq"]:checked')?.value || "";
+    const old = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Обновляем…"; }
+    try {
+        const data = await clientsApi("refreshClientRequisites", { clientId: dbInvClientId });
+        dbRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : [], cur);
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизиты обновлены из PrintOffice");
+    } catch (e) {
+        console.error("refreshClientRequisites", e);
+        alert("Не удалось обновить реквизиты: " + String(e.message || e));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = old || "⟳ Обновить из PrintOffice"; }
     }
 }
 function dbInvEsc(e) { if (e.key === "Escape") dbCloseInvoice(); }
