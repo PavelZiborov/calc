@@ -884,6 +884,8 @@ function renderDbSyncBanner(job) {
 // ---- Карточка заказа (сделка + элементы) ----
 function dbDealCardEsc(e) {
     if (e.key !== "Escape") return;
+    // Если открыт просмотр превью на весь экран — Esc закрывает его (обрабатывает dboOpenLightbox), не заказ.
+    if (document.querySelector(".preview-lightbox")) return;
     // Если открыта форма позиции — Esc закрывает её (обрабатывает dbElEditEsc), не заказ.
     if (document.getElementById("dbElEditOverlay")) return;
     if (document.getElementById("dbPayOverlay")) return;

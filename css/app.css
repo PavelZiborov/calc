@@ -2495,7 +2495,7 @@
         .crm-list-thead { display: none; }
         .crm-item--list {
             display: grid;
-            grid-template-columns: 1fr auto;
+            grid-template-columns: minmax(0, auto) minmax(0, 1fr);
             grid-template-areas:
                 "num status"
                 "client client"
@@ -2505,9 +2505,13 @@
             gap: 4px 10px;
             align-items: center;
         }
+        /* Ячейки не должны распирать строку: длинные ссылки/названия без пробелов
+           переносятся, а не создают горизонтальный скролл всей страницы. */
+        .crm-item--list .dl-cell { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
         .crm-item--list .dl-num { grid-area: num; display: flex; align-items: center; gap: 2px; }
         .crm-item--list .dl-num .deal-num-btn { font-size: 16px; font-weight: bold; }
-        .crm-item--list .dl-status { grid-area: status; justify-self: end; }
+        .crm-item--list .dl-status { grid-area: status; justify-self: end; min-width: 0; max-width: 100%; }
+        .crm-item--list .dl-status .dbk-status-pill { max-width: 100%; }
         .crm-item--list .dl-client { grid-area: client; }
         .crm-item--list .dl-client-name { font-weight: 600; }
         .crm-item--list .dl-content { grid-area: content; }
@@ -3320,6 +3324,9 @@
         box-sizing: border-box;
     }
     /* Единая высота элементов тулбара «Заказы БД», чтобы ничего не «заезжало» */
+    /* Переключатель вида не сжимаем — иначе overflow:hidden обрезает кнопку «Канбан»
+       и она уезжает под поле поиска на узких экранах. */
+    .adv-toolbar-line .dbk-viewtoggle { flex: 0 0 auto; }
     .dbk-viewtoggle .dbk-view-btn { height: 36px; padding: 0 11px; }
     /* Масштаб канбана: вместо −/+ компактный дропдаун */
     .dbk-zoom-wrap { padding: 0; height: auto; border: none; background: transparent; gap: 0; }
