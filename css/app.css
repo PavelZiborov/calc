@@ -555,9 +555,21 @@
     .dbo-inv-addwrap { margin-top: 8px; }
     .dbo-inv-addtoggle { font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; list-style: none; padding: 4px 0; user-select: none; }
     .dbo-inv-addtoggle::-webkit-details-marker { display: none; }
-    .dbo-inv-addform { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .dbo-inv-addform input { flex: 1 1 160px; min-width: 120px; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; box-sizing: border-box; font-family: inherit; }
-    .dbo-inv-addform .dbo-btn { width: auto; margin: 0; padding: 8px 14px; cursor: pointer; }
+    .dbo-inv-addform { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .dbo-inv-addform input, .dbo-inv-addform select { margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; box-sizing: border-box; font-family: inherit; }
+    .dbo-inv-addform .dbo-btn { width: auto; margin: 0; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+    .dbo-inv-search-row { display: flex; gap: 8px; }
+    .dbo-inv-search-row input { flex: 1 1 auto; min-width: 0; }
+    .dbo-inv-search-results { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .dbo-inv-search-results:empty { display: none; }
+    .dbo-inv-hit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+    .dbo-inv-hit-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .dbo-inv-hit-body b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-btn-sm { padding: 5px 12px !important; font-size: 13px; flex: 0 0 auto; }
+    .dbo-inv-create-hint { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .dbo-inv-create-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .dbo-inv-create-row input { flex: 1 1 140px; min-width: 110px; }
+    .dbo-inv-formsel { flex: 0 0 auto; }
 
     /* ---- Мобильная версия попапов «Заказы БД» ---- */
     @media (max-width: 640px) {

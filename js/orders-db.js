@@ -1527,11 +1527,25 @@ async function dbOpenInvoiceCreate(crmId) {
                 </div>
                 <div id="dbInvReqList" class="dbo-inv-req-list"><div class="dbo-asset-empty">Загрузка реквизитов…</div></div>
                 <details class="dbo-inv-addwrap">
-                    <summary class="dbo-inv-addtoggle">+ Добавить реквизит</summary>
+                    <summary class="dbo-inv-addtoggle">+ Добавить реквизит из МоеДело</summary>
                     <div class="dbo-inv-addform">
-                        <input type="text" id="dbInvAddInn" inputmode="numeric" placeholder="ИНН (10 или 12 цифр)" maxlength="12">
-                        <input type="text" id="dbInvAddName" placeholder="Наименование (ООО «…»)">
-                        <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbAddRequisite()">Добавить</button>
+                        <div class="dbo-inv-search-row">
+                            <input type="text" id="dbInvSearch" placeholder="ИНН или название контрагента" onkeydown="if(event.key==='Enter'){event.preventDefault();dbSearchKontragents()}">
+                            <button type="button" class="dbo-btn" onclick="dbSearchKontragents()">Найти</button>
+                        </div>
+                        <div id="dbInvSearchResults" class="dbo-inv-search-results"></div>
+                        <div class="dbo-inv-create-hint">Нет нужного в МоеДело? Создайте новый контрагент:</div>
+                        <div class="dbo-inv-create-row">
+                            <input type="text" id="dbInvAddInn" inputmode="numeric" placeholder="ИНН (10 или 12 цифр)" maxlength="12">
+                            <input type="text" id="dbInvAddName" placeholder="Наименование (ООО «…»)">
+                            <select id="dbInvAddForm" class="dbo-inv-formsel" title="Организационная форма">
+                                <option value="">форма: авто</option>
+                                <option value="UL">Юр. лицо</option>
+                                <option value="IP">ИП</option>
+                                <option value="FL">Физлицо</option>
+                            </select>
+                            <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbCreateKontragent()">Создать в МоеДело и привязать</button>
+                        </div>
                     </div>
                 </details>
             </div>
@@ -1567,20 +1581,72 @@ async function dbLoadRequisites(selectInn) {
         if (host) host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить реквизиты.</div>`;
     }
 }
-async function dbAddRequisite() {
+// Поиск контрагентов в МоеДело по ИНН или названию.
+async function dbSearchKontragents() {
+    const query = String(document.getElementById("dbInvSearch")?.value || "").trim();
+    const host = document.getElementById("dbInvSearchResults");
+    if (!host) return;
+    if (query.length < 3) { host.innerHTML = `<div class="dbo-asset-empty">Введите ИНН или минимум 3 символа названия.</div>`; return; }
+    // Предзаполним форму создания на случай, если контрагент не найдётся.
+    const digitsOnly = !/[^\d\s]/.test(query);
+    if (digitsOnly) {
+        const i = document.getElementById("dbInvAddInn"); if (i && !i.value) i.value = query.replace(/\D/g, "");
+    } else {
+        const n = document.getElementById("dbInvAddName"); if (n && !n.value) n.value = query;
+    }
+    host.innerHTML = `<div class="dbo-asset-empty">Поиск в МоеДело…</div>`;
+    try {
+        const data = await clientsApi("searchMoedeloKontragents", { query });
+        const results = Array.isArray(data?.results) ? data.results : [];
+        if (!results.length) { host.innerHTML = `<div class="dbo-asset-empty">В МоеДело не найдено — создайте контрагента ниже.</div>`; return; }
+        host.innerHTML = results.map(r => `<div class="dbo-inv-hit">
+            <span class="dbo-inv-hit-body"><b>${escapeHtml(r.name || r.inn)}</b><span class="dbo-inv-req-inn">ИНН ${escapeHtml(r.inn)}</span></span>
+            <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbBindKontragent('${escapeHtml(r.inn)}', this)" data-name="${escapeHtml(r.name || '')}">Привязать</button>
+        </div>`).join("");
+    } catch (e) {
+        console.error("searchMoedeloKontragents", e);
+        host.innerHTML = `<div class="dbo-asset-empty">Не удалось выполнить поиск: ${escapeHtml(String(e.message || e))}</div>`;
+    }
+}
+// Привязать найденного контрагента (в нашу БД).
+async function dbBindKontragent(inn, btn) {
+    const name = btn?.getAttribute("data-name") || "";
+    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    try {
+        const data = await clientsApi("bindMoedeloKontragent", { clientId: dbInvClientId, inn, name });
+        dbRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : [], inn);
+        const w = document.querySelector(".dbo-inv-addwrap"); if (w) w.open = false;
+        const s = document.getElementById("dbInvSearchResults"); if (s) s.innerHTML = "";
+        const q = document.getElementById("dbInvSearch"); if (q) q.value = "";
+        if (typeof showReadinessToast === "function") showReadinessToast("Реквизит привязан");
+    } catch (e) {
+        console.error("bindMoedeloKontragent", e);
+        alert("Не удалось привязать: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = "Привязать"; }
+    }
+}
+// Создать нового контрагента в МоеДело и привязать к клиенту.
+async function dbCreateKontragent() {
     const inn = String(document.getElementById("dbInvAddInn")?.value || "").replace(/\D/g, "");
     const name = String(document.getElementById("dbInvAddName")?.value || "").trim();
+    const form = String(document.getElementById("dbInvAddForm")?.value || "");
     if (!/^\d{10}$|^\d{12}$/.test(inn)) { alert("ИНН должен содержать 10 или 12 цифр."); return; }
+    if (!name) { alert("Укажите наименование контрагента."); return; }
+    const btn = document.querySelector(".dbo-inv-create-row .dbo-btn-primary");
+    if (btn) { btn.disabled = true; btn.textContent = "Создаём в МоеДело…"; }
     try {
-        const data = await clientsApi("addClientRequisite", { clientId: dbInvClientId, inn, name });
+        const data = await clientsApi("createMoedeloKontragent", { clientId: dbInvClientId, inn, name, form });
         dbRenderRequisites(Array.isArray(data?.requisites) ? data.requisites : [], inn);
         const i = document.getElementById("dbInvAddInn"); if (i) i.value = "";
         const n = document.getElementById("dbInvAddName"); if (n) n.value = "";
+        const s = document.getElementById("dbInvSearchResults"); if (s) s.innerHTML = "";
         const w = document.querySelector(".dbo-inv-addwrap"); if (w) w.open = false;
-        if (typeof showReadinessToast === "function") showReadinessToast("Реквизит добавлен");
+        if (typeof showReadinessToast === "function") showReadinessToast("Контрагент создан в МоеДело и привязан");
     } catch (e) {
-        console.error("addClientRequisite", e);
-        alert("Не удалось добавить реквизит: " + String(e.message || e));
+        console.error("createMoedeloKontragent", e);
+        alert("Не удалось создать контрагента: " + String(e.message || e));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Создать в МоеДело и привязать"; }
     }
 }
 // Принудительно подтянуть реквизиты клиента из PrintOffice (переходный период).
