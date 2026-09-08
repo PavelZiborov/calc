@@ -368,12 +368,12 @@
 
     /* ==== Карточка заказа (в стиле детальной карточки «Заказы») ==== */
     .dbo-card { background: var(--surface); border-radius: 14px; box-shadow: 0 16px 50px rgba(28,27,25,0.28); width: min(900px, 100%); max-height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
-    .dbo-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
+    .dbo-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
     .dbo-head-left { min-width: 0; }
     .dbo-num { font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1.1; }
     .dbo-client { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 15px; color: var(--text); }
     .dbo-client .dbo-ic { color: var(--text-muted); flex: 0 0 auto; }
-    .dbo-head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .dbo-head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
     .dbo-head-right .dbk-status-pill { width: auto; min-width: 128px; font-size: 12.5px; padding: 7px 16px; }
     .dbo-crm { color: var(--accent); font-weight: 700; font-size: 16px; text-decoration: none; padding: 2px 6px; }
     .dbo-crm:hover { color: var(--accent-strong); }
@@ -590,10 +590,21 @@
         .dbo-layout-add input[type="url"], .dbo-af-edit input,
         .cc-req-widget input, .cc-req-widget select { font-size: 16px; }
         .dbo-edit-body .dbo-edit-name { font-size: 16px; }
-        .dbo-head { padding: 14px 16px 12px; flex-wrap: wrap; }
-        .dbo-num { font-size: 19px; }
-        .dbo-head-right { gap: 6px; }
+        /* Шапка: № + крестик в одну строку (крестик в правом углу), статус — отдельной строкой */
+        .dbo-head {
+            padding: 12px 14px 12px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-areas: "left close" "right right";
+            align-items: start;
+            column-gap: 10px;
+            row-gap: 10px;
+        }
+        .dbo-head-left { grid-area: left; }
+        .dbo-close { grid-area: close; align-self: start; }
+        .dbo-head-right { grid-area: right; margin-left: 0; flex-wrap: wrap; gap: 6px; width: 100%; }
         .dbo-head-right .dbk-status-pill { min-width: 0; }
+        .dbo-num { font-size: 19px; }
         .dbo-body { padding: 14px 16px 18px; }
         .dbo-edit-body { padding: 12px 16px 2px; }
         .dbo-edit-head, .dbo-edit-note { padding-left: 16px; padding-right: 16px; }
@@ -602,10 +613,12 @@
         .dbo-edit-row { grid-template-columns: repeat(2, 1fr); }
         /* Строка элемента: прячем «Себес.», оставляем Статус · Название · Кол-во · Сумма */
         .dbo-elements { padding: 2px 12px 6px; }
-        .dbo-el-head, .dbo-el-row { grid-template-columns: 28px minmax(0,1fr) auto auto; gap: 8px; }
+        .dbo-el-head, .dbo-el-row { grid-template-columns: 30px minmax(0,1fr) auto auto; gap: 8px; }
         .dbo-el-head span:nth-child(4), .dbo-el-cost { display: none; }
-        .dbo-el-head span:nth-child(1) { font-size: 0; }  /* «Статус» не влезает в 28px — прячем подпись */
+        .dbo-el-head span:nth-child(1) { font-size: 0; }  /* «Статус» не влезает в 30px — прячем подпись */
         .dbo-el-statusbtn { width: 26px; height: 26px; }
+        /* Статус-кнопка и превью — в столбик, чтобы не вылезали на название */
+        .dbo-el-status { flex-direction: column; align-items: center; gap: 4px; }
         /* Доп-поля — в один столбец */
         .dbo-af-list { grid-template-columns: 1fr; padding: 10px 12px; }
         /* История оплат: прячем метод и менеджера, оставляем дату · сумму · комментарий · отмену */
@@ -696,6 +709,7 @@
     .dbk-zoom-btn:hover:not(:disabled) { background: var(--surface-2); }
     .dbk-zoom-btn:disabled { opacity: 0.35; cursor: default; }
     .dbk-zoom-label { min-width: 36px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .dbk-zoom-select { display: none; }  /* на десктопе — кнопки −/+; на мобиле подменяется дропдауном */
     /* Фильтр-попап: статусы */
     .dbk-filter-statuses { display: flex; flex-direction: column; gap: 2px; max-height: 240px; overflow-y: auto; }
     /* Компактный список статусов (по аналогии со статусами заказа): сбрасываем
@@ -3298,12 +3312,23 @@
         flex: 1 1 auto;
         min-width: 0;
         width: auto;
-        height: 34px;
+        height: 36px;
         margin-top: 0;
-        padding: 6px 30px 6px 10px;
-        font-size: 14px;
+        padding: 7px 30px 7px 10px;
+        font-size: 16px;  /* ≥16px — iOS не зумит при фокусе */
         border-radius: 8px;
         box-sizing: border-box;
+    }
+    /* Единая высота элементов тулбара «Заказы БД», чтобы ничего не «заезжало» */
+    .dbk-viewtoggle .dbk-view-btn { height: 36px; padding: 0 11px; }
+    /* Масштаб канбана: вместо −/+ компактный дропдаун */
+    .dbk-zoom-wrap { padding: 0; height: auto; border: none; background: transparent; gap: 0; }
+    .dbk-zoom-wrap .dbk-zoom-btn, .dbk-zoom-wrap .dbk-zoom-label { display: none; }
+    .dbk-zoom-select {
+        display: inline-block; height: 36px; padding: 0 6px;
+        border: 1px solid var(--border); border-radius: var(--r-sm);
+        background: var(--surface); color: var(--text);
+        font-size: 16px; font-weight: 600; box-sizing: border-box;  /* 16px — без iOS-зума */
     }
     .adv-search-clear-btn {
         position: absolute;
@@ -3339,10 +3364,10 @@
     }
     .adv-toolbar-icon-btn {
         margin: 0;
-        width: 34px;
-        min-width: 34px;
-        max-width: 34px;
-        height: 34px;
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+        height: 36px;
         padding: 0;
         display: inline-flex;
         align-items: center;

@@ -395,6 +395,8 @@ function updateDbZoomUI() {
     const z = dbOrdersState.kanbanZoom || 1;
     const lbl = document.getElementById("dbZoomLabel");
     if (lbl) lbl.textContent = Math.round(z * 100) + "%";
+    const sel = document.getElementById("dbZoomSelect");
+    if (sel) sel.value = String(Math.round(z * 10) / 10);
     document.querySelectorAll("#dbZoomWrap .dbk-zoom-btn").forEach(b => {
         const inc = /увеличить/i.test(b.getAttribute("aria-label") || "");
         b.disabled = inc ? z >= 1 - 1e-9 : z <= 0.5 + 1e-9;
@@ -1343,8 +1345,8 @@ function renderDbDealCard(data, crmId) {
                 <div class="dbo-head-right">
                     ${dealStatusControl}
                     <a class="dbo-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в CRM">↗</a>
-                    <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
                 </div>
+                <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-body">
                 <div class="dbo-elements">
