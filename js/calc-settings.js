@@ -31,11 +31,12 @@ function _idsOf(pairs) {
 function defaultCalcSettings() {
     // Бумаги: объединяем полный список и самоклейки (в т.ч. HQ-варианты)
     const paperMap = new Map();
-    (papersFull || []).forEach(([name, id]) => paperMap.set(id, { id, name, hqExcluded: false }));
+    // sheetW/sheetH — размер печатного листа для этой бумаги (по умолчанию 320×450 мм).
+    (papersFull || []).forEach(([name, id]) => paperMap.set(id, { id, name, hqExcluded: false, sheetW: 320, sheetH: 450 }));
     (stickerPapers || []).forEach(([name, id]) => {
         if (!paperMap.has(id)) {
             // «_hq» варианты — бумага не учитывается в себестоимости HQ
-            paperMap.set(id, { id, name, hqExcluded: /_hq$/i.test(id) });
+            paperMap.set(id, { id, name, hqExcluded: /_hq$/i.test(id), sheetW: 320, sheetH: 450 });
         }
     });
 
@@ -170,12 +171,22 @@ function applyCalcSettings() {
     if (typeof SRA3_H !== "undefined") { try { SRA3_H = Number(s.sheet.height) || SRA3_H; } catch (_) {} }
 }
 
-// Параметры листа для calcLayout
-function getSheetParams() {
-    const s = getCalcSettings().sheet;
+// Параметры листа для calcLayout. Размер листа — свой для каждой бумаги
+// (materials.papers[].sheetW/sheetH); если не задан — берётся общий sheet.width/height.
+function getSheetParams(paperId) {
+    const cs = getCalcSettings();
+    const s = cs.sheet || {};
+    let width = Number(s.width) || 320;
+    let height = Number(s.height) || 450;
+    if (paperId) {
+        const p = (cs.materials?.papers || []).find(x => x && x.id === paperId);
+        if (p) {
+            if (Number(p.sheetW) > 0) width = Number(p.sheetW);
+            if (Number(p.sheetH) > 0) height = Number(p.sheetH);
+        }
+    }
     return {
-        width: Number(s.width) || 320,
-        height: Number(s.height) || 450,
+        width, height,
         gap: Number(s.gap) >= 0 ? Number(s.gap) : 2,
         margin: Number(s.margin) >= 0 ? Number(s.margin) : 5,
         marginPlotter: Number(s.marginPlotter) >= 0 ? Number(s.marginPlotter) : 15,

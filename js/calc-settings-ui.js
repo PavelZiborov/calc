@@ -77,10 +77,10 @@ function renderCsSheetPane(d) {
         <input type="number" min="1" step="1" value="${_csEsc(d.sheet[key])}" onchange="csSheetChange('${key}', this.value)">
       </label>`;
     return `
-      <p class="cs-note">Размер печатного листа и отступы, по которым считается число изделий на лист. Влияет на расчёт сразу.</p>
+      <p class="cs-note">Отступы и размер листа по умолчанию. Свой размер листа для каждой бумаги задаётся в «Материалы → Бумаги» — эти поля используются как значение по умолчанию.</p>
       <div class="cs-grid2">
-        ${f("Ширина листа, мм", "width")}
-        ${f("Высота листа, мм", "height")}
+        ${f("Ширина листа по умолч., мм", "width")}
+        ${f("Высота листа по умолч., мм", "height")}
         ${f("Зазор между макетами, мм", "gap")}
         ${f("Поле по краю, мм", "margin")}
         ${f("Поле при плоттерной резке, мм", "marginPlotter")}
@@ -102,16 +102,23 @@ function renderCsMaterialsPane(d) {
 }
 function renderCsMatList(kind, title, withHq) {
     const items = calcSettingsDraft.materials[kind] || [];
+    const isPapers = kind === "papers";
     const rows = items.map((m, i) => `
-      <div class="cs-mat-row">
+      <div class="cs-mat-row${isPapers ? " cs-mat-row--paper" : ""}">
         <input class="cs-mat-name" type="text" value="${_csEsc(m.name)}" placeholder="Название" onchange="csMatField('${kind}',${i},'name',this.value)">
         <input class="cs-mat-id" type="text" value="${_csEsc(m.id)}" placeholder="id" onchange="csMatField('${kind}',${i},'id',this.value)">
+        ${isPapers ? `<span class="cs-mat-sheet-wrap" title="Размер печатного листа для этой бумаги, мм">
+          <input class="cs-mat-sheet" type="number" min="1" step="1" value="${_csEsc(m.sheetW ?? 320)}" placeholder="Ш" onchange="csMatField('papers',${i},'sheetW',this.value)">
+          <span class="cs-mat-x">×</span>
+          <input class="cs-mat-sheet" type="number" min="1" step="1" value="${_csEsc(m.sheetH ?? 450)}" placeholder="В" onchange="csMatField('papers',${i},'sheetH',this.value)">
+        </span>` : ""}
         ${withHq ? `<label class="cs-hq" title="Исключить бумагу из себестоимости HQ"><input type="checkbox" ${m.hqExcluded?'checked':''} onchange="csMatField('${kind}',${i},'hqExcluded',this.checked)"> HQ</label>` : ""}
         <button type="button" class="cs-mat-del" title="Удалить" onclick="csMatDelete('${kind}',${i})">&times;</button>
       </div>`).join("");
     return `
       <details class="cs-cat" open>
         <summary>${title} <span class="cs-count">${items.length}</span></summary>
+        ${isPapers ? `<p class="cs-mat-hint">Пара полей у каждой бумаги — размер печатного листа <b>Ш×В, мм</b> (по умолчанию 320×450). По нему считается число изделий на лист.</p>` : ""}
         <div class="cs-mat-list">${rows || '<div class="cs-empty">Пусто</div>'}</div>
         <button type="button" class="cs-add" onclick="csMatAdd('${kind}')">+ Добавить</button>
       </details>`;
@@ -120,12 +127,13 @@ function csMatField(kind, idx, field, value) {
     const m = calcSettingsDraft.materials[kind]?.[idx];
     if (!m) return;
     if (field === "hqExcluded") m.hqExcluded = !!value;
+    else if (field === "sheetW" || field === "sheetH") { const n = parseFloat(value); if (Number.isFinite(n) && n > 0) m[field] = n; }
     else m[field] = String(value);
 }
 function csMatAdd(kind) {
     calcSettingsDraft.materials[kind] = calcSettingsDraft.materials[kind] || [];
     const base = { id: "", name: "" };
-    if (kind === "papers") base.hqExcluded = false;
+    if (kind === "papers") { base.hqExcluded = false; base.sheetW = 320; base.sheetH = 450; }
     calcSettingsDraft.materials[kind].push(base);
     renderCsMaterialsPane_refresh();
 }

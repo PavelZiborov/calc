@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=95">
+<link rel="stylesheet" href="css/app.css?v=96">
 </head>
 <body>
 
@@ -116,7 +116,7 @@
 
         <div id="sheetBlock">
             <div class="row">
-                <div class="col"><label>Бумага</label><select id="paper"></select></div>
+                <div class="col"><label>Бумага</label><select id="paper" onchange="calcLayout()"></select></div>
                 <div class="col"><label>Цветность</label><select id="colorSheet"></select></div>
             </div>
             <label>Ламинация</label><select id="lamSheet"></select>
@@ -159,15 +159,9 @@
                 <span>Превью</span>
             </div>
             <div class="calc-preview-stage">
-                <div class="calc-preview-diagram">
-                    <div class="calc-preview-dim-w"><span id="previewWidthLabel">90 мм</span></div>
-                    <div class="calc-preview-dim-h"><span id="previewHeightLabel">50 мм</span></div>
-                    <div class="calc-preview-rect" id="previewRect">
-                        <svg class="calc-preview-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>
-                    </div>
-                </div>
+                <div class="calc-preview-layout" id="previewLayout"><div class="cpl-empty">Укажите размер изделия</div></div>
             </div>
-            <p class="calc-preview-caption">Схематичное отображение пропорций</p>
+            <p class="calc-preview-caption" id="previewCaption">Схема раскладки на печатном листе</p>
         </aside>
         </div><!-- /calc-body -->
 
@@ -429,19 +423,19 @@
     </div>
 </div>
 
-<script src="js/config.js?v=95"></script>
-<script src="js/calculator-data.js?v=95"></script>
-<script src="js/calc-settings.js?v=95"></script>
-<script src="js/calc-settings-ui.js?v=95"></script>
-<script src="js/utils.js?v=95"></script>
-<script src="js/auth.js?v=95"></script>
-<script src="js/calculator.js?v=95"></script>
-<script src="js/crm.js?v=95"></script>
-<script src="js/element-editor.js?v=95"></script>
-<script src="js/kp-docx.js?v=95"></script>
-<script src="js/calc-sheet.js?v=95"></script>
-<script src="js/clients.js?v=95"></script>
-<script src="js/orders-db.js?v=95"></script>
-<script src="js/main.js?v=95"></script>
+<script src="js/config.js?v=96"></script>
+<script src="js/calculator-data.js?v=96"></script>
+<script src="js/calc-settings.js?v=96"></script>
+<script src="js/calc-settings-ui.js?v=96"></script>
+<script src="js/utils.js?v=96"></script>
+<script src="js/auth.js?v=96"></script>
+<script src="js/calculator.js?v=96"></script>
+<script src="js/crm.js?v=96"></script>
+<script src="js/element-editor.js?v=96"></script>
+<script src="js/kp-docx.js?v=96"></script>
+<script src="js/calc-sheet.js?v=96"></script>
+<script src="js/clients.js?v=96"></script>
+<script src="js/orders-db.js?v=96"></script>
+<script src="js/main.js?v=96"></script>
 </body>
 </html>

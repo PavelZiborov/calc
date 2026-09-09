@@ -966,33 +966,14 @@
         display: flex; align-items: center; justify-content: center;
         padding: 30px 30px 22px;
     }
-    .calc-preview-diagram { position: relative; }
-    .calc-preview-rect {
-        width: 150px; height: 83px;
-        background: var(--surface);
-        border: 2px solid var(--accent);
-        border-radius: 4px;
-        box-shadow: var(--shadow-sm);
-        display: flex; align-items: center; justify-content: center;
-        color: var(--accent);
-        transition: width 0.32s cubic-bezier(0.22,1,0.36,1), height 0.32s cubic-bezier(0.22,1,0.36,1);
-    }
-    .calc-preview-icon { width: 34px; height: 34px; opacity: 0.3; }
-    /* размерная линия — ширина (сверху) */
-    .calc-preview-dim-w { position: absolute; left: 0; right: 0; top: -20px; height: 1px; display: flex; align-items: center; justify-content: center; }
-    .calc-preview-dim-w::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--accent); opacity: 0.45; }
-    /* размерная линия — высота (справа) */
-    .calc-preview-dim-h { position: absolute; top: 0; bottom: 0; right: -18px; width: 1px; display: flex; align-items: center; justify-content: center; }
-    .calc-preview-dim-h::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--accent); opacity: 0.45; }
-    .calc-preview-dim-w span, .calc-preview-dim-h span {
-        position: relative; z-index: 1;
-        background: var(--surface-2);
-        padding: 0 6px;
-        font-size: 12px; font-weight: 700; color: var(--accent);
-        white-space: nowrap;
-    }
-    .calc-preview-dim-h span { transform: translateX(50%); padding: 4px 6px; }
-    .calc-preview-caption { margin: 2px 0 0; font-size: 11px; color: var(--text-muted); text-align: center; }
+    /* Схема раскладки на печатном листе */
+    .calc-preview-layout { display: flex; align-items: center; justify-content: center; min-height: 150px; }
+    .cpl-svg { display: block; filter: drop-shadow(0 2px 6px rgba(28,27,25,0.10)); }
+    .cpl-sheet { fill: var(--surface); stroke: var(--border); stroke-width: 1; }
+    .cpl-safe { fill: none; stroke: var(--accent); stroke-opacity: 0.28; stroke-width: 0.6; stroke-dasharray: 2 2; }
+    .cpl-item { fill: var(--accent); fill-opacity: 0.18; stroke: var(--accent); stroke-width: 0.6; }
+    .cpl-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 20px; }
+    .calc-preview-caption { margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted); text-align: center; line-height: 1.4; }
     @media (max-width: 720px) {
         .calc-body { grid-template-columns: 1fr; gap: 18px; }
         /* схему-превью на мобильном не показываем */
@@ -1129,6 +1110,15 @@
     .cs-mat-id { flex: 0 0 140px; width: 140px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
     .cs-hq { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap; margin: 0; }
     .cs-hq input { width: auto; margin: 0; }
+    /* Размер листа для бумаги (Ш×В) */
+    .cs-mat-hint { margin: 0 14px 8px; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+    .cs-mat-sheet-wrap { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; }
+    .cs-mat-sheet { width: 60px; text-align: center; font-size: 13px; padding-left: 4px; padding-right: 4px; }
+    .cs-mat-x { color: var(--text-muted); font-size: 12px; }
+    @media (max-width: 640px) {
+        .cs-mat-row--paper { flex-wrap: wrap; }
+        .cs-mat-row--paper .cs-mat-name { flex: 1 1 100%; }
+    }
     .cs-mat-del { flex: 0 0 auto; margin: 0; width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; background: var(--surface-3); color: var(--text-2); border: none; border-radius: var(--r-sm); box-shadow: none; }
     .cs-mat-del:hover { background: var(--danger-bg); color: var(--danger); }
     .cs-add { margin: 10px 14px 12px; width: auto; padding: 8px 14px; background: var(--surface-3); color: var(--text); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; box-shadow: none; }

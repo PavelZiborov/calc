@@ -87,35 +87,57 @@ function setFormat() { let f = document.getElementById("format").value, p = docu
 function customFormat() { document.getElementById("format").value = "custom"; calcLayout(); }
 function calcLayout() {
     let w = Number(document.getElementById("width").value), h = Number(document.getElementById("height").value);
-    const sp = (typeof getSheetParams === "function") ? getSheetParams() : { width: SRA3_W, height: SRA3_H, gap: 2, margin: 5, marginPlotter: 15 };
+    // Размер листа — свой для выбранной бумаги (лист. продукция); каталоги — общий.
+    const paperId = document.getElementById("paper")?.value || null;
+    const sp = (typeof getSheetParams === "function") ? getSheetParams(paperId) : { width: SRA3_W, height: SRA3_H, gap: 2, margin: 5, marginPlotter: 15 };
     let p = document.getElementById("product").value;
     let m = (p === "Наклейка" && document.getElementById("cutMethod").value === "plotter") ? sp.marginPlotter : sp.margin, g = sp.gap;
     let ww = sp.width - (m * 2), wh = sp.height - (m * 2);
-    let r1 = Math.floor((ww + g) / (w + g)) * Math.floor((wh + g) / (h + g));
-    let r2 = Math.floor((ww + g) / (h + g)) * Math.floor((wh + g) / (w + g));
-    document.getElementById("layout").value = Math.max(r1, r2) || 0;
+    // Две ориентации изделия — выбираем ту, что даёт больше штук на листе.
+    const colsA = Math.max(0, Math.floor((ww + g) / (w + g))), rowsA = Math.max(0, Math.floor((wh + g) / (h + g)));
+    const colsB = Math.max(0, Math.floor((ww + g) / (h + g))), rowsB = Math.max(0, Math.floor((wh + g) / (w + g)));
+    const nA = colsA * rowsA, nB = colsB * rowsB;
+    let grid;
+    if (nA >= nB) grid = { cols: colsA, rows: rowsA, itemW: w, itemH: h, count: nA };
+    else grid = { cols: colsB, rows: rowsB, itemW: h, itemH: w, count: nB };
+    document.getElementById("layout").value = grid.count || 0;
+    // Сохраняем раскладку для схемы-превью (лист + сетка изделий + отступы).
+    window.calcLayoutGrid = (w > 0 && h > 0)
+        ? { ...grid, sheetW: sp.width, sheetH: sp.height, margin: m, gap: g }
+        : null;
     updateSchematic();
 }
 
-// Интерактивная схема-превью: пропорции прямоугольника = ширина/высота изделия
+// Схема-превью: печатный лист с раскладкой изделий (сетка + отступы).
 function updateSchematic() {
-    const rect = document.getElementById("previewRect");
-    if (!rect) return;
+    const host = document.getElementById("previewLayout");
+    const cap = document.getElementById("previewCaption");
     const w = parseFloat(document.getElementById("width")?.value) || 0;
     const h = parseFloat(document.getElementById("height")?.value) || 0;
-    const wl = document.getElementById("previewWidthLabel");
-    const hl = document.getElementById("previewHeightLabel");
-    if (wl) wl.textContent = w ? `${w} мм` : "—";
-    if (hl) hl.textContent = h ? `${h} мм` : "—";
-    if (w > 0 && h > 0) {
-        const maxDim = 150; // макс. сторона прямоугольника в px
-        const ratio = w / h;
-        let rw, rh;
-        if (ratio >= 1) { rw = maxDim; rh = maxDim / ratio; }
-        else { rh = maxDim; rw = maxDim * ratio; }
-        rect.style.width = `${Math.round(rw)}px`;
-        rect.style.height = `${Math.round(rh)}px`;
+    if (!host) return;
+    const g = window.calcLayoutGrid;
+    if (!(w > 0 && h > 0) || !g || !g.count) {
+        host.innerHTML = `<div class="cpl-empty">Укажите размер изделия</div>`;
+        if (cap) cap.textContent = "Схема раскладки на печатном листе";
+        return;
     }
+    const { cols, rows, itemW, itemH, sheetW, sheetH, margin, gap } = g;
+    const boxW = 172, boxH = 224;                 // область под схему, px
+    const scale = Math.min(boxW / sheetW, boxH / sheetH);
+    const SW = sheetW * scale, SH = sheetH * scale, M = margin * scale, G = gap * scale, IW = itemW * scale, IH = itemH * scale;
+    let items = "";
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const x = (M + c * (IW + G)).toFixed(1), y = (M + r * (IH + G)).toFixed(1);
+            items += `<rect x="${x}" y="${y}" width="${Math.max(0, IW).toFixed(1)}" height="${Math.max(0, IH).toFixed(1)}" rx="0.6" class="cpl-item"/>`;
+        }
+    }
+    host.innerHTML = `<svg viewBox="0 0 ${SW.toFixed(1)} ${SH.toFixed(1)}" width="${Math.round(SW)}" height="${Math.round(SH)}" class="cpl-svg" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <rect x="0.4" y="0.4" width="${(SW - 0.8).toFixed(1)}" height="${(SH - 0.8).toFixed(1)}" rx="2" class="cpl-sheet"/>
+        <rect x="${M.toFixed(1)}" y="${M.toFixed(1)}" width="${Math.max(0, SW - 2 * M).toFixed(1)}" height="${Math.max(0, SH - 2 * M).toFixed(1)}" class="cpl-safe"/>
+        ${items}
+    </svg>`;
+    if (cap) cap.textContent = `Изделие ${w}×${h} мм · ${g.count} шт на листе ${sheetW}×${sheetH} мм`;
 }
 function updateType() {
     let t = document.getElementById("type").value, p = document.getElementById("product"); p.innerHTML = "";
