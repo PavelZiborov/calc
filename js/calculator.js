@@ -147,6 +147,16 @@ async function calc() {
                 lastCalcData.costBreakdownHtml = formatCostBreakdown(result.costDetails, result.costBreakdown);
                 lastCalcData.costTotal = toFiniteNumber(result.cost, result.lastCalc?.costTotal);
                 lastCalcData.costHQ = toFiniteNumber(result.costHQ ?? result.lastCalc?.costHQ);
+                // Себест. HQ по настройке «исключить бумагу из HQ»: если у выбранной бумаги
+                // стоит флаг — вычитаем стоимость бумаги из себестоимости (её покупают отдельно).
+                if (type === "sheet") {
+                    const paperId = document.getElementById("paper")?.value;
+                    const total = Number(lastCalcData.costTotal) || 0;
+                    const paperCost = Number(result.costDetails?.paper) || 0;
+                    lastCalcData.costHQ = (typeof isPaperHqExcluded === "function" && isPaperHqExcluded(paperId))
+                        ? Math.max(0, total - paperCost)
+                        : total;
+                }
                 // Наглядная сводка себестоимости (листы / себест. / себест. HQ) для проверки
                 const scs = document.getElementById("staffCostSummary");
                 if (scs) {

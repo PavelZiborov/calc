@@ -193,6 +193,13 @@ function getSheetParams(paperId) {
     };
 }
 
+// Исключена ли бумага из себестоимости HQ (флаг в настройках → материалы → бумаги).
+function isPaperHqExcluded(paperId) {
+    if (!paperId) return false;
+    const p = (getCalcSettings().materials?.papers || []).find(x => x && x.id === paperId);
+    return !!(p && p.hqExcluded);
+}
+
 // Правило для типа продукции (с дефолтом, если тип новый)
 function getProductRule(productName) {
     const s = getCalcSettings();

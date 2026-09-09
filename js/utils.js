@@ -125,10 +125,13 @@ function updateSchematic() {
     const boxW = 172, boxH = 224;                 // область под схему, px
     const scale = Math.min(boxW / sheetW, boxH / sheetH);
     const SW = sheetW * scale, SH = sheetH * scale, M = margin * scale, G = gap * scale, IW = itemW * scale, IH = itemH * scale;
+    // Раскладку центрируем на листе (а не прижимаем к верхнему левому углу).
+    const gridW = cols * IW + (cols - 1) * G, gridH = rows * IH + (rows - 1) * G;
+    const ox = (SW - gridW) / 2, oy = (SH - gridH) / 2;
     let items = "";
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-            const x = (M + c * (IW + G)).toFixed(1), y = (M + r * (IH + G)).toFixed(1);
+            const x = (ox + c * (IW + G)).toFixed(1), y = (oy + r * (IH + G)).toFixed(1);
             items += `<rect x="${x}" y="${y}" width="${Math.max(0, IW).toFixed(1)}" height="${Math.max(0, IH).toFixed(1)}" rx="0.6" class="cpl-item"/>`;
         }
     }
@@ -138,6 +141,74 @@ function updateSchematic() {
         ${items}
     </svg>`;
     if (cap) cap.textContent = `Изделие ${w}×${h} мм · ${g.count} шт на листе ${sheetW}×${sheetH} мм`;
+    updateItemPreview();
+}
+
+// Превью самого изделия — красивый схематичный вид с учётом типа продукции:
+// буклет — с линией сложения (биговка); наклейка — прямоугольная (гильотина)
+// или фигурная (плоттер); каталог — буклет со страницами; остальное — карточка.
+function updateItemPreview() {
+    const host = document.getElementById("previewItem");
+    if (!host) return;
+    const type = document.getElementById("type")?.value || "sheet";
+    const product = document.getElementById("product")?.value || "";
+    const w = parseFloat(document.getElementById("width")?.value) || 0;
+    const h = parseFloat(document.getElementById("height")?.value) || 0;
+    if (!(w > 0 && h > 0)) { host.innerHTML = ""; return; }
+    const rounding = !!document.getElementById("rounding")?.checked;
+    const cutMethod = document.getElementById("cutMethod")?.value || "straight";
+    const isSticker = (product === "Наклейка");
+    const isBuklet = (product === "Буклет");
+    const isCatalog = (type === "catalog");
+
+    const VB = 160, VH = 124;                     // область viewBox
+    const ratio = w / h;
+    let iw, ih;
+    const maxW = VB - 24, maxH = VH - 24;
+    if (ratio >= maxW / maxH) { iw = maxW; ih = maxW / ratio; } else { ih = maxH; iw = maxH * ratio; }
+    const x = (VB - iw) / 2, y = (VH - ih) / 2;
+    const cx = VB / 2, cy = VH / 2;
+    const rx = rounding ? Math.min(iw, ih) * 0.12 : 2;
+    let body = "";
+
+    if (isSticker && cutMethod === "plotter") {
+        // Фигурная (плоттерная) наклейка: сильно скруглённая форма + контур реза (пунктир).
+        const R = Math.min(iw, ih) * 0.32;
+        const pad = 5;
+        body = `
+            <rect x="${(x - pad).toFixed(1)}" y="${(y - pad).toFixed(1)}" width="${(iw + 2 * pad).toFixed(1)}" height="${(ih + 2 * pad).toFixed(1)}" rx="${(R + pad).toFixed(1)}" class="cpi-diecut"/>
+            <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="${R.toFixed(1)}" class="cpi-sticker"/>
+            <circle cx="${(cx).toFixed(1)}" cy="${(cy - ih * 0.08).toFixed(1)}" r="${(Math.min(iw, ih) * 0.16).toFixed(1)}" class="cpi-accent"/>`;
+    } else if (isSticker) {
+        // Гильотинная наклейка: прямоугольная, с тонким белым полем.
+        body = `
+            <rect x="${(x - 3).toFixed(1)}" y="${(y - 3).toFixed(1)}" width="${(iw + 6).toFixed(1)}" height="${(ih + 6).toFixed(1)}" rx="2" class="cpi-sticker-bg"/>
+            <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="2" class="cpi-sticker"/>
+            <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(Math.min(iw, ih) * 0.16).toFixed(1)}" class="cpi-accent"/>`;
+    } else if (isCatalog) {
+        // Каталог/презентация: обложка + корешок + торцы страниц.
+        body = `
+            <rect x="${(x + 4).toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="2" class="cpi-page"/>
+            <rect x="${(x + 2).toFixed(1)}" y="${(y + 1.5).toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="2" class="cpi-page"/>
+            <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="2" class="cpi-card"/>
+            <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="6" height="${ih.toFixed(1)}" class="cpi-spine"/>
+            <rect x="${(x + iw * 0.28).toFixed(1)}" y="${(y + ih * 0.24).toFixed(1)}" width="${(iw * 0.5).toFixed(1)}" height="4" rx="2" class="cpi-accent"/>
+            <rect x="${(x + iw * 0.28).toFixed(1)}" y="${(y + ih * 0.42).toFixed(1)}" width="${(iw * 0.4).toFixed(1)}" height="3" rx="1.5" class="cpi-line"/>`;
+    } else {
+        // Карточка/визитка/листовка/меню/открытка: аккуратный прямоугольник + шаблон.
+        const px = iw * 0.14, py = ih * 0.18;
+        body = `
+            <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="${rx.toFixed(1)}" class="cpi-card"/>
+            <rect x="${(x + px).toFixed(1)}" y="${(y + py).toFixed(1)}" width="${(iw * 0.32).toFixed(1)}" height="${(ih * 0.16).toFixed(1)}" rx="1.5" class="cpi-accent"/>
+            <rect x="${(x + px).toFixed(1)}" y="${(y + ih * 0.5).toFixed(1)}" width="${(iw - 2 * px).toFixed(1)}" height="3" rx="1.5" class="cpi-line"/>
+            <rect x="${(x + px).toFixed(1)}" y="${(y + ih * 0.5 + 7).toFixed(1)}" width="${(iw - 2 * px - iw * 0.2).toFixed(1)}" height="3" rx="1.5" class="cpi-line"/>`;
+        if (isBuklet) {
+            // Линия сложения (биговка) по длинной стороне.
+            if (iw >= ih) body += `<line x1="${cx.toFixed(1)}" y1="${y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y + ih).toFixed(1)}" class="cpi-fold"/>`;
+            else body += `<line x1="${x.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(x + iw).toFixed(1)}" y2="${cy.toFixed(1)}" class="cpi-fold"/>`;
+        }
+    }
+    host.innerHTML = `<svg viewBox="0 0 ${VB} ${VH}" width="${VB}" height="${VH}" class="cpi-svg" aria-hidden="true">${body}</svg>`;
 }
 function updateType() {
     let t = document.getElementById("type").value, p = document.getElementById("product"); p.innerHTML = "";
