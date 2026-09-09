@@ -256,11 +256,21 @@ function setDbView(view) {
     updateDbViewToggle();
     loadDbDeals();
 }
+function toggleDbView() {
+    setDbView(dbOrdersState.view === "kanban" ? "list" : "kanban");
+}
 function updateDbViewToggle() {
-    const l = document.getElementById("dbViewListBtn");
-    const k = document.getElementById("dbViewKanbanBtn");
-    if (l) l.classList.toggle("is-active", dbOrdersState.view === "list");
-    if (k) k.classList.toggle("is-active", dbOrdersState.view === "kanban");
+    // Одна кнопка-переключатель: показываем иконку целевого вида (куда переключимся).
+    const btn = document.getElementById("dbViewToggleBtn");
+    if (btn) {
+        const isKanban = dbOrdersState.view === "kanban";
+        btn.title = isKanban ? "Показать списком" : "Показать канбаном";
+        const icList = btn.querySelector(".dbk-view-ic-list");
+        const icKanban = btn.querySelector(".dbk-view-ic-kanban");
+        // style.display, т.к. [hidden] на svg перебивается правилом .icn{display:…}
+        if (icList) icList.style.display = isKanban ? "" : "none";     // в канбане — иконка списка (цель)
+        if (icKanban) icKanban.style.display = isKanban ? "none" : ""; // в списке — иконка канбана (цель)
+    }
     const zoomWrap = document.getElementById("dbZoomWrap");
     if (zoomWrap) zoomWrap.style.display = dbOrdersState.view === "kanban" ? "" : "none";
     // Канбан — на весь экран (класс на body включает полноширинную раскладку).
@@ -466,7 +476,7 @@ function dbDealCardHtml(d) {
     const num = escapeHtml(String(d.num ?? d.crm_deal_id ?? ""));
     const summary = dbCardSummary(d.content);
     return `
-        <div class="dbk-card" draggable="true" ondragstart="dbDragStart(event, ${d.crm_deal_id})" ondragend="dbDragEnd(event)" onclick="openDbDealCard(${d.crm_deal_id})" title="Перетащите в колонку, чтобы сменить статус; клик — открыть">
+        <div class="dbk-card" data-deal-id="${d.crm_deal_id}" draggable="true" ondragstart="dbDragStart(event, ${d.crm_deal_id})" ondragend="dbDragEnd(event)" onclick="openDbDealCard(${d.crm_deal_id})" title="Перетащите в колонку, чтобы сменить статус; клик — открыть">
             <div class="dbk-card-top">
                 <span class="dbk-card-num">№ ${num}</span>
                 <span class="dbk-card-amount ${dbAmountPayClass(d)}">${money(d.amount)} ₽</span>
@@ -508,7 +518,9 @@ function renderDbKanban() {
             <div class="dbk-col-body">${c.deals.map(dbDealCardHtml).join("")}</div>
         </div>`).join("")}</div>`;
     applyDbKanbanHeight();
-    dbSetupBoardPan(document.querySelector("#dbOrdersBody .dbk-board"));
+    const boardEl = document.querySelector("#dbOrdersBody .dbk-board");
+    dbSetupBoardPan(boardEl);
+    dbSetupBoardTouchDrag(boardEl);
 }
 
 // Панорамирование доски мышью (замена горизонтальному скроллбару):
@@ -534,6 +546,118 @@ function dbSetupBoardPan(board) {
     const stop = () => { if (panning) { panning = false; board.classList.remove("dbk-board--panning"); } };
     window.addEventListener("mouseup", stop);
     window.addEventListener("mouseleave", stop);
+}
+
+// Перетаскивание карточек пальцем (touch) — нативный HTML5 DnD на тач не работает.
+// Долгое нажатие (~200мс) «поднимает» карточку; быстрый свайп — обычная прокрутка вбок.
+// Карточка-призрак следует за пальцем, у края доска автоскроллится, при отпускании —
+// перенос в колонку под пальцем (без перерисовки, скролл сохраняется).
+function dbSetupBoardTouchDrag(board) {
+    if (!board || board.dataset.touchDndBound === "1") return;
+    board.dataset.touchDndBound = "1";
+    const HOLD_MS = 200, MOVE_CANCEL = 10, EDGE = 46, EDGE_SPEED = 14;
+    let card = null, dealId = null, ghost = null, holdTimer = null;
+    let dragging = false, offX = 0, offY = 0, curCol = null, autoRAF = 0, lastX = 0;
+
+    const clearHold = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
+
+    board.addEventListener("pointerdown", (e) => {
+        if (e.pointerType !== "touch" || e.isPrimary === false) return;
+        const c = e.target.closest(".dbk-card");
+        if (!c || e.target.closest("button, a, input, select, textarea")) return;
+        card = c; dealId = Number(c.dataset.dealId);
+        const sx = e.clientX, sy = e.clientY;
+        clearHold();
+        holdTimer = setTimeout(() => { holdTimer = null; beginDrag(sx, sy); }, HOLD_MS);
+        // до старта drag: если палец заметно двинулся — это скролл/свайп, отменяем захват
+        const preMove = (ev) => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > MOVE_CANCEL) { clearHold(); board.removeEventListener("pointermove", preMove); } };
+        board.addEventListener("pointermove", preMove, { passive: true });
+        const preUp = () => { clearHold(); board.removeEventListener("pointermove", preMove); board.removeEventListener("pointerup", preUp); board.removeEventListener("pointercancel", preUp); };
+        board.addEventListener("pointerup", preUp);
+        board.addEventListener("pointercancel", preUp);
+    });
+
+    function beginDrag(sx, sy) {
+        if (!card) return;
+        dragging = true;
+        try { navigator.vibrate && navigator.vibrate(12); } catch (_) {}
+        const r = card.getBoundingClientRect();
+        const zoom = dbOrdersState.kanbanZoom || 1;
+        offX = sx - r.left; offY = sy - r.top; lastX = sx;
+        ghost = card.cloneNode(true);
+        ghost.classList.add("dbk-card--ghost");
+        ghost.style.width = (r.width / zoom) + "px";   // после scale(zoom) → фактическая ширина карточки
+        ghost.style.left = r.left + "px";
+        ghost.style.top = r.top + "px";
+        ghost.style.transformOrigin = "top left";
+        ghost.style.transform = `scale(${zoom}) rotate(1.5deg)`;
+        document.body.appendChild(ghost);
+        card.classList.add("dbk-card--dragging");
+        board.classList.add("dbk-board--carddrag");   // touch-action: none, чтобы не скроллилось
+        document.addEventListener("pointermove", onMove, { passive: false });
+        document.addEventListener("pointerup", onUp);
+        document.addEventListener("pointercancel", onUp);
+    }
+
+    function onMove(e) {
+        if (!dragging) return;
+        e.preventDefault();
+        lastX = e.clientX;
+        ghost.style.left = (e.clientX - offX) + "px";
+        ghost.style.top = (e.clientY - offY) + "px";
+        const under = document.elementFromPoint(e.clientX, e.clientY);
+        const col = under && under.closest(".dbk-col");
+        if (col !== curCol) {
+            if (curCol) curCol.classList.remove("dbk-col--over");
+            curCol = col;
+            if (curCol) curCol.classList.add("dbk-col--over");
+        }
+        ensureAutoScroll();
+    }
+
+    function ensureAutoScroll() {
+        if (autoRAF) return;
+        const step = () => {
+            if (!dragging) { autoRAF = 0; return; }
+            const rect = board.getBoundingClientRect();
+            let dx = 0;
+            if (lastX < rect.left + EDGE) dx = -EDGE_SPEED;
+            else if (lastX > rect.right - EDGE) dx = EDGE_SPEED;
+            if (dx) board.scrollLeft += dx;
+            autoRAF = dx ? requestAnimationFrame(step) : 0;
+        };
+        autoRAF = requestAnimationFrame(step);
+    }
+
+    function onUp() {
+        if (!dragging) { cleanup(); return; }
+        const col = curCol;
+        const dropDealId = dealId;
+        cleanup();
+        // подавляем «клик» после перетаскивания, чтобы не открылась карточка
+        document.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); }, { capture: true, once: true });
+        if (col) {
+            const sid = Number(col.dataset.statusId);
+            const deal = dbFindDeal(dropDealId);
+            if (deal && Number.isFinite(sid) && sid >= 0 && Number(deal.status_id) !== sid) {
+                setDealStatusFromKanban(dropDealId, sid);
+            }
+        }
+    }
+
+    function cleanup() {
+        clearHold();
+        dragging = false;
+        if (autoRAF) { cancelAnimationFrame(autoRAF); autoRAF = 0; }
+        if (ghost) { ghost.remove(); ghost = null; }
+        if (card) card.classList.remove("dbk-card--dragging");
+        if (curCol) curCol.classList.remove("dbk-col--over");
+        board.classList.remove("dbk-board--carddrag");
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        card = null; curCol = null; dealId = null;
+    }
 }
 
 // Высота канбана: тянем доску до низа экрана (учитываем zoom, т.к. он масштабирует высоту).
@@ -596,7 +720,41 @@ function dbDrop(e, statusId) {
     if (!id || !Number.isFinite(Number(statusId)) || Number(statusId) < 0) return;
     const deal = dbFindDeal(id);
     if (!deal || Number(deal.status_id) === Number(statusId)) return;
-    setDealStatus(id, statusId);
+    setDealStatusFromKanban(id, statusId);
+}
+
+// Оптимистичный перенос карточки в колонку БЕЗ полной перерисовки доски —
+// сохраняет позицию горизонтального скролла (иначе доска прыгает в начало).
+function dbKanbanMoveCardDom(dealId, statusId) {
+    const board = document.querySelector("#dbOrdersBody .dbk-board");
+    if (!board) return false;
+    const card = board.querySelector(`.dbk-card[data-deal-id="${dealId}"]`);
+    const body = board.querySelector(`.dbk-col[data-status-id="${statusId}"] .dbk-col-body`);
+    if (!card || !body) return false;
+    body.appendChild(card);
+    board.querySelectorAll(".dbk-col").forEach(col => {
+        const cnt = col.querySelector(".dbk-col-count");
+        if (cnt) cnt.textContent = col.querySelectorAll(".dbk-col-body .dbk-card").length;
+    });
+    return true;
+}
+// Смена статуса из канбана: оптимистично двигаем карточку в DOM (без перерисовки,
+// скролл на месте) + PUT в CRM в фоне. При ошибке — откат и полная перерисовка.
+async function setDealStatusFromKanban(dealId, statusId) {
+    const deal = dbFindDeal(dealId);
+    const prev = deal ? { status_id: deal.status_id, status_name: deal.status_name } : null;
+    const st = (dbOrdersState.statuses || []).find(s => Number(s.id) === Number(statusId));
+    dbSetDealStatusLocal(dealId, Number(statusId), st ? st.name : (deal ? deal.status_name : ""));
+    if (!dbKanbanMoveCardDom(dealId, statusId)) renderDbOrders();
+    try {
+        await clientsApi("setDealStatus", { crmId: Number(dealId), statusId: Number(statusId) });
+        if (typeof showReadinessToast === "function") showReadinessToast(`№ ${deal?.num || dealId} → ${st?.name || ""}`);
+    } catch (e) {
+        console.error("setDealStatus", e);
+        if (prev) dbSetDealStatusLocal(dealId, prev.status_id, prev.status_name);
+        renderDbOrders();
+        alert("Не удалось сменить статус сделки в CRM.");
+    }
 }
 
 // ---- Перетаскивание КОЛОНОК (порядок сохраняется в localStorage) ----

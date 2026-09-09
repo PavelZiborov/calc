@@ -793,7 +793,11 @@
 
     .dbk-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; cursor: pointer; transition: box-shadow 0.15s ease, border-color 0.15s ease; }
     .dbk-card:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(29,88,198,0.12); }
-    .dbk-card--dragging { opacity: 0.5; }
+    .dbk-card--dragging { opacity: 0.4; }
+    /* Карточка-призрак при перетаскивании пальцем (следует за пальцем) */
+    .dbk-card--ghost { position: fixed; z-index: 3000; margin: 0; pointer-events: none; opacity: 0.96; box-shadow: 0 14px 30px rgba(28,27,25,0.30); border-color: var(--accent); background: var(--surface); }
+    /* Во время перетаскивания карточки пальцем — не скроллим доску */
+    .dbk-board--carddrag { touch-action: none; cursor: grabbing; }
     /* Полноэкранный канбан: контейнер во всю ширину (высоту доски задаёт JS),
        страница не скроллится — прокрутка только внутри столбиков + панорама доски. */
     body.db-kanban-active { overflow: hidden; }
@@ -4029,3 +4033,10 @@
     .nav-tab--sheet.active { color: #fff; }
     .csh-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; margin-left:2px; background:var(--secondary); color:#fff; border-radius:var(--r-pill); font-size:11px; font-weight:700; line-height:1; }
     .nav-tab--sheet.active .csh-tab-count { background:rgba(255,255,255,0.28); }
+
+/* ─── Мобильный ландшафт (перевёрнутый экран): прячем верхнюю панель, чтобы
+   освободить место (особенно для канбана). Портрет и планшеты не затронуты. ─── */
+@media (orientation: landscape) and (max-height: 500px) {
+    .app-top-bar { display: none; }
+    body { padding-top: 6px; }
+}
