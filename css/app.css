@@ -722,7 +722,9 @@
     .kp-form-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .kp-form-row .dbo-edit-wide { flex: 1 1 150px; }
     .kp-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; margin: 0; font-weight: 500; }
-    .kp-check input { width: auto; margin: 0; }
+    .kp-check input { width: auto; margin: 0; flex: 0 0 auto; }
+    .kp-round-check { align-items: flex-start; line-height: 1.4; margin: 2px 0 8px; }
+    .kp-round-check input { margin-top: 2px; }
     .kp-vars { padding: 4px 2px; }
     .kp-var { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; font-size: 12.5px; }
     .kp-var code { flex: 0 0 auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 12px; color: var(--accent); }

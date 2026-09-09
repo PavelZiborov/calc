@@ -2580,7 +2580,8 @@ async function renderKpSettingsInline() {
     const host = document.getElementById("settingsKpHost");
     if (!host) return;
     host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
-    try { const d = await clientsApi("getKpTemplates", {}); kpCompaniesCache = Array.isArray(d?.companies) ? d.companies : []; }
+    let roundOn = true;
+    try { const d = await clientsApi("getKpTemplates", {}); kpCompaniesCache = Array.isArray(d?.companies) ? d.companies : []; roundOn = d?.round_prices !== false; }
     catch (e) { console.error("getKpTemplates", e); host.innerHTML = `<p class="dbo-ya-note">Не удалось загрузить компании.</p>`; return; }
     const rows = kpCompaniesCache.map(c => `
         <div class="kp-co-row">
@@ -2597,6 +2598,7 @@ async function renderKpSettingsInline() {
         </div>`).join("");
     host.innerHTML = `
         <p class="dbo-ya-note">Для каждой компании загрузите .docx-шаблон. «Основная» — цены как в заказе; остальные — с наценкой (случайно в диапазоне, на каждую позицию), общая сумма пересчитывается.</p>
+        <label class="kp-check kp-round-check"><input type="checkbox" id="kpRound"${roundOn ? " checked" : ""} onchange="kpSetRounding(this.checked)"> Округлять цены после наценки (красивые цены): &gt;20₽ — до рубля, 10–20₽ — до 50 коп, &lt;10₽ — до 10 коп</label>
         <div class="kp-co-list">${rows || `<div class="dbo-asset-empty">Компаний пока нет — добавьте ниже.</div>`}</div>
         <details class="dbo-inv-addwrap" id="kpAddWrap">
             <summary class="dbo-inv-addtoggle">+ Добавить / изменить компанию</summary>
@@ -2634,6 +2636,16 @@ function kpToggleMarkupRow() {
     const base = document.getElementById("kpIsBase")?.checked;
     const row = document.getElementById("kpMarkupRow");
     if (row) row.style.display = base ? "none" : "";
+}
+async function kpSetRounding(enabled) {
+    try {
+        await clientsApi("setKpRounding", { enabled: !!enabled });
+        if (typeof showReadinessToast === "function") showReadinessToast(enabled ? "Округление цен включено" : "Округление цен выключено");
+    } catch (e) {
+        console.error("setKpRounding", e);
+        alert("Не удалось сохранить настройку округления.");
+        const cb = document.getElementById("kpRound"); if (cb) cb.checked = !enabled;
+    }
 }
 function kpResetForm() {
     ["kpEditId", "kpName", "kpMarkupMin", "kpMarkupMax", "kpPhone", "kpEmail", "kpSite", "kpInn", "kpAddress"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
