@@ -126,7 +126,17 @@ function catalogFormatDims(fmt) {
     if (Array.isArray(d)) { const a = Number(d[0]), b = Number(d[1]); if (a > 0 && b > 0) return [Math.min(a, b), Math.max(a, b)]; }
     return null;
 }
-// Формат/ориентация каталога + ограничения для скобы (A4 верт. / A5 гориз., лист 450×320).
+// Можно ли печатать каталог на скобе в данном формате+ориентации.
+// Максимум: A4 вертикальный (≤210×297) и A5 горизонтальный (≤210×148). Меньше — можно.
+function catalogStapleAllowed(fmt, orientation) {
+    const d = catalogFormatDims(fmt);
+    if (!d) return true;                       // нестандартный/свой формат — не ограничиваем
+    const [short, long] = d;
+    return orientation === "portrait"
+        ? (short <= 210 && long <= 297)        // не больше A4 вертикального
+        : (long <= 210 && short <= 148);       // не больше A5 горизонтального
+}
+// Формат/ориентация каталога + ограничения для скобы (лишние варианты прячем из дропдаунов).
 function applyCatalogFormat() {
     if (document.getElementById("type")?.value !== "catalog") return;
     const binding = document.getElementById("binding")?.value;
@@ -134,17 +144,20 @@ function applyCatalogFormat() {
     const orSel = document.getElementById("orientation");
     const note = document.getElementById("catalogBindingNote");
     if (!fmtSel || !orSel) return;
+    const firstVisible = sel => [...sel.options].find(o => !o.hidden)?.value;
     if (binding === "staple") {
-        // Скоба печатается разворотами — влезает только A4 вертикальный и A5 горизонтальный.
-        if (fmtSel.value !== "A4" && fmtSel.value !== "A5") fmtSel.value = "A4";
-        [...fmtSel.options].forEach(o => o.disabled = !(o.value === "A4" || o.value === "A5"));
-        const forced = fmtSel.value === "A4" ? "portrait" : "landscape";
-        orSel.value = forced;
-        [...orSel.options].forEach(o => o.disabled = (o.value !== forced));
-        if (note) { note.textContent = "Скоба: печать разворотами. Доступны A4 вертикальный и A5 горизонтальный (лист 450×320)."; note.style.display = "block"; }
+        // Форматы: прячем те, что не печатаются ни в одной ориентации (крупнее A4).
+        [...fmtSel.options].forEach(o => {
+            o.hidden = !(catalogStapleAllowed(o.value, "portrait") || catalogStapleAllowed(o.value, "landscape"));
+        });
+        if (fmtSel.options[fmtSel.selectedIndex]?.hidden) { const v = firstVisible(fmtSel); if (v) fmtSel.value = v; }
+        // Ориентация: прячем недопустимую для текущего формата.
+        [...orSel.options].forEach(o => { o.hidden = !catalogStapleAllowed(fmtSel.value, o.value); });
+        if (orSel.options[orSel.selectedIndex]?.hidden) { const v = firstVisible(orSel); if (v) orSel.value = v; }
+        if (note) { note.textContent = "Скоба: печать разворотами. Максимум — A4 вертикальный и A5 горизонтальный (лист 450×320); меньшие форматы доступны."; note.style.display = "block"; }
     } else {
-        [...fmtSel.options].forEach(o => o.disabled = false);
-        [...orSel.options].forEach(o => o.disabled = false);
+        [...fmtSel.options].forEach(o => o.hidden = false);
+        [...orSel.options].forEach(o => o.hidden = false);
         if (note) note.style.display = "none";
     }
     const dims = catalogFormatDims(fmtSel.value);
