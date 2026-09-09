@@ -1393,6 +1393,27 @@ function money2(n) {
     return (Number(n) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 const DBO_USER_ICON = '<svg class="dbo-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg>';
+const DBO_COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+
+// Копия заказа: подтверждение → бэкенд создаёт новую сделку (без макетов) → открываем её.
+async function dbCopyDeal(crmId, btn) {
+    const d = dbCardData?.deal || {};
+    const num = String(d.num ?? crmId);
+    if (!confirm(`Создать копию заказа № ${num}?\n\nСкопируются все позиции с ценами и себестоимостью. Макеты и превью не копируются.`)) return;
+    if (btn) { btn.disabled = true; btn.classList.add("is-busy"); }
+    try {
+        const data = await clientsApi("copyDeal", { dealId: Number(crmId) });
+        const newId = Number(data?.newDealId);
+        if (!Number.isFinite(newId)) throw new Error("бэкенд не вернул id новой сделки");
+        if (typeof showReadinessToast === "function") showReadinessToast(`Создан заказ № ${data?.deal?.num || newId} (копия)`);
+        if (typeof loadDbDeals === "function") loadDbDeals();
+        openDbDealCard(newId);   // откроем карточку новой сделки
+    } catch (e) {
+        console.error("copyDeal", e);
+        alert("Не удалось создать копию заказа: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.classList.remove("is-busy"); }
+    }
+}
 
 // Доп-инфо под элементом: «Название поля: значение · …»
 function dbElAfLine(e) {
@@ -1505,7 +1526,7 @@ function renderDbDealCard(data, crmId) {
         <div class="dbo-card" role="dialog" aria-modal="true">
             <div class="dbo-head">
                 <div class="dbo-head-left">
-                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}</div>
+                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button></div>
                     ${(d.created_at_crm || d.employee_name) ? `<div class="dbo-head-meta">${[
                         d.created_at_crm ? `<b>${escapeHtml(d.created_at_crm)}</b>` : "",
                         d.employee_name ? `Менеджер: <b>${escapeHtml(d.employee_name)}</b>` : ""
