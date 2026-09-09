@@ -3133,6 +3133,7 @@
     @media (max-width: 600px) {
         body { padding: 8px; font-size: 14px; overflow-x: hidden; }
         .app-top-bar {
+            width: calc(100% + 16px);   /* body padding на мобиле 8px → full-bleed без горизонт. скролла */
             margin: -8px -8px 8px;
             padding: 4px 8px 0;
             gap: 4px;
