@@ -389,7 +389,7 @@
     .dbo-body { padding: 18px 22px 22px; overflow-y: auto; }
 
     .dbo-elements { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 2px 14px 6px; }
-    .dbo-el-head, .dbo-el-row { display: grid; grid-template-columns: 88px minmax(0,1fr) 60px 84px 78px 104px; align-items: center; gap: 10px; }
+    .dbo-el-head, .dbo-el-row { display: grid; grid-template-columns: 88px minmax(0,1fr) 60px 84px 78px 104px 26px; align-items: center; gap: 10px; }
     .dbo-el-head { padding: 10px 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
     .dbo-el-head span:nth-child(3), .dbo-el-head span:nth-child(4), .dbo-el-head span:nth-child(5), .dbo-el-head span:nth-child(6) { text-align: right; }
     .dbo-el-row { padding: 11px 0; border-bottom: 1px dashed var(--border); }
@@ -406,6 +406,13 @@
     .dbo-el-price { color: var(--text-2, var(--text)); font-size: 13px; white-space: nowrap; }
     .dbo-el-cost { color: var(--text-muted); font-size: 13px; }
     .dbo-el-sum { font-weight: 700; color: var(--text); font-size: 13px; }
+    /* Компактный крестик удаления позиции */
+    .dbo-el-del { align-self: start; width: 24px; height: 24px; margin: 0; padding: 0; border: none; background: transparent; color: var(--text-muted); font-size: 18px; line-height: 1; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.55; transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease; }
+    .dbo-el-del:hover:not(:disabled) { opacity: 1; background: var(--surface); color: var(--danger); }
+    .dbo-el-del:disabled { opacity: 0.3; cursor: default; }
+    /* Зона удаления заказа (низ карточки) */
+    .dbo-danger-zone { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+    .dbo-del-deal { width: auto; margin: 0; padding: 8px 16px; cursor: pointer; }
     /* Кружок-статус элемента */
     .dbo-el-status { align-self: start; }
     /* Превью элемента — не мельче значка статуса (двойная специфичность бьёт .element-preview-thumb) */
@@ -627,8 +634,9 @@
         /* Строка элемента: оставляем Статус · Название · Кол-во · Сумма;
            цена/шт уходит в конец названия, себестоимость — строкой под ним */
         .dbo-elements { padding: 2px 12px 6px; }
-        .dbo-el-head, .dbo-el-row { grid-template-columns: 38px minmax(0,1fr) auto auto; gap: 8px; }
+        .dbo-el-head, .dbo-el-row { grid-template-columns: 34px minmax(0,1fr) auto auto 22px; gap: 8px; }
         .dbo-el-head span:nth-child(4), .dbo-el-head span:nth-child(5), .dbo-el-price, .dbo-el-cost { display: none; }
+        .dbo-el-del { width: 22px; height: 22px; font-size: 17px; }
         .dbo-el-head span:nth-child(1) { font-size: 0; }  /* «Статус» не влезает — прячем подпись */
         .dbo-el-statusbtn { width: 26px; height: 26px; }
         .dbo-el-status .dbo-el-thumb { flex-basis: 30px; width: 30px; height: 30px; }

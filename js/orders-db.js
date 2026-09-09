@@ -1395,6 +1395,48 @@ function money2(n) {
 const DBO_USER_ICON = '<svg class="dbo-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg>';
 const DBO_COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"/></svg>';
 
+// Удаление позиции: подтверждение → бэкенд удаляет её в CRM (PrintOffice) + БД.
+async function dbDeleteElement(elementId, btn) {
+    const list = dbCardData?.elements || [];
+    const idx = list.findIndex(x => Number(x.crm_element_id) === Number(elementId));
+    if (idx < 0) return;
+    const el = list[idx];
+    const nm = el.category_and_name || el.name || "позицию";
+    if (!confirm(`Удалить позицию «${nm}»?\n\nУдаление произойдёт и в PrintOffice. Действие необратимо.`)) return;
+    if (btn) btn.disabled = true;
+    const removed = list[idx];
+    list.splice(idx, 1);                       // оптимистично убираем
+    renderDbDealCard(dbCardData, dbCardDealId);
+    try {
+        await clientsApi("deleteElement", { dealId: Number(dbCardDealId), elementId: Number(elementId) });
+        if (typeof loadDbDeals === "function") loadDbDeals();
+        // Достоверные данные (суммы + доп-поля позиций) — перечитываем сделку.
+        try { const fresh = await clientsApi("getDeal", { crmId: Number(dbCardDealId) }); renderDbDealCard(fresh, dbCardDealId); } catch (_) {}
+        if (typeof showReadinessToast === "function") showReadinessToast("Позиция удалена");
+    } catch (e) {
+        console.error("deleteElement", e);
+        (dbCardData.elements ||= []).splice(idx, 0, removed);   // откат
+        renderDbDealCard(dbCardData, dbCardDealId);
+        alert("Не удалось удалить позицию: " + String(e.message || e));
+    }
+}
+// Удаление всей сделки: подтверждение → бэкенд удаляет её в CRM (PrintOffice) + БД.
+async function dbDeleteDeal(crmId, btn) {
+    const d = dbCardData?.deal || {};
+    const num = String(d.num ?? crmId);
+    if (!confirm(`Удалить заказ № ${num} полностью?\n\nЗаказ и все его позиции будут удалены, в том числе в PrintOffice. Действие необратимо.`)) return;
+    if (btn) { btn.disabled = true; btn.textContent = "Удаляем…"; }
+    try {
+        await clientsApi("deleteDeal", { dealId: Number(crmId) });
+        if (typeof showReadinessToast === "function") showReadinessToast(`Заказ № ${num} удалён`);
+        closeDbDealCard();
+        if (typeof loadDbDeals === "function") loadDbDeals();
+    } catch (e) {
+        console.error("deleteDeal", e);
+        alert("Не удалось удалить заказ: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = "Удалить заказ"; }
+    }
+}
 // Копия заказа: подтверждение → бэкенд создаёт новую сделку (без макетов) → открываем её.
 async function dbCopyDeal(crmId, btn) {
     const d = dbCardData?.deal || {};
@@ -1474,6 +1516,7 @@ function dbElementRow(e) {
             <div class="dbo-el-price">${price ? money2(price) : "—"}</div>
             <div class="dbo-el-cost">${cost ? money(cost) : "—"}</div>
             <div class="dbo-el-sum">${money2(total)}</div>
+            <button type="button" class="dbo-el-del" onclick="event.stopPropagation(); dbDeleteElement(${e.crm_element_id}, this)" title="Удалить позицию" aria-label="Удалить позицию">×</button>
         </div>`;
 }
 
@@ -1497,7 +1540,7 @@ function renderDbDealCard(data, crmId) {
         ? dbDealStatusSelectHtml({ crm_deal_id: crmId, status_id: d.status_id, status_name: d.status_name })
         : `<span class="dbk-status-pill" style="background:#dfdfdf;color:#555">${escapeHtml(d.status_name || "Статус не установлен")}</span>`;
 
-    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Цена/шт</span><span>Себес.</span><span>Сумма</span></div>`;
+    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Цена/шт</span><span>Себес.</span><span>Сумма</span><span></span></div>`;
     const elBody = elements.length
         ? elements.map(dbElementRow).join("")
         : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
@@ -1559,6 +1602,9 @@ function renderDbDealCard(data, crmId) {
                 ${invoiceBlock}
                 ${dealAfBlock}
                 ${costBlock}
+                <div class="dbo-danger-zone">
+                    <button type="button" class="dbo-btn dbo-btn-danger dbo-del-deal" onclick="dbDeleteDeal(${crmId}, this)">Удалить заказ</button>
+                </div>
             </div>
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
