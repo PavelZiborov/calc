@@ -83,29 +83,78 @@ function restoreAppUiState() {
 }
 function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }
 function fillFormatOptions(p) { let el = document.getElementById("format"); el.innerHTML = ""; let data = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); for (let k in data) { let o = document.createElement("option"); o.value = k; o.text = Array.isArray(data[k]) ? `${k} (${data[k][0]}x${data[k][1]} мм)` : data[k]; el.appendChild(o); } }
-function setFormat() { let f = document.getElementById("format").value, p = document.getElementById("product").value; let d = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); if(d[f] && Array.isArray(d[f])){ document.getElementById("width").value = d[f][0]; document.getElementById("height").value = d[f][1]; } calcLayout(); }
+function setFormat() {
+    // Каталоги — размер через формат + ориентацию + ограничения скрепления.
+    if (document.getElementById("type")?.value === "catalog") { applyCatalogFormat(); return; }
+    let f = document.getElementById("format").value, p = document.getElementById("product").value; let d = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); if(d[f] && Array.isArray(d[f])){ document.getElementById("width").value = d[f][0]; document.getElementById("height").value = d[f][1]; } calcLayout();
+}
 function customFormat() { document.getElementById("format").value = "custom"; calcLayout(); }
 function calcLayout() {
     let w = Number(document.getElementById("width").value), h = Number(document.getElementById("height").value);
     // Размер листа — свой для выбранной бумаги (лист. продукция); каталоги — общий.
     const paperId = document.getElementById("paper")?.value || null;
     const sp = (typeof getSheetParams === "function") ? getSheetParams(paperId) : { width: SRA3_W, height: SRA3_H, gap: 2, margin: 5, marginPlotter: 15 };
+    const type = document.getElementById("type")?.value || "sheet";
     let p = document.getElementById("product").value;
-    let m = (p === "Наклейка" && document.getElementById("cutMethod").value === "plotter") ? sp.marginPlotter : sp.margin, g = sp.gap;
+    let m = (p === "Наклейка" && document.getElementById("cutMethod")?.value === "plotter") ? sp.marginPlotter : sp.margin, g = sp.gap;
+    // Единица раскладки: обычно — изделие; каталог на скобе — разворот (2 страницы рядом).
+    let unitW = w, unitH = h, unitLabel = "Изделие", unitSuffix = " шт";
+    if (type === "catalog") {
+        const binding = document.getElementById("binding")?.value;
+        if (binding === "staple") { unitW = w * 2; unitH = h; unitLabel = "Разворот"; unitSuffix = ""; }
+        else { unitLabel = "Страница"; unitSuffix = ""; }
+    }
     let ww = sp.width - (m * 2), wh = sp.height - (m * 2);
-    // Две ориентации изделия — выбираем ту, что даёт больше штук на листе.
-    const colsA = Math.max(0, Math.floor((ww + g) / (w + g))), rowsA = Math.max(0, Math.floor((wh + g) / (h + g)));
-    const colsB = Math.max(0, Math.floor((ww + g) / (h + g))), rowsB = Math.max(0, Math.floor((wh + g) / (w + g)));
+    // Две ориентации единицы — выбираем ту, что даёт больше штук на листе.
+    const colsA = Math.max(0, Math.floor((ww + g) / (unitW + g))), rowsA = Math.max(0, Math.floor((wh + g) / (unitH + g)));
+    const colsB = Math.max(0, Math.floor((ww + g) / (unitH + g))), rowsB = Math.max(0, Math.floor((wh + g) / (unitW + g)));
     const nA = colsA * rowsA, nB = colsB * rowsB;
     let grid;
-    if (nA >= nB) grid = { cols: colsA, rows: rowsA, itemW: w, itemH: h, count: nA };
-    else grid = { cols: colsB, rows: rowsB, itemW: h, itemH: w, count: nB };
+    if (nA >= nB) grid = { cols: colsA, rows: rowsA, itemW: unitW, itemH: unitH, count: nA };
+    else grid = { cols: colsB, rows: rowsB, itemW: unitH, itemH: unitW, count: nB };
+    grid.unitLabel = unitLabel; grid.unitSuffix = unitSuffix; grid.unitW = grid.itemW; grid.unitH = grid.itemH;
     document.getElementById("layout").value = grid.count || 0;
     // Сохраняем раскладку для схемы-превью (лист + сетка изделий + отступы).
     window.calcLayoutGrid = (w > 0 && h > 0)
         ? { ...grid, sheetW: sp.width, sheetH: sp.height, margin: m, gap: g }
         : null;
     updateSchematic();
+}
+// Размер формата каталога (короткая, длинная сторона), из commonFormats.
+function catalogFormatDims(fmt) {
+    const d = (typeof commonFormats !== "undefined") ? commonFormats[fmt] : null;
+    if (Array.isArray(d)) { const a = Number(d[0]), b = Number(d[1]); if (a > 0 && b > 0) return [Math.min(a, b), Math.max(a, b)]; }
+    return null;
+}
+// Формат/ориентация каталога + ограничения для скобы (A4 верт. / A5 гориз., лист 450×320).
+function applyCatalogFormat() {
+    if (document.getElementById("type")?.value !== "catalog") return;
+    const binding = document.getElementById("binding")?.value;
+    const fmtSel = document.getElementById("format");
+    const orSel = document.getElementById("orientation");
+    const note = document.getElementById("catalogBindingNote");
+    if (!fmtSel || !orSel) return;
+    if (binding === "staple") {
+        // Скоба печатается разворотами — влезает только A4 вертикальный и A5 горизонтальный.
+        if (fmtSel.value !== "A4" && fmtSel.value !== "A5") fmtSel.value = "A4";
+        [...fmtSel.options].forEach(o => o.disabled = !(o.value === "A4" || o.value === "A5"));
+        const forced = fmtSel.value === "A4" ? "portrait" : "landscape";
+        orSel.value = forced;
+        [...orSel.options].forEach(o => o.disabled = (o.value !== forced));
+        if (note) { note.textContent = "Скоба: печать разворотами. Доступны A4 вертикальный и A5 горизонтальный (лист 450×320)."; note.style.display = "block"; }
+    } else {
+        [...fmtSel.options].forEach(o => o.disabled = false);
+        [...orSel.options].forEach(o => o.disabled = false);
+        if (note) note.style.display = "none";
+    }
+    const dims = catalogFormatDims(fmtSel.value);
+    if (dims) {
+        const [short, long] = dims;
+        const portrait = orSel.value === "portrait";
+        document.getElementById("width").value = portrait ? short : long;
+        document.getElementById("height").value = portrait ? long : short;
+    }
+    calcLayout();
 }
 
 // Схема-превью: печатный лист с раскладкой изделий (сетка + отступы).
@@ -140,7 +189,10 @@ function updateSchematic() {
         <rect x="${M.toFixed(1)}" y="${M.toFixed(1)}" width="${Math.max(0, SW - 2 * M).toFixed(1)}" height="${Math.max(0, SH - 2 * M).toFixed(1)}" class="cpl-safe"/>
         ${items}
     </svg>`;
-    if (cap) cap.textContent = `Изделие ${w}×${h} мм · ${g.count} шт на листе ${sheetW}×${sheetH} мм`;
+    if (cap) {
+        const uw = g.unitW ?? itemW, uh = g.unitH ?? itemH;
+        cap.textContent = `${g.unitLabel || "Изделие"} ${uw}×${uh} мм · ${g.count}${g.unitSuffix ?? " шт"} на листе ${sheetW}×${sheetH} мм`;
+    }
     updateItemPreview();
 }
 
@@ -158,6 +210,7 @@ function updateItemPreview() {
     const rounding = !!document.getElementById("rounding")?.checked;
     const cutMethod = document.getElementById("cutMethod")?.value || "straight";
     const isSticker = (product === "Наклейка");
+    const isPack = (product === "Стикерпак");
     const isBuklet = (product === "Буклет");
     const isCatalog = (type === "catalog");
 
@@ -185,6 +238,34 @@ function updateItemPreview() {
             <rect x="${(x - 3).toFixed(1)}" y="${(y - 3).toFixed(1)}" width="${(iw + 6).toFixed(1)}" height="${(ih + 6).toFixed(1)}" rx="2" class="cpi-sticker-bg"/>
             <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" rx="2" class="cpi-sticker"/>
             <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(Math.min(iw, ih) * 0.16).toFixed(1)}" class="cpi-accent"/>`;
+    } else if (isPack) {
+        // Стикерпак: подложка (общий размер) с разными фигурными наклейками внутри.
+        const pad = Math.min(iw, ih) * 0.09;
+        const cw = (iw - pad * 3) / 2, ch = (ih - pad * 3) / 2;
+        const cellCx = c => x + pad + c * (cw + pad) + cw / 2;
+        const cellCy = r => y + pad + r * (ch + pad) + ch / 2;
+        const shape = (cx0, cy0, s) => {
+            const rr = Math.min(cw, ch) / 2;
+            if (s === "circle") return `<circle cx="${cx0.toFixed(1)}" cy="${cy0.toFixed(1)}" r="${(rr * 0.92).toFixed(1)}" class="cpi-pack-item"/>`;
+            if (s === "star") {
+                const R = rr * 0.98, ri = R * 0.45, pts = [];
+                for (let i = 0; i < 10; i++) { const ang = -Math.PI / 2 + i * Math.PI / 5; const rad = i % 2 ? ri : R; pts.push(`${(cx0 + rad * Math.cos(ang)).toFixed(1)},${(cy0 + rad * Math.sin(ang)).toFixed(1)}`); }
+                return `<polygon points="${pts.join(" ")}" class="cpi-pack-item"/>`;
+            }
+            if (s === "heart") {
+                const u = rr * 0.95, sc = (u * 2) / 24;
+                const tx = (cx0 - u).toFixed(1), ty = (cy0 - u * 0.9).toFixed(1);
+                return `<path transform="translate(${tx} ${ty}) scale(${sc.toFixed(3)})" d="M12 21 C7 16.5 3 12.8 3 8.6 C3 6.1 5 4.2 7.4 4.2 C9.4 4.2 11 5.5 12 6.9 C13 5.5 14.6 4.2 16.6 4.2 C19 4.2 21 6.1 21 8.6 C21 12.8 17 16.5 12 21 Z" class="cpi-pack-item"/>`;
+            }
+            // rounded square
+            return `<rect x="${(cx0 - rr * 0.85).toFixed(1)}" y="${(cy0 - rr * 0.85).toFixed(1)}" width="${(rr * 1.7).toFixed(1)}" height="${(rr * 1.7).toFixed(1)}" rx="${(rr * 0.5).toFixed(1)}" class="cpi-pack-item"/>`;
+        };
+        body = `
+            <rect x="${(x - 2).toFixed(1)}" y="${(y - 2).toFixed(1)}" width="${(iw + 4).toFixed(1)}" height="${(ih + 4).toFixed(1)}" rx="3" class="cpi-pack-base"/>
+            ${shape(cellCx(0), cellCy(0), "circle")}
+            ${shape(cellCx(1), cellCy(0), "star")}
+            ${shape(cellCx(0), cellCy(1), "heart")}
+            ${shape(cellCx(1), cellCy(1), "square")}`;
     } else if (isCatalog) {
         // Каталог/презентация: обложка + корешок + торцы страниц.
         body = `
@@ -234,7 +315,9 @@ function updateType() {
         } else {
             fillOptions("paperCover", papersFull, "Бумага 300 гр."); fillOptions("paperBlock", papersFull, "Бумага 150 гр.");
         }
-        fillFormatOptions("default"); document.getElementById("format").value = "A4"; setFormat();
+        fillFormatOptions("default"); document.getElementById("format").value = "A4";
+        const orSel = document.getElementById("orientation"); if (orSel) orSel.value = "portrait";
+        applyCatalogFormat();
     }
 }
 

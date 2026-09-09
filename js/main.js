@@ -15,8 +15,9 @@ window.onload = () => {
     fillOptions("colorCover", colorOptions, "4+4"); 
     fillOptions("colorBlock", colorOptions, "4+4");
     
-    fillOptions("lamSheet", lamOptions, "Без ламинации"); 
+    fillOptions("lamSheet", lamOptions, "Без ламинации");
     fillOptions("lamCover", lamOptions, "Без ламинации");
+    fillOptions("lamBlock", lamOptions, "Без ламинации");
     
     updateType(); 
     setFormat(); 

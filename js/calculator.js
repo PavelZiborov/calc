@@ -54,11 +54,13 @@ async function calc() {
     } else {
         calcData.pages = pagesInput;
         calcData.binding = document.getElementById("binding").value;
+        calcData.orientation = document.getElementById("orientation")?.value || "portrait";
         calcData.paperCoverId = document.getElementById("paperCover").value;
         calcData.colorCoverId = document.getElementById("colorCover").value;
         calcData.lamCoverId = document.getElementById("lamCover").value;
         calcData.paperBlockId = document.getElementById("paperBlock").value;
         calcData.colorBlockId = document.getElementById("colorBlock").value;
+        calcData.lamBlockId = document.getElementById("lamBlock")?.value;
     }
 
     try {
