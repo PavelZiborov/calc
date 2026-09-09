@@ -260,8 +260,8 @@ async function openClientCard(crmId) {
         overlay.className = "client-card-overlay";
         overlay.setAttribute("onmousedown", "overlayDown(event)");
         overlay.setAttribute("onclick", "if (overlayClickedSelf(event)) closeClientCard()");
-        document.body.appendChild(overlay);
     }
+    document.body.appendChild(overlay);   // всегда в конец body → поверх карточки заказа
     overlay.style.display = "flex";
     overlay.innerHTML = `<div class="client-card"><div class="client-card-loading">Загрузка карточки…</div></div>`;
     document.addEventListener("keydown", clientCardEscHandler);
@@ -299,7 +299,7 @@ function clientCardDealRow(d) {
     const num = String(d.num ?? d.crm_deal_id ?? "").trim();
     const crmId = d.crm_deal_id;
     const numHtml = crmId
-        ? `<a href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener">№ ${escapeHtml(num)}</a>`
+        ? `<a href="#" onclick="event.preventDefault(); openDbDealCard(${crmId});" title="Открыть карточку заказа">№ ${escapeHtml(num)}</a>`
         : `№ ${escapeHtml(num)}`;
     const status = String(d.status_name ?? "").trim();
     const date = String(d.created_at_crm ?? "").trim();

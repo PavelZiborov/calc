@@ -373,6 +373,8 @@
     .dbo-num { font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1.1; }
     .dbo-client { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text); }
     .dbo-client .dbo-ic { color: var(--text-muted); flex: 0 0 auto; }
+    .dbo-client--link { cursor: pointer; }
+    .dbo-client--link:hover { color: var(--accent); text-decoration: underline; }
     .dbo-head-meta { display: none; }   /* дата · менеджер — только на мобиле (в шапке) */
     .dbo-head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
     .dbo-head-right .dbk-status-pill { width: auto; min-width: 128px; font-size: 12.5px; padding: 7px 16px; }
@@ -425,8 +427,9 @@
     .dbo-edit { background: var(--surface); border-radius: 14px; box-shadow: 0 16px 50px rgba(28,27,25,0.3); width: min(680px, 100%); max-height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
     .dbo-edit-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); }
     .dbo-edit-head h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text); }
-    .dbo-edit-body { padding: 14px 20px 2px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .dbo-edit-body label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted); }
+    .dbo-edit-body { padding: 14px 20px 2px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    /* margin:0 — снимаем глобальный label{margin-top:14px}, иначе двойные отступы между полями */
+    .dbo-edit-body label { display: flex; flex-direction: column; gap: 3px; margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted); }
     /* Ряд «как в PrintOffice»: ед.изм, кол-во, цена, себест., сумма — в одну строку */
     .dbo-edit-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px 10px; }
     .dbo-edit-body input, .dbo-edit-body select, .dbo-edit-body textarea { margin: 0; width: 100%; padding: 8px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; font-weight: 400; background: var(--surface); color: var(--text); box-sizing: border-box; text-transform: none; font-family: inherit; }
@@ -608,7 +611,7 @@
         }
         .dbo-head-left { grid-area: left; }
         .dbo-close { grid-area: close; align-self: start; }
-        .dbo-head-right { grid-area: right; margin-left: 0; flex-wrap: wrap; gap: 6px; width: 100%; }
+        .dbo-head-right { grid-area: right; margin-left: 0; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: 100%; }
         .dbo-head-right .dbk-status-pill { min-width: 0; }
         .dbo-num { font-size: 19px; }
         .dbo-body { padding: 14px 16px 18px; }
@@ -639,14 +642,15 @@
         /* Превью и макеты — в столбик */
         .dbo-assets-row { flex-direction: column; }
         .dbo-layouts-col { width: 100%; }
-        /* Дата и менеджер — в шапку (под номером/клиентом), из середины убираем */
-        .dbo-head-meta { display: block; margin-top: 8px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+        /* Дата · менеджер — сразу под номером (компактно), из середины убираем */
+        .dbo-head-meta { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-muted); line-height: 1.35; }
         .dbo-head-meta b { color: var(--text); font-weight: 600; }
+        .dbo-client { margin-top: 5px; }
         .dbo-meta { display: none; }
         /* Блок оплаты — на всю ширину, в стиле таблицы элементов */
         .dbo-mid { flex-direction: column; align-items: stretch; gap: 12px; margin-top: 12px; }
         .dbo-totals.payment-summary { width: 100% !important; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
-        .dbo-totals .payment-summary-row { grid-template-columns: 1fr auto auto; gap: 10px; padding: 11px 14px !important; background: transparent !important; border-bottom: 1px dashed var(--border); }
+        .dbo-totals .payment-summary-row { grid-template-columns: 1fr auto auto; gap: 10px; padding: 7px 14px !important; background: transparent !important; border-bottom: 1px dashed var(--border); line-height: 1.25; }
         .dbo-totals .payment-summary-row:last-child { border-bottom: none; }
         .dbo-totals .payment-summary-label { font-size: 13px !important; color: var(--text-muted); text-align: left; }
         .dbo-totals .payment-summary-value { font-size: 14px !important; text-align: right; }

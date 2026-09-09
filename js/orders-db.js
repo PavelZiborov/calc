@@ -1070,8 +1070,8 @@ async function openDbDealCard(crmId) {
         ov.className = "client-card-overlay";
         ov.setAttribute("onmousedown", "overlayDown(event)");
         ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbDealCard()");
-        document.body.appendChild(ov);
     }
+    document.body.appendChild(ov);   // всегда в конец body → поверх карточки клиента
     ov.style.display = "flex";
     ov.innerHTML = `<div class="client-card"><div class="client-card-loading">Загрузка заказа…</div></div>`;
     document.addEventListener("keydown", dbDealCardEsc);
@@ -1469,6 +1469,7 @@ function renderDbDealCard(data, crmId) {
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
+    const dbClientClickable = Number.isFinite(Number(d.client_crm_id)) && Number(d.client_crm_id) > 0;
 
     // Статус — цветная пилюля с меню (как в «Заказах»).
     const dealStatusControl = (dbOrdersState.statuses && dbOrdersState.statuses.length)
@@ -1505,11 +1506,11 @@ function renderDbDealCard(data, crmId) {
             <div class="dbo-head">
                 <div class="dbo-head-left">
                     <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}</div>
-                    <div class="dbo-client">${DBO_USER_ICON} ${escapeHtml(d.client_name || "—")}</div>
                     ${(d.created_at_crm || d.employee_name) ? `<div class="dbo-head-meta">${[
-                        d.created_at_crm ? `Дата: <b>${escapeHtml(d.created_at_crm)}</b>` : "",
+                        d.created_at_crm ? `<b>${escapeHtml(d.created_at_crm)}</b>` : "",
                         d.employee_name ? `Менеджер: <b>${escapeHtml(d.employee_name)}</b>` : ""
                     ].filter(Boolean).join(" · ")}</div>` : ""}
+                    <div class="dbo-client${dbClientClickable ? " dbo-client--link" : ""}"${dbClientClickable ? ` onclick="openClientCard(${Number(d.client_crm_id)})" title="Открыть карточку клиента"` : ""}>${DBO_USER_ICON} ${escapeHtml(d.client_name || "—")}</div>
                 </div>
                 <div class="dbo-head-right">
                     ${dealStatusControl}
