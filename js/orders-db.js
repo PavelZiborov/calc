@@ -1298,6 +1298,196 @@ async function dbSaveElEdit(elId) {
     }
 }
 
+// ——— Добавление новой позиции: меню (вручную / из калькулятора) ———
+function dbToggleAddElMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const menu = document.getElementById("dbAddElMenu");
+    if (!menu) return;
+    if (!menu.hidden) { dbCloseAddElMenu(); return; }
+    menu.hidden = false;
+    setTimeout(() => document.addEventListener("click", dbAddElMenuOutside), 0);
+}
+function dbAddElMenuOutside(e) {
+    const wrap = document.querySelector(".dbo-addel-wrap");
+    if (wrap && !wrap.contains(e.target)) dbCloseAddElMenu();
+}
+function dbCloseAddElMenu() {
+    const menu = document.getElementById("dbAddElMenu");
+    if (menu) menu.hidden = true;
+    document.removeEventListener("click", dbAddElMenuOutside);
+}
+function dbAddElManual() { dbCloseAddElMenu(); dbOpenElAdd(); }
+function dbAddElFromCalc() { dbCloseAddElMenu(); dbOpenCalcModal(); }
+
+// Форма новой позиции (как редактирование, но без макетов — их добавляют после сохранения).
+function dbOpenElAdd(prefill = {}) {
+    closeDbElEdit();
+    const name = String(prefill.name ?? "").trim();
+    const catId = prefill.categoryId != null ? Number(prefill.categoryId)
+        : (typeof getDefaultElementCategoryId === "function" ? getDefaultElementCategoryId() : (dbCardCategories?.[0]?.id ?? null));
+    const catOpts = (dbCardCategories || []).map(c =>
+        `<option value="${c.id}"${Number(c.id) === Number(catId) ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+    const units = prefill.units || "шт";
+    const qty = prefill.quantity != null ? Number(prefill.quantity) : 1;
+    const price = prefill.price != null ? Number(prefill.price) : 0;
+    const total = prefill.total != null ? Number(prefill.total) : Math.round(qty * price * 100) / 100;
+    const cost = prefill.cost != null ? Number(prefill.cost) : 0;
+    const costHq = prefill.costHq != null ? String(prefill.costHq) : "";
+    const sheets = prefill.sheets != null ? String(prefill.sheets) : "";
+    dbEditCostPerUnit = qty ? cost / qty : 0;
+    const ov = document.createElement("div");
+    ov.id = "dbElEditOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbElEdit()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head"><h3>Добавление позиции</h3>
+                <button class="dbo-close" onclick="closeDbElEdit()" aria-label="Закрыть">×</button></div>
+            <div class="dbo-edit-body">
+                <label class="dbo-edit-wide">Наименование
+                    <textarea id="dbEditName" class="dbo-edit-name" rows="1" oninput="dbAutoGrow(this)">${escapeHtml(name)}</textarea></label>
+                <label class="dbo-edit-wide">Категория
+                    <select id="dbEditCat">${catOpts || `<option value="">— нет категорий —</option>`}</select></label>
+                <div class="dbo-edit-row">
+                    <label>Ед.изм
+                        <div class="dbo-units" id="dbUnitsWrap">
+                            <button type="button" class="dbo-units-btn" id="dbUnitsBtn" onclick="dbToggleUnits(event)"><span id="dbUnitsBtnText">${escapeHtml(units)}</span><span class="dbo-units-caret">▾</span></button>
+                            <div class="dbo-units-menu" id="dbUnitsMenu" hidden>
+                                <button type="button" class="dbo-units-opt" onclick="dbPickUnit('шт')">шт</button>
+                                <button type="button" class="dbo-units-opt" onclick="dbPickUnit('услуга')">услуга</button>
+                                <input type="text" class="dbo-units-custom" placeholder="Своё значение" maxlength="32" oninput="dbUnitsCustom(this.value)">
+                            </div>
+                            <input type="hidden" id="dbEditUnits" value="${escapeHtml(units)}">
+                        </div>
+                    </label>
+                    <label>Кол-во<input type="text" inputmode="decimal" id="dbEditQty" value="${qty}" oninput="dbCleanNum(this); dbEditRecalc('qty')"></label>
+                    <label>Цена<input type="text" inputmode="decimal" id="dbEditPrice" value="${price}" oninput="dbCleanNum(this); dbEditRecalc('price')"></label>
+                    <label>Себестоимость<input type="text" inputmode="decimal" id="dbEditCost" value="${cost}" oninput="dbCleanNum(this)" onblur="dbCostBlur(this)"></label>
+                    <label>Сумма<input type="text" inputmode="decimal" id="dbEditTotal" value="${total}" oninput="dbCleanNum(this); dbEditRecalc('total')"></label>
+                </div>
+                <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
+                <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
+                <div class="dbo-addel-hint">Макеты и превью можно добавить после сохранения — откроется карточка позиции.</div>
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbEditSaveBtn" onclick="dbSaveElAdd()">Сохранить</button>
+                <button class="dbo-btn" onclick="closeDbElEdit()">Отмена</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    document.addEventListener("keydown", dbElEditEsc);
+    setTimeout(() => { const t = document.getElementById("dbEditName"); if (t) { dbAutoGrow(t); t.focus(); } }, 0);
+}
+async function dbSaveElAdd() {
+    const val = id => document.getElementById(id)?.value;
+    const name = String(val("dbEditName") || "").trim();
+    if (!name) { alert("Укажите наименование."); return; }
+    const categoryId = val("dbEditCat") !== "" ? Number(val("dbEditCat")) : null;
+    const units = String(val("dbEditUnits") || "шт").trim() || "шт";
+    const quantity = Number(val("dbEditQty")) || 0;
+    const price = Number(val("dbEditPrice")) || 0;
+    const total = Number(val("dbEditTotal")) || 0;
+    const cost = Number(val("dbEditCost")) || 0;
+    const costHq = String(val("dbEditCostHq") || "").trim();
+    const sheets = String(val("dbEditSheets") || "").trim();
+    const btn = document.getElementById("dbEditSaveBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Создание…"; }
+    try {
+        const data = await clientsApi("addElement", { dealId: Number(dbCardDealId), name, categoryId, units, quantity, price, total, cost, costHq, sheets });
+        if (data?.deal) dbCardData.deal = data.deal;
+        if (Array.isArray(data?.elements)) dbCardData.elements = data.elements;
+        renderDbDealCard(dbCardData, dbCardDealId);
+        closeDbElEdit();
+        loadDbDeals();
+        if (typeof showReadinessToast === "function") showReadinessToast("Позиция добавлена");
+        const newId = Number(data?.newElementId);
+        if (Number.isFinite(newId)) dbOpenElEdit(newId);   // открыть карточку для макетов/превью
+    } catch (err) {
+        console.error("addElement", err);
+        if (btn) { btn.disabled = false; btn.textContent = "Сохранить"; }
+        alert("Не удалось добавить позицию: " + String(err.message || err));
+    }
+}
+
+// ——— Калькулятор в попапе: переносим #calcContainer в модалку, считаем, добавляем в заказ ———
+let dbCalcReturnParent = null, dbCalcReturnNext = null;
+function dbOpenCalcModal() {
+    const calc = document.getElementById("calcContainer");
+    if (!calc) { alert("Калькулятор недоступен на этой странице."); return; }
+    if (document.getElementById("dbCalcOverlay")) return;
+    dbCalcReturnParent = calc.parentNode;
+    dbCalcReturnNext = calc.nextSibling;
+    const ov = document.createElement("div");
+    ov.id = "dbCalcOverlay";
+    ov.className = "client-card-overlay dbo-calc-overlay";
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-calc-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head"><h3>Калькулятор — новая позиция</h3>
+                <button class="dbo-close" onclick="dbCloseCalcModal()" aria-label="Закрыть">×</button></div>
+            <div class="dbo-calc-body" id="dbCalcBody"></div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbCalcAddBtn" onclick="dbAddCalcToDeal(this)">Добавить в заказ</button>
+                <button class="dbo-btn" onclick="dbCloseCalcModal()">Отмена</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    document.getElementById("dbCalcBody").appendChild(calc);   // переносим сам калькулятор внутрь модалки
+    document.addEventListener("keydown", dbCalcEsc);
+}
+function dbCalcEsc(e) { if (e.key === "Escape") dbCloseCalcModal(); }
+function dbReturnCalc() {
+    const calc = document.getElementById("calcContainer");
+    if (calc && dbCalcReturnParent) {
+        if (dbCalcReturnNext && dbCalcReturnNext.parentNode === dbCalcReturnParent) dbCalcReturnParent.insertBefore(calc, dbCalcReturnNext);
+        else dbCalcReturnParent.appendChild(calc);
+    }
+    dbCalcReturnParent = null; dbCalcReturnNext = null;
+}
+function dbCloseCalcModal() {
+    dbReturnCalc();
+    document.getElementById("dbCalcOverlay")?.remove();
+    document.removeEventListener("keydown", dbCalcEsc);
+}
+async function dbAddCalcToDeal(btn) {
+    if (typeof lastCalcData === "undefined" || !lastCalcData) {
+        alert("Сначала сделайте расчёт — кнопка «Рассчитать стоимость».");
+        return;
+    }
+    const s = (typeof window.currentCalcState !== "undefined" && window.currentCalcState) || {};
+    const name = String(lastCalcData.fullName || lastCalcData.name || "").trim();
+    if (!name) { alert("Не удалось определить наименование из расчёта."); return; }
+    const payload = {
+        dealId: Number(dbCardDealId), name,
+        categoryId: (typeof getDefaultElementCategoryId === "function" ? getDefaultElementCategoryId() : null),
+        units: "шт",
+        quantity: Number(lastCalcData.qty) || 0,
+        price: Number(lastCalcData.priceOne) || 0,
+        total: Number(lastCalcData.total) || 0,
+        cost: Math.round(Number(lastCalcData.costTotal ?? s.totalCost ?? 0)),
+        costHq: Math.round(Number(lastCalcData.costHQ ?? lastCalcData.costTotal ?? s.totalCost ?? 0)),
+        sheets: Number(lastCalcData.sra3Sheets ?? 0)
+    };
+    if (btn) { btn.disabled = true; btn.textContent = "Добавляем…"; }
+    try {
+        const data = await clientsApi("addElement", payload);
+        if (data?.deal) dbCardData.deal = data.deal;
+        if (Array.isArray(data?.elements)) dbCardData.elements = data.elements;
+        dbCloseCalcModal();
+        renderDbDealCard(dbCardData, dbCardDealId);
+        loadDbDeals();
+        if (typeof showReadinessToast === "function") showReadinessToast("Позиция добавлена из калькулятора");
+        const newId = Number(data?.newElementId);
+        if (Number.isFinite(newId)) dbOpenElEdit(newId);   // редактирование + макеты
+    } catch (e) {
+        console.error("addElement(calc)", e);
+        if (btn) { btn.disabled = false; btn.textContent = "Добавить в заказ"; }
+        alert("Не удалось добавить позицию: " + String(e.message || e));
+    }
+}
+
 function dbIcon(name) { return (typeof icon === "function") ? icon(name) : ""; }
 // Цвет/иконка статуса элемента по имени (как getStatusIcon в CRM).
 function dbElStatusColor(name, bkColor) {
@@ -1691,6 +1881,13 @@ function renderDbDealCard(data, crmId) {
                 <div class="dbo-elements">
                     ${elHead}
                     ${elBody}
+                </div>
+                <div class="dbo-addel-wrap">
+                    <button type="button" class="dbo-addel-btn" onclick="dbToggleAddElMenu(event)">+ Добавить наименование</button>
+                    <div class="dbo-addel-menu" id="dbAddElMenu" hidden>
+                        <button type="button" onclick="dbAddElManual()">Добавить вручную</button>
+                        <button type="button" onclick="dbAddElFromCalc()">Добавить из калькулятора</button>
+                    </div>
                 </div>
                 <div class="dbo-mid">
                     <div class="dbo-meta">
