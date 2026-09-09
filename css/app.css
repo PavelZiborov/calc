@@ -410,8 +410,22 @@
     .dbo-el-del { align-self: start; width: 24px; height: 24px; margin: 0; padding: 0; border: none; background: transparent; color: var(--text-muted); font-size: 18px; line-height: 1; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.55; transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease; }
     .dbo-el-del:hover:not(:disabled) { opacity: 1; background: var(--surface); color: var(--danger); }
     .dbo-el-del:disabled { opacity: 0.3; cursor: default; }
+    /* Действия внизу карточки: копировать для клиента / скачать КП */
+    .dbo-card-actions { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .dbo-card-actions .dbo-btn { width: auto; margin: 0; padding: 9px 16px; cursor: pointer; }
+    .dbo-kp-wrap { position: relative; display: inline-block; }
+    .dbo-kp-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 230px; max-width: 320px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 34px rgba(28,27,25,0.22); padding: 6px; }
+    .dbo-kp-menu[hidden] { display: none; }
+    .dbo-kp-note { padding: 10px 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+    .dbo-kp-company { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; border-radius: 8px; }
+    .dbo-kp-company:hover { background: var(--surface-2); }
+    .dbo-kp-company-name { font-size: 13px; font-weight: 600; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-kp-formats { flex: 0 0 auto; display: inline-flex; gap: 6px; }
+    .dbo-kp-fmt { margin: 0; padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--accent); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .dbo-kp-fmt:hover { background: var(--accent-container); color: #fff; border-color: var(--accent-container); }
     /* Зона удаления заказа (низ карточки) */
-    .dbo-danger-zone { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+    .dbo-danger-zone { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
     .dbo-del-deal { width: auto; margin: 0; padding: 8px 16px; cursor: pointer; }
     /* Кружок-статус элемента */
     .dbo-el-status { align-self: start; }
@@ -691,6 +705,29 @@
     .settings-card .dbo-edit-wide input { width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; box-sizing: border-box; }
     .settings-actions { display: flex; gap: 10px; margin-top: 8px; }
     .settings-actions .dbo-btn { width: auto; margin: 0; padding: 9px 18px; cursor: pointer; }
+    /* Шаблоны КП в настройках */
+    .kp-co-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+    .kp-co-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+    .kp-co-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+    .kp-co-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .kp-co-badge { font-size: 11.5px; font-weight: 600; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; }
+    .kp-co-badge--base { color: #fff; background: var(--accent-container); border-color: var(--accent-container); }
+    .kp-co-tpl { font-size: 12px; }
+    .kp-co-tpl.is-ok { color: var(--success, #15803D); }
+    .kp-co-tpl.is-warn { color: var(--danger); }
+    .kp-co-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .kp-co-actions .dbo-btn, .kp-co-upload { width: auto; margin: 0; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    .kp-co-upload { display: inline-flex; align-items: center; }
+    .kp-form { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .kp-form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .kp-form-row .dbo-edit-wide { flex: 1 1 150px; }
+    .kp-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; margin: 0; font-weight: 500; }
+    .kp-check input { width: auto; margin: 0; }
+    .kp-vars { padding: 4px 2px; }
+    .kp-var { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; font-size: 12.5px; }
+    .kp-var code { flex: 0 0 auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 12px; color: var(--accent); }
+    .kp-var span { color: var(--text-muted); }
+    .kp-var-group { margin: 10px 0 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 
     /* ---- Заказы БД: канбан ---- */
     .dbk-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }

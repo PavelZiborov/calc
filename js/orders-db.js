@@ -1395,6 +1395,111 @@ function money2(n) {
 const DBO_USER_ICON = '<svg class="dbo-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg>';
 const DBO_COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"/></svg>';
 
+// Копирование в буфер (с фолбэком на execCommand для незащищённого контекста).
+function dbCopyText(text, okMsg) {
+    const ok = () => { if (typeof showReadinessToast === "function") showReadinessToast(okMsg || "Скопировано"); };
+    const fail = () => alert("Не удалось скопировать автоматически. Скопируйте вручную:\n\n" + text);
+    const fallback = () => {
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = text; ta.style.position = "fixed"; ta.style.top = "-9999px"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            const done = document.execCommand("copy"); ta.remove();
+            done ? ok() : fail();
+        } catch (_) { fail(); }
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(ok).catch(fallback);
+    } else fallback();
+}
+// «Скопировать для заказчика»: список позиций (наименование, тираж, сумма, цена/шт) + итог.
+function dbCopyForClient(crmId, btn) {
+    const els = dbCardData?.elements || [];
+    if (!els.length) { alert("В заказе нет позиций для копирования."); return; }
+    let sum = 0;
+    const blocks = els.map(e => {
+        const name = dbElBaseName(e);
+        const qty = Number(e.quantity) || 0;
+        const total = Number(e.total) || 0;
+        const units = e.units || "шт";
+        const price = (e.price != null && Number(e.price) > 0) ? Number(e.price) : (qty ? total / qty : 0);
+        sum += total;
+        const qtyTxt = Number.isInteger(qty) ? String(qty) : String(qty);
+        return `${name}\n${qtyTxt} ${units} — ${money2(total)} ₽ (${price.toFixed(2)} ₽/шт)`;
+    });
+    const text = blocks.join("\n\n") + `\n\nИтого: ${money2(sum)} ₽`;
+    dbCopyText(text, "Заказ скопирован — можно отправить клиенту");
+}
+// ——— Меню «Скачать КП»: выбор компании (шаблона) и формата (Word / PDF) ———
+function dbToggleKpMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const menu = document.getElementById("dbKpMenu");
+    if (!menu) return;
+    if (!menu.hidden) { dbCloseKpMenu(); return; }
+    menu.innerHTML = `<div class="dbo-kp-note">Загрузка шаблонов…</div>`;
+    menu.hidden = false;
+    setTimeout(() => document.addEventListener("click", dbKpMenuOutside), 0);
+    dbLoadKpMenu();
+}
+function dbKpMenuOutside(e) {
+    const wrap = document.querySelector(".dbo-kp-wrap");
+    if (wrap && !wrap.contains(e.target)) dbCloseKpMenu();
+}
+function dbCloseKpMenu() {
+    const menu = document.getElementById("dbKpMenu");
+    if (menu) menu.hidden = true;
+    document.removeEventListener("click", dbKpMenuOutside);
+}
+async function dbLoadKpMenu() {
+    const menu = document.getElementById("dbKpMenu");
+    if (!menu) return;
+    let companies = [];
+    try { const data = await clientsApi("getKpTemplates", {}); companies = Array.isArray(data?.companies) ? data.companies : []; }
+    catch (e) { console.error("getKpTemplates", e); }
+    companies = companies.filter(c => c.has_template);   // без шаблона генерировать нечего
+    if (!companies.length) {
+        menu.innerHTML = `<div class="dbo-kp-note">Шаблоны КП не загружены.<br>Настройки → «Шаблоны коммерческих предложений».</div>`;
+        return;
+    }
+    menu.innerHTML = companies.map(c => `
+        <div class="dbo-kp-company">
+            <span class="dbo-kp-company-name">${escapeHtml(c.name)}</span>
+            <span class="dbo-kp-formats">
+                <button type="button" class="dbo-kp-fmt" onclick="dbDownloadKp('${escapeHtml(c.id)}','docx')">Word</button>
+                <button type="button" class="dbo-kp-fmt" onclick="dbDownloadKp('${escapeHtml(c.id)}','pdf')">PDF</button>
+            </span>
+        </div>`).join("");
+}
+async function dbDownloadKp(companyId, format) {
+    dbCloseKpMenu();
+    if (typeof showReadinessToast === "function") showReadinessToast("Готовим КП…");
+    try {
+        await dbFetchKpFile(Number(dbCardDealId), companyId, format);
+    } catch (e) {
+        console.error("generateKp", e);
+        alert("Не удалось сформировать КП: " + String(e.message || e));
+    }
+}
+// Скачивание сгенерированного КП (бинарный ответ) с сервера.
+async function dbFetchKpFile(dealId, companyId, format) {
+    const resp = await fetch(CLIENTS_URL, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ action: "generateKp", dealId: Number(dealId), companyId, format })
+    });
+    if (resp.status === 401) { if (typeof handleUnauthorized === "function") handleUnauthorized(); throw new Error("Unauthorized"); }
+    if (!resp.ok) { let d = ""; try { d = await resp.text(); } catch (_) {} throw new Error(`(${resp.status}) ${d}`.trim()); }
+    const blob = await resp.blob();
+    let filename = `КП.${format === "pdf" ? "pdf" : "docx"}`;
+    const cd = resp.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+    if (m) { try { filename = decodeURIComponent(m[1]); } catch (_) { filename = m[1]; } }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (typeof showReadinessToast === "function") showReadinessToast("КП скачано");
+}
 // Удаление позиции: подтверждение → бэкенд удаляет её в CRM (PrintOffice) + БД.
 async function dbDeleteElement(elementId, btn) {
     const list = dbCardData?.elements || [];
@@ -1602,6 +1707,13 @@ function renderDbDealCard(data, crmId) {
                 ${invoiceBlock}
                 ${dealAfBlock}
                 ${costBlock}
+                <div class="dbo-card-actions">
+                    <button type="button" class="dbo-btn" onclick="dbCopyForClient(${crmId}, this)" title="Скопировать список позиций с ценами для отправки клиенту">Скопировать для заказчика</button>
+                    <div class="dbo-kp-wrap">
+                        <button type="button" class="dbo-btn" onclick="dbToggleKpMenu(event)" title="Скачать коммерческое предложение">Скачать КП ▾</button>
+                        <div class="dbo-kp-menu" id="dbKpMenu" hidden></div>
+                    </div>
+                </div>
                 <div class="dbo-danger-zone">
                     <button type="button" class="dbo-btn dbo-btn-danger dbo-del-deal" onclick="dbDeleteDeal(${crmId}, this)">Удалить заказ</button>
                 </div>
@@ -2403,6 +2515,7 @@ function openSettingsPage() {
     renderYandexSettingsInline();
     renderMoedeloSettingsInline();
     renderDadataSettingsInline();
+    renderKpSettingsInline();
 }
 async function renderDadataSettingsInline() {
     const host = document.getElementById("settingsDadataHost");
@@ -2433,6 +2546,169 @@ async function dboSaveDadataToken(clear = false) {
     } catch (e) {
         console.error("dboSaveDadataToken", e);
         alert("Не удалось сохранить ключ.");
+    }
+}
+
+// ——— Настройки: шаблоны коммерческих предложений ———
+let kpCompaniesCache = [];
+function kpFileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => { const s = String(r.result || ""); const i = s.indexOf(","); resolve(i >= 0 ? s.slice(i + 1) : s); };
+        r.onerror = () => reject(new Error("Не удалось прочитать файл"));
+        r.readAsDataURL(file);
+    });
+}
+function kpVarsHelpHtml() {
+    const v = (name, desc) => `<div class="kp-var"><code>{${name}}</code><span>${desc}</span></div>`;
+    return `
+        <p class="dbo-ya-hint">Вставьте эти переменные в свой .docx (фигурные скобки). Список позиций — цикл по строке таблицы.</p>
+        <div class="kp-var-group">Компания и КП</div>
+        ${v("company_name", "название компании")}${v("company_phone", "телефон")}${v("company_email", "e-mail")}
+        ${v("company_site", "сайт")}${v("company_address", "адрес")}${v("company_inn", "ИНН компании")}
+        ${v("kp_number", "номер КП (= номер заказа)")}${v("kp_date", "дата (дд.мм.гггг)")}${v("manager_name", "менеджер")}
+        <div class="kp-var-group">Клиент</div>
+        ${v("client_name", "имя/название клиента")}
+        <div class="kp-var-group">Позиции — цикл (в строке таблицы)</div>
+        <div class="kp-var"><code>{#positions} … {/positions}</code><span>оберните строку таблицы; внутри:</span></div>
+        ${v("no", "№ по порядку")}${v("name", "наименование")}${v("qty", "тираж")}${v("units", "ед. изм.")}
+        ${v("price", "цена за штуку (с наценкой)")}${v("sum", "сумма позиции")}
+        <div class="kp-var-group">Итоги</div>
+        ${v("total", "итоговая сумма")}${v("total_words", "сумма прописью")}`;
+}
+async function renderKpSettingsInline() {
+    const host = document.getElementById("settingsKpHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    try { const d = await clientsApi("getKpTemplates", {}); kpCompaniesCache = Array.isArray(d?.companies) ? d.companies : []; }
+    catch (e) { console.error("getKpTemplates", e); host.innerHTML = `<p class="dbo-ya-note">Не удалось загрузить компании.</p>`; return; }
+    const rows = kpCompaniesCache.map(c => `
+        <div class="kp-co-row">
+            <div class="kp-co-main">
+                <span class="kp-co-name">${escapeHtml(c.name)}</span>
+                ${c.is_base ? `<span class="kp-co-badge kp-co-badge--base">основная</span>` : `<span class="kp-co-badge">наценка ${c.markup_min}–${c.markup_max}%</span>`}
+                <span class="kp-co-tpl ${c.has_template ? "is-ok" : "is-warn"}">${c.has_template ? "шаблон: " + escapeHtml(c.template_name || "загружен") : "нет шаблона"}</span>
+            </div>
+            <div class="kp-co-actions">
+                <label class="dbo-btn kp-co-upload">${c.has_template ? "Заменить .docx" : "Загрузить .docx"}<input type="file" accept=".docx" hidden onchange="kpUploadTemplate('${c.id}', this)"></label>
+                <button type="button" class="dbo-btn" onclick="kpEditCompany('${c.id}')">Изменить</button>
+                <button type="button" class="dbo-btn dbo-btn-danger" onclick="kpDeleteCompany('${c.id}')">Удалить</button>
+            </div>
+        </div>`).join("");
+    host.innerHTML = `
+        <p class="dbo-ya-note">Для каждой компании загрузите .docx-шаблон. «Основная» — цены как в заказе; остальные — с наценкой (случайно в диапазоне, на каждую позицию), общая сумма пересчитывается.</p>
+        <div class="kp-co-list">${rows || `<div class="dbo-asset-empty">Компаний пока нет — добавьте ниже.</div>`}</div>
+        <details class="dbo-inv-addwrap" id="kpAddWrap">
+            <summary class="dbo-inv-addtoggle">+ Добавить / изменить компанию</summary>
+            <div class="kp-form">
+                <input type="hidden" id="kpEditId" value="">
+                <label class="dbo-edit-wide">Название компании<input type="text" id="kpName" placeholder="Heaven Print"></label>
+                <label class="kp-check"><input type="checkbox" id="kpIsBase" onchange="kpToggleMarkupRow()"> Основная компания (цены как в заказе, без наценки)</label>
+                <div class="kp-form-row" id="kpMarkupRow">
+                    <label class="dbo-edit-wide">Наценка от, %<input type="text" id="kpMarkupMin" inputmode="decimal" placeholder="10"></label>
+                    <label class="dbo-edit-wide">Наценка до, %<input type="text" id="kpMarkupMax" inputmode="decimal" placeholder="15"></label>
+                </div>
+                <div class="kp-form-row">
+                    <label class="dbo-edit-wide">Телефон<input type="text" id="kpPhone"></label>
+                    <label class="dbo-edit-wide">E-mail<input type="text" id="kpEmail"></label>
+                </div>
+                <div class="kp-form-row">
+                    <label class="dbo-edit-wide">Сайт<input type="text" id="kpSite"></label>
+                    <label class="dbo-edit-wide">ИНН<input type="text" id="kpInn" inputmode="numeric"></label>
+                </div>
+                <label class="dbo-edit-wide">Адрес<input type="text" id="kpAddress"></label>
+                <label class="dbo-edit-wide">Шаблон .docx (необязательно — можно загрузить позже кнопкой у компании)<input type="file" id="kpFile" accept=".docx"></label>
+                <div class="settings-actions">
+                    <button type="button" class="dbo-btn dbo-btn-primary" onclick="kpSaveCompany()">Сохранить</button>
+                    <button type="button" class="dbo-btn" onclick="kpResetForm()">Очистить</button>
+                </div>
+            </div>
+        </details>
+        <details class="dbo-inv-addwrap">
+            <summary class="dbo-inv-addtoggle">Переменные для шаблонов Word</summary>
+            <div class="kp-vars">${kpVarsHelpHtml()}</div>
+        </details>`;
+    kpToggleMarkupRow();
+}
+function kpToggleMarkupRow() {
+    const base = document.getElementById("kpIsBase")?.checked;
+    const row = document.getElementById("kpMarkupRow");
+    if (row) row.style.display = base ? "none" : "";
+}
+function kpResetForm() {
+    ["kpEditId", "kpName", "kpMarkupMin", "kpMarkupMax", "kpPhone", "kpEmail", "kpSite", "kpInn", "kpAddress"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+    const b = document.getElementById("kpIsBase"); if (b) b.checked = false;
+    const f = document.getElementById("kpFile"); if (f) f.value = "";
+    kpToggleMarkupRow();
+}
+function kpEditCompany(id) {
+    const c = kpCompaniesCache.find(x => String(x.id) === String(id));
+    if (!c) return;
+    const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ""; };
+    set("kpEditId", c.id); set("kpName", c.name); set("kpMarkupMin", c.markup_min); set("kpMarkupMax", c.markup_max);
+    set("kpPhone", c.phone); set("kpEmail", c.email); set("kpSite", c.site); set("kpInn", c.inn); set("kpAddress", c.address);
+    const b = document.getElementById("kpIsBase"); if (b) b.checked = !!c.is_base;
+    const f = document.getElementById("kpFile"); if (f) f.value = "";
+    kpToggleMarkupRow();
+    const wrap = document.getElementById("kpAddWrap"); if (wrap) wrap.open = true;
+    document.getElementById("kpName")?.scrollIntoView({ block: "center" });
+}
+async function kpSaveCompany() {
+    const name = String(document.getElementById("kpName")?.value || "").trim();
+    if (!name) { alert("Укажите название компании."); return; }
+    const payload = {
+        id: document.getElementById("kpEditId")?.value || undefined,
+        name,
+        is_base: !!document.getElementById("kpIsBase")?.checked,
+        markup_min: document.getElementById("kpMarkupMin")?.value || 10,
+        markup_max: document.getElementById("kpMarkupMax")?.value || 15,
+        phone: document.getElementById("kpPhone")?.value || "",
+        email: document.getElementById("kpEmail")?.value || "",
+        site: document.getElementById("kpSite")?.value || "",
+        inn: document.getElementById("kpInn")?.value || "",
+        address: document.getElementById("kpAddress")?.value || ""
+    };
+    const file = document.getElementById("kpFile")?.files?.[0];
+    try {
+        if (file) {
+            if (!/\.docx$/i.test(file.name)) { alert("Шаблон должен быть в формате .docx"); return; }
+            payload.template_base64 = await kpFileToBase64(file);
+            payload.template_name = file.name;
+        }
+        await clientsApi("saveKpCompany", payload);
+        kpResetForm();
+        const wrap = document.getElementById("kpAddWrap"); if (wrap) wrap.open = false;
+        if (typeof showReadinessToast === "function") showReadinessToast("Компания сохранена");
+        renderKpSettingsInline();
+    } catch (e) {
+        console.error("saveKpCompany", e);
+        alert("Не удалось сохранить: " + String(e.message || e));
+    }
+}
+async function kpUploadTemplate(id, input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+    if (!/\.docx$/i.test(file.name)) { alert("Шаблон должен быть в формате .docx"); input.value = ""; return; }
+    try {
+        const template_base64 = await kpFileToBase64(file);
+        await clientsApi("uploadKpTemplate", { id: Number(id), template_base64, template_name: file.name });
+        if (typeof showReadinessToast === "function") showReadinessToast("Шаблон загружен");
+        renderKpSettingsInline();
+    } catch (e) {
+        console.error("uploadKpTemplate", e);
+        alert("Не удалось загрузить шаблон: " + String(e.message || e));
+    }
+}
+async function kpDeleteCompany(id) {
+    const c = kpCompaniesCache.find(x => String(x.id) === String(id));
+    if (!confirm(`Удалить компанию «${c ? c.name : id}» и её шаблон?`)) return;
+    try {
+        await clientsApi("deleteKpCompany", { id: Number(id) });
+        if (typeof showReadinessToast === "function") showReadinessToast("Компания удалена");
+        renderKpSettingsInline();
+    } catch (e) {
+        console.error("deleteKpCompany", e);
+        alert("Не удалось удалить: " + String(e.message || e));
     }
 }
 async function renderMoedeloSettingsInline() {
