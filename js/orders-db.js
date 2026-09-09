@@ -1433,19 +1433,24 @@ function dbPaymentsBlock(payments) {
     </details>`;
 }
 
-// Строка элемента: СТАТУС(кружок) · НАЗВАНИЕ(+доп-инфо) · КОЛ-ВО · СЕБЕС. · СУММА.
+// Строка элемента: СТАТУС(кружок) · НАЗВАНИЕ(+доп-инфо) · КОЛ-ВО · ЦЕНА/ШТ · СЕБЕС. · СУММА.
+// На мобиле цена/шт уходит в конец наименования, себестоимость — строкой под названием.
 function dbElementRow(e) {
     const qty = Number(e.quantity) || 0;
     const cost = Number(e.cost) || 0;
     const total = Number(e.total) || 0;
+    const price = (e.price != null && Number(e.price) > 0) ? Number(e.price) : (qty ? total / qty : 0);
+    const units = escapeHtml(e.units || "шт");
     return `
         <div class="dbo-el-row">
             <div class="dbo-el-status">${dbElStatusBtn(e)}<span class="element-preview-thumb dbo-el-thumb" data-el="${e.crm_element_id}"></span></div>
             <div class="dbo-el-name">
-                <div class="dbo-el-title dbo-el-title--edit" onclick="dbOpenElEdit(${e.crm_element_id})" title="Редактировать позицию">${escapeHtml(e.category_and_name || e.name || "—")}</div>
+                <div class="dbo-el-title dbo-el-title--edit" onclick="dbOpenElEdit(${e.crm_element_id})" title="Редактировать позицию">${escapeHtml(e.category_and_name || e.name || "—")}${price ? `<span class="dbo-el-price-inline"> (${money2(price)} руб./${units})</span>` : ""}</div>
+                ${cost ? `<div class="dbo-el-costline">Себестоимость: <b>${money(cost)}</b></div>` : ""}
                 ${dbElAfLine(e)}
             </div>
-            <div class="dbo-el-qty">${qty} ${escapeHtml(e.units || "шт")}</div>
+            <div class="dbo-el-qty">${qty} ${units}</div>
+            <div class="dbo-el-price">${price ? money2(price) : "—"}</div>
             <div class="dbo-el-cost">${cost ? money(cost) : "—"}</div>
             <div class="dbo-el-sum">${money2(total)}</div>
         </div>`;
@@ -1470,7 +1475,7 @@ function renderDbDealCard(data, crmId) {
         ? dbDealStatusSelectHtml({ crm_deal_id: crmId, status_id: d.status_id, status_name: d.status_name })
         : `<span class="dbk-status-pill" style="background:#dfdfdf;color:#555">${escapeHtml(d.status_name || "Статус не установлен")}</span>`;
 
-    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Себес.</span><span>Сумма</span></div>`;
+    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Цена/шт</span><span>Себес.</span><span>Сумма</span></div>`;
     const elBody = elements.length
         ? elements.map(dbElementRow).join("")
         : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
@@ -1501,6 +1506,10 @@ function renderDbDealCard(data, crmId) {
                 <div class="dbo-head-left">
                     <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}</div>
                     <div class="dbo-client">${DBO_USER_ICON} ${escapeHtml(d.client_name || "—")}</div>
+                    ${(d.created_at_crm || d.employee_name) ? `<div class="dbo-head-meta">${[
+                        d.created_at_crm ? `Дата: <b>${escapeHtml(d.created_at_crm)}</b>` : "",
+                        d.employee_name ? `Менеджер: <b>${escapeHtml(d.employee_name)}</b>` : ""
+                    ].filter(Boolean).join(" · ")}</div>` : ""}
                 </div>
                 <div class="dbo-head-right">
                     ${dealStatusControl}
