@@ -6,6 +6,9 @@ const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 // same-origin, с github.io — кросс-домен (бэкенд отдаёт CORS). Сюда же будем
 // переносить остальные API по мере ухода с n8n.
 const CLIENTS_URL = "https://calc.heavendevelop.ru/api/clients";
+// Своя авторизация (ушли от n8n): вход/выход через собственный бэкенд.
+const LOGIN_URL = CLIENTS_URL.replace(/\/clients$/, "/login");
+const LOGOUT_URL = CLIENTS_URL.replace(/\/clients$/, "/logout");
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
 const DELETE_ASSETS_TIMEOUT_MS = 45000;
@@ -96,6 +99,9 @@ function readSession() {
             crmId: raw.crmId,
             clientName: raw.clientName || "",
             expiresAt: raw.expiresAt,
+            userId: raw.userId ?? null,
+            email: raw.email || "",
+            isAdmin: !!raw.isAdmin,
             statuses: [],
             paymentMethods: [],
             elementStatuses: [],
@@ -120,7 +126,10 @@ function persistSession(user = currentUser) {
         name: user.login || user.name || "",
         crmId: user.crmId,
         clientName: user.clientName || "",
-        expiresAt: user.expiresAt
+        expiresAt: user.expiresAt,
+        userId: user.userId ?? null,
+        email: user.email || "",
+        isAdmin: !!user.isAdmin
     };
 
     try {
@@ -314,6 +323,7 @@ const SESSION_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 function buildUserSession(session, fallbackLogin = "") {
     const token = extractSessionToken(session);
     const hasServerExpiry = session.expiresAt != null && session.expiresAt !== "";
+    const profile = (session.user && typeof session.user === "object") ? session.user : {};
     return {
         role: session.role,
         login: session.name || session.login || fallbackLogin,
@@ -321,12 +331,21 @@ function buildUserSession(session, fallbackLogin = "") {
         crmId: session.crmId,
         clientName: session.name || session.clientName || "",
         expiresAt: hasServerExpiry ? session.expiresAt : (Date.now() + SESSION_TTL_MS),
+        // Профиль своей авторизации (для гейтинга админ-функций в UI).
+        userId: profile.id ?? session.userId ?? null,
+        email: profile.email ?? session.email ?? "",
+        isAdmin: profile.isAdmin ?? session.isAdmin ?? false,
         statuses: normalizeStatuses(session.dealStatuses || session.statuses),
         paymentMethods: normalizePaymentMethods(session.paymentMethods),
         elementStatuses: normalizeElementStatuses(session.elementStatuses),
         managers: normalizeManagers(session.managers || session.employees || session.responsibles),
         categories: normalizeCategories(session.categories)
     };
+}
+
+// Является ли текущий пользователь администратором (для показа настроек/пользователей).
+function isCurrentUserAdmin() {
+    return currentUser.role === "staff" && !!currentUser.isAdmin;
 }
 
 function normalizeManagers(managers) {

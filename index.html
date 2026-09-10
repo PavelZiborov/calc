@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=100">
+<link rel="stylesheet" href="css/app.css?v=102">
 </head>
 <body>
 
@@ -48,15 +48,17 @@
                 <span id="role-badge" class="auth-role-badge">ГОСТЬ</span>
                 <div id="user-display-name" class="auth-user-name">Режим просмотра</div>
             </div>
-            <button type="button" id="calcSettingsBtn" class="auth-settings-btn gated-nav" style="display:none;" onclick="openSettingsPage()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>Настройки</button>
+            <button type="button" id="calcSettingsBtn" class="auth-settings-btn" style="display:none;" onclick="openSettingsPage()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>Настройки</button>
+            <button type="button" id="usersBtn" class="auth-settings-btn" style="display:none;" onclick="openUsersPage()">Пользователи</button>
+            <button type="button" id="changePassBtn" class="auth-settings-btn" onclick="openChangePassword()">Сменить пароль</button>
             <button type="button" id="logoutBtn" class="auth-logout-btn" onclick="logout()">Выйти</button>
         </div>
 
         <div id="auth-login-panel" class="auth-panel">
             <h3 class="auth-panel-title">Авторизация</h3>
             <form onsubmit="attemptLogin(event)">
-                <input type="text" id="loginEmail" name="username" placeholder="Ваш ID компании" autocomplete="username">
-                <input type="password" id="loginPass" name="password" placeholder="Пароль (Ваш телефон)" style="margin-top:12px;" autocomplete="current-password">
+                <input type="email" id="loginEmail" name="username" placeholder="Email" autocomplete="username" inputmode="email">
+                <input type="password" id="loginPass" name="password" placeholder="Пароль" style="margin-top:12px;" autocomplete="current-password">
                 <button type="submit" id="loginSubmitBtn">Войти в систему</button>
             </form>
             <div id="login-error" class="auth-login-error"></div>
@@ -399,6 +401,11 @@
             <p class="settings-sub">Настройки калькулятора и интеграции.</p>
         </div>
         <div class="settings-sections">
+            <section class="settings-card" id="settingsUsersCard">
+                <h3>Пользователи</h3>
+                <p class="settings-card-note">Учётные записи менеджеров: вход по email и паролю, права администратора, привязка к PrintOffice.</p>
+                <div id="settingsUsersHost"></div>
+            </section>
             <section class="settings-card">
                 <h3>Калькулятор</h3>
                 <p class="settings-card-note">Лист и зазоры, материалы, правила продуктов.</p>
@@ -432,19 +439,19 @@
     </div>
 </div>
 
-<script src="js/config.js?v=100"></script>
-<script src="js/calculator-data.js?v=100"></script>
-<script src="js/calc-settings.js?v=100"></script>
-<script src="js/calc-settings-ui.js?v=100"></script>
-<script src="js/utils.js?v=100"></script>
-<script src="js/auth.js?v=100"></script>
-<script src="js/calculator.js?v=100"></script>
-<script src="js/crm.js?v=100"></script>
-<script src="js/element-editor.js?v=100"></script>
-<script src="js/kp-docx.js?v=100"></script>
-<script src="js/calc-sheet.js?v=100"></script>
-<script src="js/clients.js?v=100"></script>
-<script src="js/orders-db.js?v=100"></script>
-<script src="js/main.js?v=100"></script>
+<script src="js/config.js?v=102"></script>
+<script src="js/calculator-data.js?v=102"></script>
+<script src="js/calc-settings.js?v=102"></script>
+<script src="js/calc-settings-ui.js?v=102"></script>
+<script src="js/utils.js?v=102"></script>
+<script src="js/auth.js?v=102"></script>
+<script src="js/calculator.js?v=102"></script>
+<script src="js/crm.js?v=102"></script>
+<script src="js/element-editor.js?v=102"></script>
+<script src="js/kp-docx.js?v=102"></script>
+<script src="js/calc-sheet.js?v=102"></script>
+<script src="js/clients.js?v=102"></script>
+<script src="js/orders-db.js?v=102"></script>
+<script src="js/main.js?v=102"></script>
 </body>
 </html>

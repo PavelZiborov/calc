@@ -564,6 +564,33 @@
     .dbo-units-opt { margin: 0; width: 100%; text-align: left; padding: 7px 10px; border: none; border-radius: 6px; background: transparent; color: var(--text); font-size: 14px; cursor: pointer; text-transform: none; font-weight: 400; }
     .dbo-units-opt:hover { background: var(--surface-2); }
     .dbo-units-custom { margin: 4px 0 0; width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    /* Ответственные — мультивыбор менеджеров (дропдаун с чекбоксами) */
+    .dbo-resp-field { display: block; }
+    .dbo-resp { position: relative; margin-top: 5px; }
+    .dbo-resp-btn { margin: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 14px; cursor: pointer; text-align: left; text-transform: none; font-weight: 400; }
+    .dbo-resp-btn #dbRespBtnText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-resp-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10; max-height: 260px; overflow-y: auto; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.16); display: flex; flex-direction: column; gap: 2px; }
+    .dbo-resp-menu[hidden] { display: none; }
+    .dbo-resp-opt { margin: 0; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; color: var(--text); text-transform: none; font-weight: 400; }
+    .dbo-resp-opt:hover { background: var(--surface-2); }
+    .dbo-resp-opt input { margin: 0; flex: 0 0 auto; width: 16px; height: 16px; cursor: pointer; }
+    .dbo-resp-empty { padding: 8px 10px; font-size: 12px; color: var(--text-muted); }
+    /* Раздел «Пользователи» (настройки) */
+    .dbo-users-list { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+    .dbo-user-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .dbo-user-main { flex: 1 1 200px; min-width: 0; }
+    .dbo-user-name { font-weight: 600; color: var(--text); font-size: 14px; }
+    .dbo-user-crm { font-weight: 400; font-size: 11px; color: var(--text-muted); }
+    .dbo-user-email { font-size: 12px; color: var(--text-muted); word-break: break-all; }
+    .dbo-user-badge { flex: 0 0 auto; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; }
+    .dbo-user-badge--super { background: #8e44ad; }
+    .dbo-user-badge--admin { background: #2980b9; }
+    .dbo-user-badge--staff { background: #7f8c8d; }
+    .dbo-user-actions { display: flex; gap: 6px; flex-wrap: wrap; flex: 0 0 auto; }
+    .dbo-edit--narrow { max-width: 440px; }
+    .dbo-user-admin-toggle { display: flex; align-items: center; gap: 9px; margin: 4px 0; font-size: 14px; color: var(--text); cursor: pointer; }
+    .dbo-user-admin-toggle input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
+    .dbo-user-admin-toggle.is-disabled { opacity: 0.7; cursor: default; }
     /* Drop-зоны превью и макетов */
     .dbo-preview-box { cursor: pointer; }
     .dbo-preview-box .dbo-asset-empty { pointer-events: none; font-size: 13px; color: var(--accent); font-weight: 600; }
@@ -3203,6 +3230,7 @@
         color: #fff;
     }
     .auth-role-badge--staff { background: #e67e22; }
+    .auth-role-badge--admin { background: #8e44ad; }
     .auth-role-badge--client { background: #27ae60; }
     .auth-user-name {
         margin-top: 10px;

@@ -14,10 +14,14 @@ function updateAuthModalUi() {
     if (loggedInPanel) loggedInPanel.hidden = !loggedIn;
     if (loginPanel) loginPanel.hidden = loggedIn;
 
+    const isAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
+    const usersBtn = document.getElementById("usersBtn");
+    const settingsBtn = document.getElementById("calcSettingsBtn");
+
     if (loggedIn) {
         if (badge) {
-            badge.innerText = currentUser.role === "staff" ? "СОТРУДНИК" : "КЛИЕНТ";
-            badge.className = "auth-role-badge auth-role-badge--" + currentUser.role;
+            badge.innerText = currentUser.role === "staff" ? (isAdmin ? "АДМИН" : "СОТРУДНИК") : "КЛИЕНТ";
+            badge.className = "auth-role-badge auth-role-badge--" + (isAdmin ? "admin" : currentUser.role);
         }
         if (nameDisp) {
             nameDisp.innerText = currentUser.login || currentUser.name || "Пользователь";
@@ -26,7 +30,12 @@ function updateAuthModalUi() {
             authBtn.classList.add("is-logged-in");
             authBtn.title = currentUser.login || "Аккаунт";
         }
+        // Управление пользователями и настройки калькулятора — только админам.
+        if (usersBtn) usersBtn.style.display = isAdmin ? "" : "none";
+        if (settingsBtn) settingsBtn.style.display = isAdmin ? "" : "none";
     } else {
+        if (usersBtn) usersBtn.style.display = "none";
+        if (settingsBtn) settingsBtn.style.display = "none";
         if (badge) {
             badge.innerText = "ГОСТЬ";
             badge.className = "auth-role-badge auth-role-badge--guest";
@@ -59,31 +68,31 @@ function toggleAuthModal(forceOpen = null) {
 async function attemptLogin(event) {
     if (event) event.preventDefault();
 
-    const clientId = document.getElementById("loginEmail").value;
+    const email = String(document.getElementById("loginEmail").value || "").trim().toLowerCase();
     const pass = document.getElementById("loginPass").value;
     const errorDiv = document.getElementById("login-error");
     const btn = document.getElementById("loginSubmitBtn");
 
-    if (!clientId || !pass) {
-        if (errorDiv) errorDiv.innerText = "Введите ID и пароль";
+    if (!email || !pass) {
+        if (errorDiv) errorDiv.innerText = "Введите email и пароль";
         return;
     }
     btn.innerText = "Проверка...";
     btn.disabled = true;
 
     try {
-        const response = await fetchWithTimeout(N8N_URL, {
+        // Своя авторизация: email+пароль → наш бэкенд выдаёт токен-сессию.
+        const response = await fetchWithTimeout(LOGIN_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "auth", clientId: clientId, password: pass })
+            body: JSON.stringify({ email, password: pass })
         });
-        const data = await response.json();
-        const session = parseAuthResponse(data);
-        const token = extractSessionToken(session);
+        const data = await response.json().catch(() => ({}));
+        const token = extractSessionToken(data);
 
-        if (response.ok && session?.role && token) {
-            currentUser = buildUserSession({ ...session, token }, clientId);
-            if (typeof applyUserPrefsFromAuth === "function") applyUserPrefsFromAuth(session);
+        if (response.ok && data?.role && token) {
+            currentUser = buildUserSession({ ...data, token }, email);
+            if (typeof applyUserPrefsFromAuth === "function") applyUserPrefsFromAuth(data);
             if (!persistSession(currentUser)) {
                 if (errorDiv) {
                     errorDiv.innerText = "Не удалось сохранить сессию. Проверьте, что браузер не блокирует localStorage (режим инкognito, настройки приватности).";
@@ -94,7 +103,7 @@ async function attemptLogin(event) {
             applyPermissions();
             if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
         } else if (errorDiv) {
-            errorDiv.innerText = "За получением логина и пароля обратитесь к вашему менеджеру";
+            errorDiv.innerText = data?.error || "Неверный email или пароль";
         }
     } catch (e) {
         if (errorDiv) errorDiv.innerText = SERVER_TIMEOUT_MESSAGE;
@@ -105,6 +114,13 @@ async function attemptLogin(event) {
 }
 
 function logout() {
+    // Best-effort инвалидация токена на сервере (не блокируем выход).
+    try {
+        const token = extractSessionToken(currentUser);
+        if (token && typeof LOGOUT_URL === "string") {
+            fetchWithTimeout(LOGOUT_URL, { method: "POST", headers: authHeaders() }, 5000).catch(() => {});
+        }
+    } catch (_) {}
     toggleAuthModal(false);
     localStorage.removeItem("calc_session");
     sessionStorage.removeItem("calc_session_meta");

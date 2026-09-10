@@ -1174,6 +1174,9 @@ function dbOpenElEdit(elId) {
                     <label>Себестоимость<input type="text" inputmode="decimal" id="dbEditCost" value="${Number(e.cost) || 0}" oninput="dbCleanNum(this)" onblur="dbCostBlur(this)"></label>
                     <label>Сумма<input type="text" inputmode="decimal" id="dbEditTotal" value="${Number(e.total) || 0}" oninput="dbCleanNum(this); dbEditRecalc('total')"></label>
                 </div>
+                <div class="dbo-edit-wide dbo-resp-field">Ответственный
+                    ${dbRespControlHtml()}
+                </div>
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
                 <div class="dbo-assets-title dbo-assets-heading">Превью и макеты</div>
@@ -1191,7 +1194,84 @@ function dbOpenElEdit(elId) {
     // Освежаем превью/макеты позиции (если карточка ещё не догрузила).
     const cached = dboAssets.get(dboAssetKey(elId));
     if (!cached || cached.status !== "ready") dboLoadElementAssets(elId).catch(() => {});
+    // Ответственные — загружаем менеджеров и текущий выбор.
+    dbInitRespControl(elId).catch(() => {});
 }
+// ——— Ответственные за позицию (мультивыбор менеджеров, зеркалим в PrintOffice) ———
+let dbEditRespSelected = new Set();   // выбранные crm-id ответственных
+let dbEditRespOptions = [];           // [{id, name}] — менеджеры + текущие ответственные
+let dbEditRespInitial = new Set();    // исходные (для сравнения при сохранении)
+function dbRespControlHtml() {
+    return `
+        <div class="dbo-resp" id="dbRespWrap">
+            <button type="button" class="dbo-resp-btn" id="dbRespBtn" onclick="dbToggleResp(event)">
+                <span id="dbRespBtnText">Загрузка…</span><span class="dbo-units-caret">▾</span>
+            </button>
+            <div class="dbo-resp-menu" id="dbRespMenu" hidden></div>
+        </div>`;
+}
+// Загрузка менеджеров + текущих ответственных позиции.
+async function dbInitRespControl(elId) {
+    dbEditRespSelected = new Set();
+    dbEditRespInitial = new Set();
+    dbEditRespOptions = [];
+    let managers = (typeof getManagers === "function") ? getManagers() : [];
+    try {
+        const [respData, mgrData] = await Promise.all([
+            clientsApi("getElementResponsibles", { dealId: Number(dbCardDealId), elementId: Number(elId) }),
+            (managers.length ? Promise.resolve(null) : clientsApi("getManagers"))
+        ]);
+        if (mgrData && Array.isArray(mgrData.managers)) {
+            managers = mgrData.managers.map(m => ({ id: Number(m.id), name: String(m.name || m.email || "") }));
+        }
+        const current = Array.isArray(respData?.responsibles) ? respData.responsibles : [];
+        // Опции = менеджеры ∪ текущие ответственные (на случай, если кого-то нет в нашей БД).
+        const byId = new Map();
+        managers.forEach(m => { if (Number.isFinite(m.id)) byId.set(m.id, { id: m.id, name: m.name }); });
+        current.forEach(r => { const id = Number(r.id); if (Number.isFinite(id) && !byId.has(id)) byId.set(id, { id, name: String(r.name || `#${id}`) }); });
+        dbEditRespOptions = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+        dbEditRespSelected = new Set(current.map(r => Number(r.id)).filter(Number.isFinite));
+        dbEditRespInitial = new Set(dbEditRespSelected);
+    } catch (err) {
+        console.error("init responsibles", err);
+    }
+    dbRespRender();
+}
+function dbRespRender() {
+    const menu = document.getElementById("dbRespMenu");
+    const txt = document.getElementById("dbRespBtnText");
+    if (!menu || !txt) return;
+    if (!dbEditRespOptions.length) {
+        menu.innerHTML = `<div class="dbo-resp-empty">Список менеджеров пуст. Добавьте пользователей с привязкой к PrintOffice в разделе «Пользователи».</div>`;
+    } else {
+        menu.innerHTML = dbEditRespOptions.map(o => `
+            <label class="dbo-resp-opt">
+                <input type="checkbox" value="${o.id}"${dbEditRespSelected.has(o.id) ? " checked" : ""} onchange="dbRespToggle(${o.id}, this.checked)">
+                <span>${escapeHtml(o.name)}</span>
+            </label>`).join("");
+    }
+    const names = dbEditRespOptions.filter(o => dbEditRespSelected.has(o.id)).map(o => o.name);
+    txt.textContent = names.length ? names.join(", ") : "Не назначен";
+}
+function dbRespToggle(id, checked) {
+    if (checked) dbEditRespSelected.add(Number(id));
+    else dbEditRespSelected.delete(Number(id));
+    dbRespRender();
+}
+function dbToggleResp(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById("dbRespMenu");
+    if (!menu) return;
+    const open = menu.hidden;
+    menu.hidden = !open;
+    if (open) setTimeout(() => document.addEventListener("click", dbRespOutside), 0);
+    else document.removeEventListener("click", dbRespOutside);
+}
+function dbRespOutside(e) {
+    const wrap = document.getElementById("dbRespWrap");
+    if (wrap && !wrap.contains(e.target)) { const m = document.getElementById("dbRespMenu"); if (m) m.hidden = true; document.removeEventListener("click", dbRespOutside); }
+}
+
 // Авто-высота textarea наименования (растёт вниз по мере ввода).
 function dbAutoGrow(el) {
     if (!el) return;
@@ -1283,6 +1363,19 @@ async function dbSaveElEdit(elId) {
             dealId: Number(dbCardDealId), elementId: Number(elId),
             name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate
         });
+        // Ответственные: синхронизируем, если менялись (или элемент пересоздан → id новый).
+        const targetElId = Number(data?.newElementId ?? elId);
+        const changed = recreate
+            || dbEditRespSelected.size !== dbEditRespInitial.size
+            || [...dbEditRespSelected].some(id => !dbEditRespInitial.has(id));
+        if (changed) {
+            try {
+                await clientsApi("setElementResponsibles", {
+                    dealId: Number(dbCardDealId), elementId: targetElId,
+                    responsibleIds: [...dbEditRespSelected]
+                });
+            } catch (respErr) { console.error("setElementResponsibles", respErr); }
+        }
         // обновляем карточку свежими данными
         if (data?.deal) dbCardData.deal = data.deal;
         if (Array.isArray(data?.elements)) dbCardData.elements = data.elements;
@@ -1878,6 +1971,11 @@ function renderDbDealCard(data, crmId) {
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-body">
+                <div class="dbo-section dbo-dealinfo-section">
+                    <div class="dbo-section-title">Дополнительная информация к сделке</div>
+                    <textarea id="dbDealInfoInput" class="dbo-costinfo-input" rows="3" placeholder="Загрузка…" disabled
+                        onblur="dbSaveDealInfo(${crmId}, this.value)"></textarea>
+                </div>
                 <div class="dbo-elements">
                     ${elHead}
                     ${elBody}
@@ -1918,6 +2016,43 @@ function renderDbDealCard(data, crmId) {
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
     dboLoadAllAssets(crmId, d.num, elements);
+    // «Дополнительная информация к сделке» (зеркалим с PrintOffice) — грузим асинхронно.
+    dbLoadDealInfo(crmId);
+}
+
+// Состояние поля «Дополнительная информация к сделке» текущей карточки.
+let dbDealInfoState = { crmId: null, fieldId: null, value: "" };
+async function dbLoadDealInfo(crmId) {
+    const ta = document.getElementById("dbDealInfoInput");
+    if (!ta) return;
+    try {
+        const data = await clientsApi("getDealExtraInfo", { crmId: Number(crmId) });
+        // Карточку могли уже закрыть/сменить — не трогаем чужой textarea.
+        if (Number(dbCardDealId) !== Number(crmId)) return;
+        const cur = document.getElementById("dbDealInfoInput");
+        if (!cur) return;
+        dbDealInfoState = { crmId: Number(crmId), fieldId: data?.fieldId ?? null, value: String(data?.value ?? "") };
+        cur.value = dbDealInfoState.value;
+        cur.placeholder = "Заметки и пожелания по заказу…";
+        cur.disabled = false;
+    } catch (err) {
+        console.error("getDealExtraInfo", err);
+        const cur = document.getElementById("dbDealInfoInput");
+        if (cur) { cur.placeholder = "Не удалось загрузить"; cur.disabled = false; }
+    }
+}
+// Сохранение «Дополнительной информации к сделке» (PUT в CRM + mirror), по blur.
+async function dbSaveDealInfo(crmId, value) {
+    const val = String(value ?? "");
+    if (Number(dbDealInfoState.crmId) === Number(crmId) && val === dbDealInfoState.value) return;
+    try {
+        const data = await clientsApi("setDealExtraInfo", { crmId: Number(crmId), value: val });
+        dbDealInfoState = { crmId: Number(crmId), fieldId: data?.fieldId ?? dbDealInfoState.fieldId, value: val };
+        if (typeof showReadinessToast === "function") showReadinessToast("Дополнительная информация сохранена");
+    } catch (err) {
+        console.error("setDealExtraInfo", err);
+        alert("Не удалось сохранить дополнительную информацию к сделке.");
+    }
 }
 
 // Сохранение «Информации по себестоимости» (доп-поле 476) в CRM + локально.
@@ -2222,7 +2357,7 @@ async function dbCreateKontragent() {
     const name = String(document.getElementById("dbInvAddName")?.value || "").trim();
     const form = String(document.getElementById("dbInvAddForm")?.value || "");
     if (!/^\d{10}$|^\d{12}$/.test(inn)) { alert("ИНН должен содержать 10 или 12 цифр."); return; }
-    if (!name) { alert("Укажите наименование контрагента."); return; }
+    // Название необязательно — МоеДело подтянет его по ИНН из ЕГРЮЛ/ЕГРИП.
     const btn = document.querySelector(".dbo-inv-create-row .dbo-btn-primary");
     if (btn) { btn.disabled = true; btn.textContent = "Создаём в МоеДело…"; }
     try {
@@ -2709,10 +2844,225 @@ function openSettingsPage() {
     if (!ensureActiveSession()) return;
     if (typeof toggleAuthModal === "function") toggleAuthModal(false);
     if (typeof switchTab === "function") switchTab("settings-tab");
+    renderUsersSettingsInline();
     renderYandexSettingsInline();
     renderMoedeloSettingsInline();
     renderDadataSettingsInline();
     renderKpSettingsInline();
+}
+// Открыть настройки и проскроллить к разделу «Пользователи».
+function openUsersPage() {
+    openSettingsPage();
+    setTimeout(() => {
+        const card = document.getElementById("settingsUsersCard");
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+}
+
+// ——— Раздел «Пользователи» (только админ) ———
+let dbUsersCache = [];
+function dbUserRoleLabel(u) {
+    if (u.role === "superadmin") return "Супер-админ";
+    return u.isAdmin ? "Администратор" : "Сотрудник";
+}
+async function renderUsersSettingsInline() {
+    const host = document.getElementById("settingsUsersHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let users = [];
+    try {
+        const data = await clientsApi("listUsers", {});
+        users = Array.isArray(data?.users) ? data.users : [];
+    } catch (e) {
+        host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить пользователей (нужны права администратора).</p>`;
+        return;
+    }
+    dbUsersCache = users;
+    const rows = users.map(u => `
+        <div class="dbo-user-row">
+            <div class="dbo-user-main">
+                <div class="dbo-user-name">${escapeHtml(u.name || u.email)}${u.crmUserId ? ` <span class="dbo-user-crm" title="ID в PrintOffice">PO#${u.crmUserId}</span>` : ""}</div>
+                <div class="dbo-user-email">${escapeHtml(u.email)}</div>
+            </div>
+            <span class="dbo-user-badge dbo-user-badge--${u.role === "superadmin" ? "super" : (u.isAdmin ? "admin" : "staff")}">${escapeHtml(dbUserRoleLabel(u))}</span>
+            <div class="dbo-user-actions">
+                <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbUserEdit(${u.id})">Изменить</button>
+                <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbUserResetPassword(${u.id})">Сбросить пароль</button>
+                ${u.role === "superadmin" ? "" : `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbUserDelete(${u.id})">Удалить</button>`}
+            </div>
+        </div>`).join("");
+    host.innerHTML = `
+        <div class="dbo-users-list">${rows || `<p class="dbo-ya-note">Пользователей нет.</p>`}</div>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dbUserEdit(null)">+ Добавить пользователя</button>
+            <button class="dbo-btn" onclick="dbSyncManagers(this)" title="Подтянуть сотрудников из PrintOffice">⟳ Синхронизировать из PrintOffice</button>
+        </div>`;
+}
+async function dbSyncManagers(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Синхронизация…"; }
+    try {
+        const data = await clientsApi("syncManagersFromCrm", {});
+        if (typeof showReadinessToast === "function") showReadinessToast(`Синхронизировано: +${data?.added || 0}, обновлено ${data?.updated || 0}`);
+        await renderUsersSettingsInline();
+    } catch (e) {
+        console.error("syncManagersFromCrm", e);
+        alert("Не удалось синхронизировать менеджеров из PrintOffice.");
+        if (btn) { btn.disabled = false; btn.textContent = "⟳ Синхронизировать из PrintOffice"; }
+    }
+}
+// Модалка создания/редактирования пользователя.
+function dbUserEdit(id) {
+    const u = id != null ? dbUsersCache.find(x => Number(x.id) === Number(id)) : null;
+    const isSuper = u?.role === "superadmin";
+    closeDbUserEdit();
+    const ov = document.createElement("div");
+    ov.id = "dbUserEditOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbUserEdit()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit dbo-edit--narrow" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head">
+                <h3>${u ? "Редактирование пользователя" : "Новый пользователь"}</h3>
+                <button class="dbo-close" onclick="closeDbUserEdit()" aria-label="Закрыть">×</button>
+            </div>
+            <div class="dbo-edit-body">
+                <label class="dbo-edit-wide">Имя (ФИО)
+                    <input type="text" id="dbUserName" value="${escapeHtml(u?.name || "")}">
+                </label>
+                <label class="dbo-edit-wide">Email (логин)
+                    <input type="email" id="dbUserEmail" value="${escapeHtml(u?.email || "")}" autocomplete="off" inputmode="email">
+                </label>
+                <label class="dbo-edit-wide">${u ? "Новый пароль (оставьте пустым — без изменений)" : "Пароль (можно оставить пустым и задать позже)"}
+                    <input type="text" id="dbUserPass" value="" autocomplete="new-password" placeholder="минимум 6 символов">
+                </label>
+                <label class="dbo-edit-wide">ID в PrintOffice (для ответственных)
+                    <input type="text" inputmode="numeric" id="dbUserCrmId" value="${u?.crmUserId != null ? u.crmUserId : ""}" placeholder="напр. 123">
+                </label>
+                <label class="dbo-user-admin-toggle${isSuper ? " is-disabled" : ""}">
+                    <input type="checkbox" id="dbUserAdmin"${(u?.isAdmin || isSuper) ? " checked" : ""}${isSuper ? " disabled" : ""}>
+                    <span>Права администратора (настройки, интеграции, пользователи)</span>
+                </label>
+                ${isSuper ? `<div class="dbo-edit-note">Супер-администратор всегда имеет полные права.</div>` : ""}
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbUserSaveBtn" onclick="dbUserSave(${u ? u.id : "null"})">Сохранить</button>
+                <button class="dbo-btn" onclick="closeDbUserEdit()">Отмена</button>
+            </div>
+            <div id="dbUserEditError" class="auth-login-error"></div>
+        </div>`;
+    document.body.appendChild(ov);
+    setTimeout(() => { const t = document.getElementById("dbUserName"); if (t) t.focus(); }, 0);
+}
+function closeDbUserEdit() {
+    const ov = document.getElementById("dbUserEditOverlay");
+    if (ov) ov.remove();
+}
+async function dbUserSave(id) {
+    const val = id2 => document.getElementById(id2)?.value;
+    const err = document.getElementById("dbUserEditError");
+    const email = String(val("dbUserEmail") || "").trim().toLowerCase();
+    const name = String(val("dbUserName") || "").trim();
+    const password = String(val("dbUserPass") || "");
+    const crmUserId = String(val("dbUserCrmId") || "").trim();
+    const isAdmin = !!document.getElementById("dbUserAdmin")?.checked;
+    if (!email) { if (err) err.textContent = "Укажите email"; return; }
+    const btn = document.getElementById("dbUserSaveBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Сохранение…"; }
+    try {
+        await clientsApi("saveUser", {
+            id: id ?? null, email, name, password: password || null,
+            crmUserId: crmUserId === "" ? null : Number(crmUserId), isAdmin
+        });
+        closeDbUserEdit();
+        await renderUsersSettingsInline();
+        if (typeof showReadinessToast === "function") showReadinessToast("Пользователь сохранён");
+    } catch (e) {
+        console.error("saveUser", e);
+        if (err) err.textContent = (e && e.message) ? e.message : "Не удалось сохранить пользователя";
+        if (btn) { btn.disabled = false; btn.textContent = "Сохранить"; }
+    }
+}
+async function dbUserResetPassword(id) {
+    if (!confirm("Сбросить пароль пользователю? Будет сгенерирован новый временный пароль.")) return;
+    try {
+        const data = await clientsApi("resetUserPassword", { id: Number(id) });
+        const temp = data?.tempPassword || "";
+        window.prompt("Новый временный пароль (передайте пользователю, он сменит его после входа):", temp);
+    } catch (e) {
+        console.error("resetUserPassword", e);
+        alert("Не удалось сбросить пароль.");
+    }
+}
+async function dbUserDelete(id) {
+    if (!confirm("Удалить (деактивировать) пользователя? Он больше не сможет войти.")) return;
+    try {
+        await clientsApi("deleteUser", { id: Number(id) });
+        await renderUsersSettingsInline();
+    } catch (e) {
+        console.error("deleteUser", e);
+        alert("Не удалось удалить пользователя.");
+    }
+}
+
+// ——— Смена собственного пароля ———
+function openChangePassword() {
+    if (typeof toggleAuthModal === "function") toggleAuthModal(false);
+    const ov = document.createElement("div");
+    ov.id = "dbChangePassOverlay";
+    ov.className = "client-card-overlay dbo-edit-overlay";
+    ov.setAttribute("onmousedown", "overlayDown(event)");
+    ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeChangePassword()");
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit dbo-edit--narrow" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head">
+                <h3>Смена пароля</h3>
+                <button class="dbo-close" onclick="closeChangePassword()" aria-label="Закрыть">×</button>
+            </div>
+            <div class="dbo-edit-body">
+                <label class="dbo-edit-wide">Текущий пароль
+                    <input type="password" id="dbCurPass" autocomplete="current-password">
+                </label>
+                <label class="dbo-edit-wide">Новый пароль (минимум 6 символов)
+                    <input type="password" id="dbNewPass" autocomplete="new-password">
+                </label>
+                <label class="dbo-edit-wide">Повторите новый пароль
+                    <input type="password" id="dbNewPass2" autocomplete="new-password">
+                </label>
+            </div>
+            <div class="dbo-edit-actions">
+                <button class="dbo-btn dbo-btn-primary" id="dbChangePassBtn" onclick="dbChangePassword()">Сохранить</button>
+                <button class="dbo-btn" onclick="closeChangePassword()">Отмена</button>
+            </div>
+            <div id="dbChangePassError" class="auth-login-error"></div>
+        </div>`;
+    document.body.appendChild(ov);
+    setTimeout(() => { const t = document.getElementById("dbCurPass"); if (t) t.focus(); }, 0);
+}
+function closeChangePassword() {
+    const ov = document.getElementById("dbChangePassOverlay");
+    if (ov) ov.remove();
+}
+async function dbChangePassword() {
+    const err = document.getElementById("dbChangePassError");
+    const cur = document.getElementById("dbCurPass")?.value || "";
+    const next = document.getElementById("dbNewPass")?.value || "";
+    const next2 = document.getElementById("dbNewPass2")?.value || "";
+    if (next.length < 6) { if (err) err.textContent = "Новый пароль минимум 6 символов"; return; }
+    if (next !== next2) { if (err) err.textContent = "Пароли не совпадают"; return; }
+    const btn = document.getElementById("dbChangePassBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Сохранение…"; }
+    try {
+        await clientsApi("changeMyPassword", { currentPassword: cur, newPassword: next });
+        closeChangePassword();
+        if (typeof showReadinessToast === "function") showReadinessToast("Пароль изменён");
+    } catch (e) {
+        console.error("changeMyPassword", e);
+        if (err) err.textContent = (e && e.message) ? e.message : "Не удалось изменить пароль";
+        if (btn) { btn.disabled = false; btn.textContent = "Сохранить"; }
+    }
 }
 async function renderDadataSettingsInline() {
     const host = document.getElementById("settingsDadataHost");

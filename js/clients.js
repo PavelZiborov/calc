@@ -32,7 +32,12 @@ async function clientsApi(action, body = {}) {
     if (!resp.ok) {
         let detail = "";
         try { detail = await resp.text(); } catch (_) {}
-        throw new Error(`clients ${action} (${resp.status}) ${detail}`.trim());
+        // Если сервер вернул {error:"..."} — показываем чистое сообщение.
+        let clean = "";
+        try { clean = JSON.parse(detail)?.error || ""; } catch (_) {}
+        const err = new Error(clean || `clients ${action} (${resp.status}) ${detail}`.trim());
+        err.status = resp.status;
+        throw err;
     }
     return (typeof parseApiResponse === "function") ? parseApiResponse(resp) : resp.json();
 }
@@ -523,7 +528,7 @@ async function ccReqCreate() {
     const name = String(document.getElementById("ccReqAddName")?.value || "").trim();
     const form = String(document.getElementById("ccReqAddForm")?.value || "");
     if (!/^\d{10}$|^\d{12}$/.test(inn)) { alert("ИНН должен содержать 10 или 12 цифр."); return; }
-    if (!name) { alert("Укажите наименование контрагента."); return; }
+    // Название необязательно — МоеДело подтянет его по ИНН из ЕГРЮЛ/ЕГРИП.
     const btn = document.querySelector(".cc-req-section .dbo-inv-create-row .dbo-btn-primary");
     if (btn) { btn.disabled = true; btn.textContent = "Создаём в МоеДело…"; }
     try {
