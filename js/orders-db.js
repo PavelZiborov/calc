@@ -1180,7 +1180,7 @@ function dbOpenElEdit(elId) {
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Дополнительная информация
-                    <textarea id="dbEditElInfo" class="dbo-edit-name" rows="2" oninput="dbAutoGrow(this)" placeholder="Заметки к позиции…">${escapeHtml(e.extra_info || "")}</textarea>
+                    <textarea id="dbEditElInfo" class="dbo-edit-name" rows="2" oninput="dbAutoGrow(this)" placeholder="Заметки к позиции…">${escapeHtml(e.description || "")}</textarea>
                 </label>
                 <div class="dbo-assets-title dbo-assets-heading">Превью и макеты</div>
                 ${dboAssetsEditHtml(elId)}
@@ -1360,7 +1360,7 @@ async function dbSaveElEdit(elId) {
     const cost = Number(val("dbEditCost")) || 0;
     const costHq = String(val("dbEditCostHq") || "").trim();
     const sheets = String(val("dbEditSheets") || "").trim();
-    const extraInfo = String(val("dbEditElInfo") ?? "");
+    const description = String(val("dbEditElInfo") ?? "");
     // имя/категория изменились → пересоздание
     const recreate = (name !== dbElBaseName(e)) || (categoryId !== (e.category_id != null ? Number(e.category_id) : null));
 
@@ -1369,7 +1369,7 @@ async function dbSaveElEdit(elId) {
     try {
         const data = await clientsApi("editElement", {
             dealId: Number(dbCardDealId), elementId: Number(elId),
-            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate, extraInfo
+            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate, description
         });
         // Ответственные: синхронизируем, если менялись (или элемент пересоздан → id новый).
         const targetElId = Number(data?.newElementId ?? elId);
