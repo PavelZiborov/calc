@@ -2845,6 +2845,7 @@ function openSettingsPage() {
     if (typeof toggleAuthModal === "function") toggleAuthModal(false);
     if (typeof switchTab === "function") switchTab("settings-tab");
     renderUsersSettingsInline();
+    renderCalcPricesSettingsInline();
     renderYandexSettingsInline();
     renderMoedeloSettingsInline();
     renderDadataSettingsInline();
@@ -3003,6 +3004,144 @@ async function dbUserDelete(id) {
     } catch (e) {
         console.error("deleteUser", e);
         alert("Не удалось удалить пользователя.");
+    }
+}
+
+// ——— Редактор цен калькулятора (только админ) ———
+let calcPricesDraft = null;
+const CP_OP_LABELS = {
+    min_order_price: "Минимальный заказ, ₽",
+    cut_percent: "Резка: % от себестоимости (0.1 = 10%)",
+    cut_min_price: "Резка: минимум, ₽",
+    cut_plotter_sheet: "Плоттерная резка, ₽/лист",
+    rounding_unit: "Скругление углов, ₽/шт",
+    rounding_min: "Скругление: минимум, ₽",
+    catalog_staple: "Каталог: сборка на скобу, ₽/шт",
+    catalog_spring: "Каталог: сборка на пружину, ₽/шт",
+};
+async function renderCalcPricesSettingsInline() {
+    const host = document.getElementById("settingsPricesHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    try {
+        const data = await clientsApi("getCalcPrices", {});
+        calcPricesDraft = data?.prices || { papers: [], printing: [], lamination: [], operations: {}, markups: [] };
+    } catch (e) {
+        host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить цены (нужны права администратора).</p>`;
+        return;
+    }
+    dbRenderPricesEditor();
+}
+function dbMatRowsHtml(list, kind) {
+    return (list || []).map((x, i) => `
+        <div class="cp-row" data-kind="${kind}" data-i="${i}">
+            <input class="cp-id" value="${escapeHtml(x.ID || "")}" placeholder="ID" title="ID — должен совпадать с калькулятором">
+            <input class="cp-name" value="${escapeHtml(x.Name || "")}" placeholder="Название">
+            <input class="cp-price" type="text" inputmode="decimal" value="${Number(x.Price) || 0}" oninput="dbCleanNum(this)" placeholder="₽">
+            <input type="hidden" class="cp-cat" value="${escapeHtml(x.Category || "")}">
+            <button type="button" class="cp-del" title="Удалить" onclick="dbPricesDelRow('${kind}', ${i})">×</button>
+        </div>`).join("");
+}
+function dbRenderPricesEditor() {
+    const host = document.getElementById("settingsPricesHost");
+    if (!host || !calcPricesDraft) return;
+    const d = calcPricesDraft;
+    const opsKeys = Array.from(new Set([...Object.keys(CP_OP_LABELS), ...Object.keys(d.operations || {})]));
+    const opsHtml = opsKeys.map(k => `
+        <label class="cp-op">
+            <span>${escapeHtml(CP_OP_LABELS[k] || k)}</span>
+            <input type="text" inputmode="decimal" data-op="${escapeHtml(k)}" value="${Number(d.operations?.[k]) || 0}" oninput="dbCleanNum(this)">
+        </label>`).join("");
+    const markupsHtml = (d.markups || []).map((m, i) => `
+        <div class="cp-row cp-row--markup" data-i="${i}">
+            <input class="cp-thr" type="text" inputmode="decimal" value="${Number(m.Threshold) || 0}" oninput="dbCleanNum(this)" placeholder="Порог, ₽">
+            <input class="cp-mult" type="text" inputmode="decimal" value="${Number(m.Multiplier) || 0}" oninput="dbCleanNum(this)" placeholder="Коэф.">
+            <button type="button" class="cp-del" onclick="dbPricesDelMarkup(${i})" title="Удалить">×</button>
+        </div>`).join("");
+    const section = (title, kind, list, head) => `
+        <div class="cp-section">
+            <div class="cp-section-head"><h4>${title}</h4><button type="button" class="dbo-btn dbo-btn-sm" onclick="dbPricesAddRow('${kind}')">+ строка</button></div>
+            <div class="cp-row cp-row--head">${head}</div>
+            <div id="cp-${kind}">${dbMatRowsHtml(list, kind)}</div>
+        </div>`;
+    const matHead = `<span>ID</span><span>Название</span><span>₽/лист</span><span></span>`;
+    host.innerHTML = `
+        <p class="dbo-ya-hint">Цена бумаги/печати/ламинации — за печатный лист SRA3. ID менять только вместе с калькулятором.</p>
+        ${section("Бумага", "papers", d.papers, matHead)}
+        ${section("Печать", "printing", d.printing, matHead)}
+        ${section("Ламинация", "lamination", d.lamination, matHead)}
+        <div class="cp-section">
+            <div class="cp-section-head"><h4>Операции</h4></div>
+            <div class="cp-ops">${opsHtml}</div>
+        </div>
+        <div class="cp-section">
+            <div class="cp-section-head"><h4>Наценки (по себестоимости)</h4><button type="button" class="dbo-btn dbo-btn-sm" onclick="dbPricesAddMarkup()">+ строка</button></div>
+            <div class="cp-row cp-row--markup cp-row--head"><span>Порог себест., ₽</span><span>Коэффициент</span><span></span></div>
+            <div id="cp-markups">${markupsHtml}</div>
+        </div>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" id="cpSaveBtn" onclick="dbSaveCalcPrices()">Сохранить цены</button>
+            <button class="dbo-btn" onclick="renderCalcPricesSettingsInline()">Отменить изменения</button>
+        </div>
+        <div id="cpSaveMsg" class="dbo-ya-note"></div>`;
+}
+// Синхронизируем DOM → черновик (перед add/remove/save, чтобы не терять ввод).
+function dbPricesCollectFromDom() {
+    if (!calcPricesDraft) return;
+    const num = v => { const n = Number(String(v).replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+    const readMat = kind => Array.from(document.querySelectorAll(`#cp-${kind} .cp-row`)).map(r => {
+        const o = { ID: r.querySelector(".cp-id").value.trim(), Name: r.querySelector(".cp-name").value.trim(), Price: num(r.querySelector(".cp-price").value) };
+        const cat = r.querySelector(".cp-cat")?.value.trim(); if (cat) o.Category = cat;
+        return o;
+    });
+    calcPricesDraft.papers = readMat("papers");
+    calcPricesDraft.printing = readMat("printing");
+    calcPricesDraft.lamination = readMat("lamination").map(({ Category, ...rest }) => rest);
+    const ops = {};
+    document.querySelectorAll("#settingsPricesHost .cp-ops input[data-op]").forEach(inp => { ops[inp.getAttribute("data-op")] = num(inp.value); });
+    calcPricesDraft.operations = ops;
+    calcPricesDraft.markups = Array.from(document.querySelectorAll("#cp-markups .cp-row")).map(r => ({
+        Threshold: num(r.querySelector(".cp-thr").value), Multiplier: num(r.querySelector(".cp-mult").value)
+    }));
+}
+function dbPricesAddRow(kind) {
+    dbPricesCollectFromDom();
+    calcPricesDraft[kind] = calcPricesDraft[kind] || [];
+    calcPricesDraft[kind].push({ ID: "", Name: "", Price: 0 });
+    dbRenderPricesEditor();
+}
+function dbPricesDelRow(kind, i) {
+    dbPricesCollectFromDom();
+    calcPricesDraft[kind].splice(i, 1);
+    dbRenderPricesEditor();
+}
+function dbPricesAddMarkup() {
+    dbPricesCollectFromDom();
+    calcPricesDraft.markups = calcPricesDraft.markups || [];
+    calcPricesDraft.markups.push({ Threshold: 0, Multiplier: 2 });
+    dbRenderPricesEditor();
+}
+function dbPricesDelMarkup(i) {
+    dbPricesCollectFromDom();
+    calcPricesDraft.markups.splice(i, 1);
+    dbRenderPricesEditor();
+}
+async function dbSaveCalcPrices() {
+    dbPricesCollectFromDom();
+    const msg = document.getElementById("cpSaveMsg");
+    const btn = document.getElementById("cpSaveBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Сохранение…"; }
+    if (msg) { msg.textContent = ""; msg.className = "dbo-ya-note"; }
+    try {
+        const data = await clientsApi("saveCalcPrices", { prices: calcPricesDraft });
+        if (data?.prices) calcPricesDraft = data.prices;
+        if (msg) { msg.textContent = "Цены сохранены. Новый расчёт уже использует их."; msg.className = "dbo-ya-note payment-ok"; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Цены калькулятора сохранены");
+    } catch (e) {
+        console.error("saveCalcPrices", e);
+        if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить цены"; msg.className = "dbo-ya-note payment-alert"; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Сохранить цены"; }
     }
 }
 

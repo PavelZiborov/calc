@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=102">
+<link rel="stylesheet" href="css/app.css?v=104">
 </head>
 <body>
 
@@ -24,8 +24,8 @@
         </button>
         <nav class="tabs-nav" id="tabsNav" aria-label="Разделы">
             <button class="nav-tab tab-btn active" data-tab-target="main-tab" onclick="switchTab('main-tab')"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h4"/></svg><span>Калькулятор</span></button>
-            <button class="nav-tab tab-btn gated-nav" id="adv-tab-btn" data-tab-target="search-tab" onclick="openOrdersView('list', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg><span>Заказы</span></button>
-            <button class="nav-tab tab-btn gated-nav" id="kanban-nav-btn" data-tab-target="search-tab" onclick="openOrdersView('kanban', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Канбан</span></button>
+            <button class="nav-tab tab-btn legacy-n8n-hidden" id="adv-tab-btn" data-tab-target="search-tab" onclick="openOrdersView('list', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg><span>Заказы</span></button>
+            <button class="nav-tab tab-btn legacy-n8n-hidden" id="kanban-nav-btn" data-tab-target="search-tab" onclick="openOrdersView('kanban', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Канбан</span></button>
             <button class="nav-tab tab-btn gated-nav" id="clients-nav-btn" data-tab-target="clients-tab" onclick="openClientsView(this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></svg><span>Клиенты</span></button>
             <button class="nav-tab tab-btn gated-nav" id="db-orders-nav-btn" data-tab-target="db-orders-tab" onclick="openDbOrders(this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Заказы БД</span></button>
         </nav>
@@ -411,6 +411,11 @@
                 <p class="settings-card-note">Лист и зазоры, материалы, правила продуктов.</p>
                 <button type="button" class="dbk-btn dbk-btn-sync" onclick="openCalcSettings()">Открыть настройки калькулятора</button>
             </section>
+            <section class="settings-card" id="settingsPricesCard">
+                <h3>Цены калькулятора</h3>
+                <p class="settings-card-note">Себестоимость бумаг, печати, ламинации, операций и таблица наценок. Используется при расчёте.</p>
+                <div id="settingsPricesHost"></div>
+            </section>
             <section class="settings-card">
                 <h3>Интеграция с Яндекс.Диском</h3>
                 <div id="settingsYandexHost"></div>
@@ -439,19 +444,19 @@
     </div>
 </div>
 
-<script src="js/config.js?v=102"></script>
-<script src="js/calculator-data.js?v=102"></script>
-<script src="js/calc-settings.js?v=102"></script>
-<script src="js/calc-settings-ui.js?v=102"></script>
-<script src="js/utils.js?v=102"></script>
-<script src="js/auth.js?v=102"></script>
-<script src="js/calculator.js?v=102"></script>
-<script src="js/crm.js?v=102"></script>
-<script src="js/element-editor.js?v=102"></script>
-<script src="js/kp-docx.js?v=102"></script>
-<script src="js/calc-sheet.js?v=102"></script>
-<script src="js/clients.js?v=102"></script>
-<script src="js/orders-db.js?v=102"></script>
-<script src="js/main.js?v=102"></script>
+<script src="js/config.js?v=104"></script>
+<script src="js/calculator-data.js?v=104"></script>
+<script src="js/calc-settings.js?v=104"></script>
+<script src="js/calc-settings-ui.js?v=104"></script>
+<script src="js/utils.js?v=104"></script>
+<script src="js/auth.js?v=104"></script>
+<script src="js/calculator.js?v=104"></script>
+<script src="js/crm.js?v=104"></script>
+<script src="js/element-editor.js?v=104"></script>
+<script src="js/kp-docx.js?v=104"></script>
+<script src="js/calc-sheet.js?v=104"></script>
+<script src="js/clients.js?v=104"></script>
+<script src="js/orders-db.js?v=104"></script>
+<script src="js/main.js?v=104"></script>
 </body>
 </html>

@@ -67,7 +67,8 @@ async function calc() {
         // Запускаем таймер на 1 секунды одновременно с запросом
         const timerPromise = new Promise(res => setTimeout(res, 1000));
         
-        const fetchPromise = fetchWithTimeout(N8N_URL, {
+        // Расчёт теперь на нашем бэкенде (CALC_URL), а не в n8n.
+        const fetchPromise = fetchWithTimeout(CALC_URL, {
             method: 'POST',
             headers: authHeaders(),
             body: JSON.stringify(calcData)

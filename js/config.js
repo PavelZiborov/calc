@@ -9,6 +9,8 @@ const CLIENTS_URL = "https://calc.heavendevelop.ru/api/clients";
 // Своя авторизация (ушли от n8n): вход/выход через собственный бэкенд.
 const LOGIN_URL = CLIENTS_URL.replace(/\/clients$/, "/login");
 const LOGOUT_URL = CLIENTS_URL.replace(/\/clients$/, "/logout");
+// Калькуляция перенесена с n8n на наш бэкенд (публичный эндпоинт).
+const CALC_URL = CLIENTS_URL.replace(/\/clients$/, "/calculate");
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
 const DELETE_ASSETS_TIMEOUT_MS = 45000;

@@ -591,6 +591,20 @@
     .dbo-user-admin-toggle { display: flex; align-items: center; gap: 9px; margin: 4px 0; font-size: 14px; color: var(--text); cursor: pointer; }
     .dbo-user-admin-toggle input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
     .dbo-user-admin-toggle.is-disabled { opacity: 0.7; cursor: default; }
+    /* Редактор цен калькулятора */
+    .cp-section { margin: 14px 0; }
+    .cp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .cp-section-head h4 { margin: 0; font-size: 14px; color: var(--text); }
+    .cp-row { display: grid; grid-template-columns: 1.3fr 2fr 0.8fr 28px; gap: 6px; align-items: center; margin-bottom: 5px; }
+    .cp-row--markup { grid-template-columns: 1fr 1fr 28px; }
+    .cp-row--head { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
+    .cp-row--head span { padding: 0 4px; }
+    .cp-row input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--surface); color: var(--text); box-sizing: border-box; }
+    .cp-del { border: none; background: transparent; color: var(--payment-alert, #c0392b); font-size: 20px; line-height: 1; cursor: pointer; border-radius: 6px; }
+    .cp-del:hover { background: var(--surface-2); }
+    .cp-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+    .cp-op { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-muted); }
+    .cp-op input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--surface); color: var(--text); }
     /* Drop-зоны превью и макетов */
     .dbo-preview-box { cursor: pointer; }
     .dbo-preview-box .dbo-asset-empty { pointer-events: none; font-size: 13px; color: var(--accent); font-weight: 600; }
@@ -3229,6 +3243,8 @@
         text-transform: uppercase;
         color: #fff;
     }
+    /* Легаси-разделы на n8n («Заказы»/«Канбан») временно скрыты (перенос не завершён). */
+    .legacy-n8n-hidden { display: none !important; }
     .auth-role-badge--staff { background: #e67e22; }
     .auth-role-badge--admin { background: #8e44ad; }
     .auth-role-badge--client { background: #27ae60; }
