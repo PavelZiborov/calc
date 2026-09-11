@@ -1179,6 +1179,9 @@ function dbOpenElEdit(elId) {
                 </div>
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
+                <label class="dbo-edit-wide">Дополнительная информация
+                    <textarea id="dbEditElInfo" class="dbo-edit-name" rows="2" oninput="dbAutoGrow(this)" placeholder="Заметки к позиции…">${escapeHtml(e.extra_info || "")}</textarea>
+                </label>
                 <div class="dbo-assets-title dbo-assets-heading">Превью и макеты</div>
                 ${dboAssetsEditHtml(elId)}
             </div>
@@ -1215,14 +1218,18 @@ async function dbInitRespControl(elId) {
     dbEditRespSelected = new Set();
     dbEditRespInitial = new Set();
     dbEditRespOptions = [];
-    let managers = (typeof getManagers === "function") ? getManagers() : [];
+    let managers = [];
     try {
+        // Всегда тянем свежий список менеджеров (созданные/активированные после входа
+        // ещё не попали в сессионный кэш) + текущих ответственных позиции.
         const [respData, mgrData] = await Promise.all([
             clientsApi("getElementResponsibles", { dealId: Number(dbCardDealId), elementId: Number(elId) }),
-            (managers.length ? Promise.resolve(null) : clientsApi("getManagers"))
+            clientsApi("getManagers")
         ]);
         if (mgrData && Array.isArray(mgrData.managers)) {
             managers = mgrData.managers.map(m => ({ id: Number(m.id), name: String(m.name || m.email || "") }));
+        } else if (typeof getManagers === "function") {
+            managers = getManagers();
         }
         const current = Array.isArray(respData?.responsibles) ? respData.responsibles : [];
         // Опции = менеджеры ∪ текущие ответственные (на случай, если кого-то нет в нашей БД).
@@ -1353,6 +1360,7 @@ async function dbSaveElEdit(elId) {
     const cost = Number(val("dbEditCost")) || 0;
     const costHq = String(val("dbEditCostHq") || "").trim();
     const sheets = String(val("dbEditSheets") || "").trim();
+    const extraInfo = String(val("dbEditElInfo") ?? "");
     // имя/категория изменились → пересоздание
     const recreate = (name !== dbElBaseName(e)) || (categoryId !== (e.category_id != null ? Number(e.category_id) : null));
 
@@ -1361,7 +1369,7 @@ async function dbSaveElEdit(elId) {
     try {
         const data = await clientsApi("editElement", {
             dealId: Number(dbCardDealId), elementId: Number(elId),
-            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate
+            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate, extraInfo
         });
         // Ответственные: синхронизируем, если менялись (или элемент пересоздан → id новый).
         const targetElId = Number(data?.newElementId ?? elId);
@@ -1971,11 +1979,6 @@ function renderDbDealCard(data, crmId) {
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-body">
-                <div class="dbo-section dbo-dealinfo-section">
-                    <div class="dbo-section-title">Дополнительная информация к сделке</div>
-                    <textarea id="dbDealInfoInput" class="dbo-costinfo-input" rows="3" placeholder="Загрузка…" disabled
-                        onblur="dbSaveDealInfo(${crmId}, this.value)"></textarea>
-                </div>
                 <div class="dbo-elements">
                     ${elHead}
                     ${elBody}
@@ -2016,43 +2019,6 @@ function renderDbDealCard(data, crmId) {
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
     dboLoadAllAssets(crmId, d.num, elements);
-    // «Дополнительная информация к сделке» (зеркалим с PrintOffice) — грузим асинхронно.
-    dbLoadDealInfo(crmId);
-}
-
-// Состояние поля «Дополнительная информация к сделке» текущей карточки.
-let dbDealInfoState = { crmId: null, fieldId: null, value: "" };
-async function dbLoadDealInfo(crmId) {
-    const ta = document.getElementById("dbDealInfoInput");
-    if (!ta) return;
-    try {
-        const data = await clientsApi("getDealExtraInfo", { crmId: Number(crmId) });
-        // Карточку могли уже закрыть/сменить — не трогаем чужой textarea.
-        if (Number(dbCardDealId) !== Number(crmId)) return;
-        const cur = document.getElementById("dbDealInfoInput");
-        if (!cur) return;
-        dbDealInfoState = { crmId: Number(crmId), fieldId: data?.fieldId ?? null, value: String(data?.value ?? "") };
-        cur.value = dbDealInfoState.value;
-        cur.placeholder = "Заметки и пожелания по заказу…";
-        cur.disabled = false;
-    } catch (err) {
-        console.error("getDealExtraInfo", err);
-        const cur = document.getElementById("dbDealInfoInput");
-        if (cur) { cur.placeholder = "Не удалось загрузить"; cur.disabled = false; }
-    }
-}
-// Сохранение «Дополнительной информации к сделке» (PUT в CRM + mirror), по blur.
-async function dbSaveDealInfo(crmId, value) {
-    const val = String(value ?? "");
-    if (Number(dbDealInfoState.crmId) === Number(crmId) && val === dbDealInfoState.value) return;
-    try {
-        const data = await clientsApi("setDealExtraInfo", { crmId: Number(crmId), value: val });
-        dbDealInfoState = { crmId: Number(crmId), fieldId: data?.fieldId ?? dbDealInfoState.fieldId, value: val };
-        if (typeof showReadinessToast === "function") showReadinessToast("Дополнительная информация сохранена");
-    } catch (err) {
-        console.error("setDealExtraInfo", err);
-        alert("Не удалось сохранить дополнительную информацию к сделке.");
-    }
 }
 
 // Сохранение «Информации по себестоимости» (доп-поле 476) в CRM + локально.
@@ -2879,19 +2845,24 @@ async function renderUsersSettingsInline() {
         return;
     }
     dbUsersCache = users;
-    const rows = users.map(u => `
-        <div class="dbo-user-row">
+    const rows = users.map(u => {
+        const inactive = u.active === false;
+        return `
+        <div class="dbo-user-row${inactive ? " dbo-user-row--inactive" : ""}">
             <div class="dbo-user-main">
-                <div class="dbo-user-name">${escapeHtml(u.name || u.email)}${u.crmUserId ? ` <span class="dbo-user-crm" title="ID в PrintOffice">PO#${u.crmUserId}</span>` : ""}</div>
+                <div class="dbo-user-name">${escapeHtml(u.name || u.email)}${u.crmUserId ? ` <span class="dbo-user-crm" title="ID в PrintOffice">PO#${u.crmUserId}</span>` : ""}${inactive ? ` <span class="dbo-user-off">деактивирован</span>` : ""}</div>
                 <div class="dbo-user-email">${escapeHtml(u.email)}</div>
             </div>
             <span class="dbo-user-badge dbo-user-badge--${u.role === "superadmin" ? "super" : (u.isAdmin ? "admin" : "staff")}">${escapeHtml(dbUserRoleLabel(u))}</span>
             <div class="dbo-user-actions">
                 <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbUserEdit(${u.id})">Изменить</button>
                 <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbUserResetPassword(${u.id})">Сбросить пароль</button>
-                ${u.role === "superadmin" ? "" : `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbUserDelete(${u.id})">Удалить</button>`}
+                ${u.role === "superadmin" ? "" : (inactive
+                    ? `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-primary" onclick="dbUserSetActive(${u.id}, true)">Активировать</button>`
+                    : `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbUserSetActive(${u.id}, false)">Деактивировать</button>`)}
             </div>
-        </div>`).join("");
+        </div>`;
+    }).join("");
     host.innerHTML = `
         <div class="dbo-users-list">${rows || `<p class="dbo-ya-note">Пользователей нет.</p>`}</div>
         <div class="settings-actions">
@@ -2996,14 +2967,15 @@ async function dbUserResetPassword(id) {
         alert("Не удалось сбросить пароль.");
     }
 }
-async function dbUserDelete(id) {
-    if (!confirm("Удалить (деактивировать) пользователя? Он больше не сможет войти.")) return;
+async function dbUserSetActive(id, active) {
+    if (!active && !confirm("Деактивировать пользователя? Он не сможет войти и исчезнет из списка ответственных.")) return;
     try {
-        await clientsApi("deleteUser", { id: Number(id) });
+        await clientsApi("setUserActive", { id: Number(id), active: !!active });
         await renderUsersSettingsInline();
+        if (typeof showReadinessToast === "function") showReadinessToast(active ? "Пользователь активирован" : "Пользователь деактивирован");
     } catch (e) {
-        console.error("deleteUser", e);
-        alert("Не удалось удалить пользователя.");
+        console.error("setUserActive", e);
+        alert("Не удалось изменить статус пользователя.");
     }
 }
 

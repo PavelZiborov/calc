@@ -587,6 +587,8 @@
     .dbo-user-badge--admin { background: #2980b9; }
     .dbo-user-badge--staff { background: #7f8c8d; }
     .dbo-user-actions { display: flex; gap: 6px; flex-wrap: wrap; flex: 0 0 auto; }
+    .dbo-user-row--inactive { opacity: 0.62; }
+    .dbo-user-off { font-size: 10px; font-weight: 700; color: #c0392b; text-transform: uppercase; letter-spacing: .03em; }
     .dbo-edit--narrow { max-width: 440px; }
     .dbo-user-admin-toggle { display: flex; align-items: center; gap: 9px; margin: 4px 0; font-size: 14px; color: var(--text); cursor: pointer; }
     .dbo-user-admin-toggle input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
