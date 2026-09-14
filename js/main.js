@@ -29,8 +29,9 @@ window.onload = () => {
     if (typeof initCrmViewToggle === "function") initCrmViewToggle();
     if (typeof restoreAppUiState === "function") restoreAppUiState();
     
-    document.getElementById('crmSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
-    document.getElementById('advSearchInput').addEventListener('keypress', (e) => {
+    // #crmSearchInput (легаси-поиск на калькуляторе) удалён — гвардим.
+    document.getElementById('crmSearchInput')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCRM('main'); });
+    document.getElementById('advSearchInput')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') searchCRM('adv');
     });
 

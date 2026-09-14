@@ -135,7 +135,7 @@ function applyPermissions() {
     updateAuthModalUi();
 
     if (isUserLoggedIn()) {
-        crmContainer.style.display = "block";
+        if (crmContainer) crmContainer.style.display = "block";   // легаси-блок удалён — может отсутствовать
 
         if (currentUser.role === "client" && searchRow) {
             searchRow.innerHTML = `
