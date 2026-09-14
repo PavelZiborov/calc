@@ -3512,6 +3512,8 @@
     }
     .adv-search-clear-btn:hover { background: #d6d0c4; color: #3a3833; }
     .adv-search-clear-btn[hidden] { display: none; }
+    /* Клик всегда попадает по кнопке, а не по вложенному <path> (иначе крестик «не срабатывал») */
+    .adv-search-clear-btn svg, .adv-search-clear-btn svg * { pointer-events: none; }
     .adv-toolbar-actions {
         display: flex;
         align-items: center;

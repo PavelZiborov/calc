@@ -73,11 +73,15 @@ function updateDbSearchClearBtn() {
     const inp = document.getElementById("dbkSearchInput");
     if (btn && inp) btn.hidden = !inp.value;
 }
-function clearDbSearch() {
+function clearDbSearch(event) {
+    if (event) event.preventDefault();          // не даём полю потерять фокус на press
     const inp = document.getElementById("dbkSearchInput");
-    if (inp) inp.value = "";
+    if (!inp || inp.value === "") return;        // уже пусто — не дёргаем сервер повторно
+    inp.value = "";
+    clearTimeout(dbDealsSearchTimer);            // отменяем отложенный поиск от набора текста
     dbOrdersState.query = "";
     updateDbSearchClearBtn();
+    inp.focus();
     dbApplyQueryOrFilters();
 }
 // Список: перезагрузка с сервера (пагинация/фильтры серверные). Канбан: клиентский рендер.
