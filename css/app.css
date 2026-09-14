@@ -593,6 +593,7 @@
     .dbo-user-admin-toggle { display: flex; align-items: center; gap: 9px; margin: 4px 0; font-size: 14px; color: var(--text); cursor: pointer; }
     .dbo-user-admin-toggle input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
     .dbo-user-admin-toggle.is-disabled { opacity: 0.7; cursor: default; }
+    .dbo-smtp-block { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
     /* Редактор цен калькулятора */
     .cp-section { margin: 14px 0; }
     .cp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
@@ -3247,6 +3248,9 @@
     }
     /* Легаси-разделы на n8n («Заказы»/«Канбан») временно скрыты (перенос не завершён). */
     .legacy-n8n-hidden { display: none !important; }
+    /* Блок «Уведомление о готовности» в карточке Заказы БД (переиспользует .deal-notify-*) */
+    .dbo-notify-block { margin-top: 14px; }
+    .dbo-notify-block .dbo-section-title { margin-bottom: 2px; }
     .auth-role-badge--staff { background: #e67e22; }
     .auth-role-badge--admin { background: #8e44ad; }
     .auth-role-badge--client { background: #27ae60; }

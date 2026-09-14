@@ -1990,6 +1990,10 @@ function renderDbDealCard(data, crmId) {
                         <button type="button" onclick="dbAddElFromCalc()">Добавить из калькулятора</button>
                     </div>
                 </div>
+                <div class="deal-notify-section dbo-notify-block" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
+                    <div class="dbo-section-title">Уведомление о готовности</div>
+                    <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
+                </div>
                 <div class="dbo-mid">
                     <div class="dbo-meta">
                         ${d.created_at_crm ? `<div>Дата заказа: <b>${escapeHtml(d.created_at_crm)}</b></div>` : ""}
@@ -2019,6 +2023,242 @@ function renderDbDealCard(data, crmId) {
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
     dboLoadAllAssets(crmId, d.num, elements);
+    // Уведомление о готовности — контакты (наша БД) грузим асинхронно.
+    if (d.client_crm_id) dbNotifyLoad(crmId, Number(d.client_crm_id));
+    else {
+        const b = document.querySelector("#dbNotifySection .deal-notify-body");
+        if (b) b.innerHTML = `<div class="deal-notify-empty">Клиент не привязан к сделке — уведомления недоступны</div>`;
+    }
+}
+
+// ==================== Уведомление о готовности (контакты + отправка) ====================
+// Переиспользуем чистые хелперы из js/crm.js: parseContactReach, buildContactLabel,
+// contactTelegramNick, contactEmailAddr, formatNotifySentAt, maskRuPhone, icon.
+const dbNotifyCache = new Map();
+function dbNotifySection() { return document.getElementById("dbNotifySection"); }
+async function dbNotifyLoad(dealId, clientId) {
+    const section = dbNotifySection();
+    if (!section) return;
+    try {
+        const data = await clientsApi("getDealContacts", { dealId: Number(dealId), clientId: Number(clientId) });
+        if (Number(dbCardDealId) !== Number(dealId)) return;   // карточку сменили
+        dbNotifyCache.set(String(dealId), data);
+        dbNotifyRender(dealId);
+    } catch (e) {
+        console.error("getDealContacts", e);
+        const b = document.querySelector("#dbNotifySection .deal-notify-body");
+        if (b) b.innerHTML = `<div class="deal-notify-error">Не удалось загрузить контакты</div>`;
+    }
+}
+function dbNotifyRender(dealId) {
+    const section = dbNotifySection();
+    const body = section?.querySelector(".deal-notify-body");
+    if (!section || !body) return;
+    const data = dbNotifyCache.get(String(dealId)) || { selectedContactId: null, notifyDisabled: false, contacts: [] };
+    const selectedId = data.selectedContactId;
+    const hasSelection = selectedId != null;
+    const notifyDisabled = data.notifyDisabled === true;
+    const isDecided = hasSelection || notifyDisabled;
+    const clientId = section.dataset.clientId;
+    const sentAt = formatNotifySentAt(data.lastSentAt);
+    const sentBadge = sentAt
+        ? `<div class="deal-notify-sent">${icon("check")} Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}</div>`
+        : "";
+    const sendLabel = sentAt ? (icon("mail") + " Отправить ещё раз") : (icon("mail") + " Отправить уведомление о готовности");
+    const selectedContact = hasSelection ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId)) : null;
+    const ddOptionsHtml = data.contacts.map(contact => {
+        const isSel = contact.contactId != null && Number(contact.contactId) === Number(selectedId);
+        const canDel = contact.source === "manual" && contact.contactId != null;
+        return `<div class="deal-notify-dd-opt-row">
+            <button type="button" class="deal-notify-dd-opt${isSel ? " is-sel" : ""}" onclick="dbNotifyPick(${dealId}, '${escapeHtml(contact.key)}')">${isSel ? "✓ " : ""}${escapeHtml(buildContactLabel(contact))}</button>
+            ${canDel ? `<button type="button" class="deal-notify-dd-edit" onclick="event.stopPropagation(); dbNotifyEditContact(${dealId}, ${contact.contactId})" title="Редактировать">${icon("edit")}</button>` : ""}
+            ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="event.stopPropagation(); dbNotifyDeleteContact(${dealId}, ${contact.contactId})" title="Удалить контакт">${icon("trash")}</button>` : ""}
+        </div>`;
+    }).join("");
+    const currentLabel = notifyDisabled ? (icon("bellOff") + " Не уведомлять")
+        : (hasSelection ? escapeHtml(buildContactLabel(selectedContact)) : "— выберите контакт —");
+    section.classList.toggle("is-unset", !isDecided);
+    body.innerHTML = `
+        ${!isDecided ? `<div class="deal-notify-alert">${icon("alert")} Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
+        <div class="deal-notify-row">
+            <div class="deal-notify-dd">
+                <button type="button" class="deal-notify-dd-toggle${!isDecided ? " is-unset" : ""}" onclick="dbNotifyToggleDropdown(event)">
+                    <span class="deal-notify-dd-current">${currentLabel}</span><span class="deal-notify-dd-caret">▾</span>
+                </button>
+                <div class="deal-notify-dd-menu" hidden>
+                    <button type="button" class="deal-notify-dd-opt${notifyDisabled ? " is-sel" : ""}" onclick="dbNotifyPick(${dealId}, '__none__')">${notifyDisabled ? "✓ " : ""}${icon("bellOff")} Не уведомлять</button>
+                    ${ddOptionsHtml}
+                    <div class="deal-notify-dd-foot">
+                        <button type="button" class="deal-notify-dd-add" onclick="dbNotifyOpenForm(${dealId})">+ Добавить</button>
+                        ${clientId ? `<a class="deal-notify-dd-crm" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" onclick="dbNotifyCloseDropdown()">Добавить в CRM ↗</a>` : ""}
+                    </div>
+                </div>
+            </div>
+        </div>
+        ${sentBadge}
+        ${hasSelection ? dbNotifyChannelsHtml(selectedContact, dealId) : ""}
+        ${hasSelection ? `<button type="button" class="deal-notify-send-btn" id="dbNotifySendBtn" onclick="dbNotifySend(${dealId})">${sendLabel}</button>` : ""}
+        <div class="deal-notify-modal" hidden onmousedown="overlayDown(event)" onclick="if(overlayClickedSelf(event))dbNotifyCloseForm()">
+            <div class="deal-notify-modal-card">
+                <div class="deal-notify-modal-title">Новый контакт</div>
+                <input type="text" class="deal-notify-input deal-notify-name" placeholder="Имя">
+                <input type="text" class="deal-notify-input deal-notify-email" placeholder="Email">
+                <input type="text" class="deal-notify-input deal-notify-telegram" placeholder="@ник в Telegram (необязательно)">
+                <input type="tel" inputmode="tel" class="deal-notify-input deal-notify-phone" placeholder="+7 (___) ___ __ __" oninput="maskRuPhone(this)">
+                <div class="deal-notify-form-actions">
+                    <button type="button" class="deal-notify-form-cancel" onclick="dbNotifyCloseForm()">Отмена</button>
+                    <button type="button" class="deal-notify-form-save" onclick="dbNotifySubmitForm(${dealId})">Сохранить и выбрать</button>
+                </div>
+            </div>
+        </div>`;
+}
+function dbNotifyChannelsHtml(contact, dealId) {
+    const email = contactEmailAddr(contact), tg = contactTelegramNick(contact);
+    const hasEmail = !!email, hasTg = !!tg;
+    const stored = dbNotifyStoredChannels(dealId);
+    const emailChecked = hasEmail && (stored ? stored.includes("email") : true);
+    const tgChecked = stored ? stored.includes("telegram") : hasTg;
+    return `
+        <div class="deal-notify-channels">
+            <span class="deal-notify-channels-label">Куда слать:</span>
+            <label class="deal-notify-ch-label${hasEmail ? "" : " is-disabled"}" title="${hasEmail ? escapeHtml(email) : "нет почты"}">
+                <input type="checkbox" class="deal-notify-ch" value="email" ${hasEmail ? "" : "disabled"} ${emailChecked ? "checked" : ""} onchange="dbNotifyChannelToggle(${dealId})"> ${icon("mail")} Email
+            </label>
+            <label class="deal-notify-ch-label" title="${hasTg ? "@" + escapeHtml(tg) : "по подписке в боте"}">
+                <input type="checkbox" class="deal-notify-ch" value="telegram" ${tgChecked ? "checked" : ""} onchange="dbNotifyChannelToggle(${dealId})"> ${icon("telegram")} Telegram${hasTg ? "" : ` <span class="deal-notify-ch-hint">(по подписке)</span>`}
+            </label>
+        </div>`;
+}
+function dbNotifyStoredChannels(dealId) {
+    try { const raw = localStorage.getItem(`calc_notify_ch_${dealId}`); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function dbNotifyCheckedChannels() {
+    const s = dbNotifySection();
+    return s ? Array.from(s.querySelectorAll(".deal-notify-ch:checked")).map(c => c.value) : [];
+}
+function dbNotifyChannelToggle(dealId) {
+    const channels = dbNotifyCheckedChannels();
+    try { localStorage.setItem(`calc_notify_ch_${dealId}`, JSON.stringify(channels)); } catch (_) {}
+    clientsApi("saveNotifyChannels", { dealId: Number(dealId), channels }).catch(e => console.warn("saveNotifyChannels", e));
+}
+// Дропдаун
+function dbNotifyCloseDropdown() {
+    document.querySelectorAll("#dbNotifySection .deal-notify-dd-menu").forEach(m => { m.hidden = true; });
+    document.querySelectorAll("#dbNotifySection .deal-notify-dd.is-open").forEach(d => d.classList.remove("is-open", "is-up"));
+    document.removeEventListener("click", dbNotifyDropdownOutside);
+}
+function dbNotifyDropdownOutside(ev) { if (!ev.target.closest(".deal-notify-dd")) dbNotifyCloseDropdown(); }
+function dbNotifyToggleDropdown(ev) {
+    if (ev) ev.stopPropagation();
+    const dd = dbNotifySection()?.querySelector(".deal-notify-dd");
+    const menu = dd?.querySelector(".deal-notify-dd-menu");
+    if (!menu) return;
+    const willOpen = menu.hidden;
+    dbNotifyCloseDropdown();
+    if (willOpen) {
+        menu.hidden = false; dd.classList.add("is-open");
+        setTimeout(() => document.addEventListener("click", dbNotifyDropdownOutside), 0);
+    }
+}
+function dbNotifyPick(dealId, key) { dbNotifyCloseDropdown(); dbNotifySelect(dealId, key); }
+async function dbNotifySelect(dealId, key) {
+    if (!key) return;
+    if (key === "__none__") { await dbNotifySaveAndRefresh(dealId, { disable: true }); return; }
+    const data = dbNotifyCache.get(String(dealId));
+    const contact = data?.contacts.find(c => c.key === key);
+    if (!contact) return;
+    let payload;
+    if (contact.contactId != null) payload = { contactId: Number(contact.contactId) };
+    else if (contact.source === "crm") payload = { source: "crm", crmRef: contact.crmRef, name: contact.name, email: contact.email, phone: contact.phone, telegram: contact.telegram || "" };
+    else payload = { source: "manual", name: contact.name, email: contact.email, phone: contact.phone, telegram: contact.telegram || "" };
+    await dbNotifySaveAndRefresh(dealId, payload);
+}
+async function dbNotifySaveAndRefresh(dealId, payload) {
+    const section = dbNotifySection();
+    const clientId = section?.dataset.clientId;
+    try {
+        await clientsApi("saveDealContact", { dealId: Number(dealId), clientId: clientId ? Number(clientId) : undefined, ...payload });
+        await dbNotifyLoad(dealId, Number(clientId));
+    } catch (e) { console.error("saveDealContact", e); alert("Не удалось сохранить контакт."); }
+}
+// Форма контакта
+function dbNotifyOpenForm(dealId) {
+    dbNotifyCloseDropdown();
+    const modal = dbNotifySection()?.querySelector(".deal-notify-modal");
+    if (!modal) return;
+    delete modal.dataset.editId;
+    modal.querySelectorAll(".deal-notify-input").forEach(i => { i.value = ""; });
+    modal.querySelector(".deal-notify-modal-title").textContent = "Новый контакт";
+    modal.querySelector(".deal-notify-form-save").textContent = "Сохранить и выбрать";
+    modal.hidden = false;
+    modal.querySelector(".deal-notify-name")?.focus();
+}
+function dbNotifyEditContact(dealId, contactId) {
+    dbNotifyCloseDropdown();
+    const data = dbNotifyCache.get(String(dealId));
+    const contact = data?.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(contactId));
+    if (!contact) return;
+    const modal = dbNotifySection()?.querySelector(".deal-notify-modal");
+    if (!modal) return;
+    const email = contactEmailAddr(contact), tg = contactTelegramNick(contact);
+    const rawName = contact.name != null ? String(contact.name).trim() : "";
+    const auto = !rawName || rawName === email || rawName === (tg ? "@" + tg : "\0") || rawName === (contact.phone || "\0");
+    modal.querySelector(".deal-notify-name").value = auto ? "" : rawName;
+    modal.querySelector(".deal-notify-email").value = email;
+    modal.querySelector(".deal-notify-telegram").value = tg ? "@" + tg : "";
+    modal.querySelector(".deal-notify-phone").value = contact.phone || "";
+    modal.dataset.editId = String(contactId);
+    modal.querySelector(".deal-notify-modal-title").textContent = "Редактировать контакт";
+    modal.querySelector(".deal-notify-form-save").textContent = "Сохранить";
+    modal.hidden = false;
+}
+function dbNotifyCloseForm() {
+    const modal = dbNotifySection()?.querySelector(".deal-notify-modal");
+    if (modal) modal.hidden = true;
+}
+async function dbNotifySubmitForm(dealId) {
+    const modal = dbNotifySection()?.querySelector(".deal-notify-modal");
+    if (!modal) return;
+    const name = modal.querySelector(".deal-notify-name").value.trim();
+    const email = modal.querySelector(".deal-notify-email").value.trim();
+    const telegram = modal.querySelector(".deal-notify-telegram").value.trim();
+    const phone = modal.querySelector(".deal-notify-phone").value.trim();
+    if (!email && !telegram && !phone) { alert("Укажите email, @ник в Telegram или телефон"); return; }
+    const editId = modal.dataset.editId ? Number(modal.dataset.editId) : null;
+    const payload = editId
+        ? { contactId: editId, source: "manual", name, email, phone, telegram }
+        : { source: "manual", name, email, phone, telegram };
+    dbNotifyCloseForm();
+    await dbNotifySaveAndRefresh(dealId, payload);
+}
+async function dbNotifyDeleteContact(dealId, contactId) {
+    if (!confirm("Удалить контакт из книги?")) return;
+    try {
+        await clientsApi("deleteDealContact", { contactId: Number(contactId) });
+        const section = dbNotifySection();
+        await dbNotifyLoad(dealId, Number(section?.dataset.clientId));
+    } catch (e) { console.error("deleteDealContact", e); alert("Не удалось удалить контакт."); }
+}
+async function dbNotifySend(dealId) {
+    const channels = dbNotifyCheckedChannels();
+    if (!channels.length) { alert("Отметьте хотя бы один канал (Email/Telegram)"); return; }
+    const btn = document.getElementById("dbNotifySendBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Отправка…"; }
+    try {
+        const data = await clientsApi("sendReadinessNotification", { dealId: Number(dealId), channels, force: true });
+        const okCh = (data?.results || []).filter(r => r.ok && !r.skipped).map(r => r.channel);
+        const errCh = (data?.results || []).filter(r => !r.ok);
+        let msg = okCh.length ? `Отправлено: ${okCh.map(c => c === "email" ? "Email" : "Telegram").join(", ")}` : "Ничего не отправлено";
+        if (errCh.length) msg += "\n" + errCh.map(r => `${r.channel}: ${r.error}`).join("\n");
+        if (typeof showReadinessToast === "function" && okCh.length) showReadinessToast(msg);
+        else alert(msg);
+        const section = dbNotifySection();
+        await dbNotifyLoad(dealId, Number(section?.dataset.clientId));
+    } catch (e) {
+        console.error("sendReadinessNotification", e);
+        alert("Не удалось отправить уведомление: " + (e.message || ""));
+        if (btn) { btn.disabled = false; }
+    }
 }
 
 // Сохранение «Информации по себестоимости» (доп-поле 476) в CRM + локально.
@@ -2815,7 +3055,47 @@ function openSettingsPage() {
     renderYandexSettingsInline();
     renderMoedeloSettingsInline();
     renderDadataSettingsInline();
+    renderNotifySettingsInline();
     renderKpSettingsInline();
+}
+
+// ——— Настройки Telegram-бота уведомлений (только админ) ———
+async function renderNotifySettingsInline() {
+    const host = document.getElementById("settingsNotifyHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка статуса…</p>`;
+    let s = {};
+    try { s = await clientsApi("getNotifySettings", {}); } catch (_) {}
+    const wh = s.webhookUrl || "";
+    host.innerHTML = `
+        <p class="dbo-ya-note">Бот один на всю компанию — рассылает уведомления о готовности в Telegram. Почта настраивается отдельно у каждого менеджера (Настройки → Пользователи → SMTP).</p>
+        <div class="dbo-ya-status">Токен бота: <b class="${s.telegramTokenSet ? "payment-ok" : "payment-alert"}">${s.telegramTokenSet ? "задан" : "не задан"}</b></div>
+        <label class="dbo-edit-wide">Токен бота (@HeavenPrint_bot)
+            <input type="password" id="dboTgToken" placeholder="${s.telegramTokenSet ? "•••••• (задан) — введите новый, чтобы заменить" : "123456:AA..."}" autocomplete="off">
+        </label>
+        <label class="dbo-edit-wide">Секрет вебхука (любая длинная строка)
+            <input type="text" id="dboTgSecret" value="${escapeHtml(s.webhookSecret || "")}" placeholder="сгенерируйте случайную строку" autocomplete="off">
+        </label>
+        <p class="dbo-ya-hint">Подписки клиентов (кнопка «Старт» в боте) можно ловить одним из способов:</p>
+        <ul class="dbo-ya-hint" style="margin:4px 0 0 16px;">
+            <li>указать вебхук бота на:<br><code style="word-break:break-all;">${wh ? escapeHtml(wh) : "— (сначала задайте секрет и сохраните)"}</code></li>
+            <li>или из n8n-бота слать <code>POST ${escapeHtml(s.subscribeUrl || "/api/telegram/subscribe")}</code> с заголовком <code>X-Sync-Secret: &lt;секрет&gt;</code> и телом <code>{chat_id, username, first_name}</code>.</li>
+        </ul>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dboSaveTelegramSettings()">Сохранить</button>
+        </div>`;
+}
+async function dboSaveTelegramSettings() {
+    const token = document.getElementById("dboTgToken")?.value || "";
+    const secret = document.getElementById("dboTgSecret")?.value || "";
+    try {
+        await clientsApi("setTelegramSettings", { token, secret });
+        if (typeof showReadinessToast === "function") showReadinessToast("Настройки Telegram сохранены");
+        renderNotifySettingsInline();
+    } catch (e) {
+        console.error("setTelegramSettings", e);
+        alert("Не удалось сохранить настройки Telegram.");
+    }
 }
 // Открыть настройки и проскроллить к разделу «Пользователи».
 function openUsersPage() {
@@ -2917,6 +3197,17 @@ function dbUserEdit(id) {
                     <span>Права администратора (настройки, интеграции, пользователи)</span>
                 </label>
                 ${isSuper ? `<div class="dbo-edit-note">Супер-администратор всегда имеет полные права.</div>` : ""}
+                <div class="dbo-smtp-block">
+                    <div class="dbo-section-title" style="margin-top:6px;">Почта для уведомлений (SMTP)</div>
+                    <div class="dbo-edit-note">Письма о готовности уходят с этой почты, когда менеджер — ответственный за сделку. Для mail.ru нужен пароль для внешних приложений.${u?.smtpConfigured ? " <b class=\"payment-ok\">Настроено.</b>" : ""}</div>
+                    <div class="dbo-edit-row">
+                        <label style="flex:2 1 160px;">SMTP-сервер<input type="text" id="dbUserSmtpHost" value="${escapeHtml(u?.smtpHost || "smtp.mail.ru")}" placeholder="smtp.mail.ru"></label>
+                        <label style="flex:0 1 90px;">Порт<input type="text" inputmode="numeric" id="dbUserSmtpPort" value="${u?.smtpPort != null ? u.smtpPort : 465}" placeholder="465"></label>
+                    </div>
+                    <label class="dbo-edit-wide">Логин / адрес почты<input type="text" id="dbUserSmtpUser" value="${escapeHtml(u?.smtpUser || "")}" placeholder="manager@heavenprint.ru" autocomplete="off"></label>
+                    <label class="dbo-edit-wide">Пароль для внешних приложений<input type="password" id="dbUserSmtpPass" value="" placeholder="${u?.smtpConfigured ? "•••••• (задан) — введите новый, чтобы заменить" : "app-пароль почты"}" autocomplete="off"></label>
+                    <label class="dbo-edit-wide">Имя отправителя (необязательно)<input type="text" id="dbUserSmtpFromName" value="${escapeHtml(u?.smtpFromName || "")}" placeholder="как подписать письмо (по умолчанию — имя)"></label>
+                </div>
             </div>
             <div class="dbo-edit-actions">
                 <button class="dbo-btn dbo-btn-primary" id="dbUserSaveBtn" onclick="dbUserSave(${u ? u.id : "null"})">Сохранить</button>
@@ -2945,7 +3236,12 @@ async function dbUserSave(id) {
     try {
         await clientsApi("saveUser", {
             id: id ?? null, email, name, password: password || null,
-            crmUserId: crmUserId === "" ? null : Number(crmUserId), isAdmin
+            crmUserId: crmUserId === "" ? null : Number(crmUserId), isAdmin,
+            smtpHost: String(val("dbUserSmtpHost") || "").trim(),
+            smtpPort: String(val("dbUserSmtpPort") || "").trim(),
+            smtpUser: String(val("dbUserSmtpUser") || "").trim(),
+            smtpPass: val("dbUserSmtpPass") || "",           // пусто = не менять
+            smtpFromName: String(val("dbUserSmtpFromName") || "").trim()
         });
         closeDbUserEdit();
         await renderUsersSettingsInline();
