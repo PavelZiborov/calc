@@ -2101,6 +2101,7 @@ function dbNotifyRender(dealId) {
         </div>
         ${sentBadge}
         ${hasSelection ? dbNotifyChannelsHtml(selectedContact, dealId) : ""}
+        ${hasSelection ? dbNotifyTgStatusHtml(selectedContact, dealId) : ""}
         ${hasSelection ? `<button type="button" class="deal-notify-send-btn" id="dbNotifySendBtn" onclick="dbNotifySend(${dealId})">${sendLabel}</button>` : ""}
         <div class="deal-notify-modal" hidden onmousedown="overlayDown(event)" onclick="if(overlayClickedSelf(event))dbNotifyCloseForm()">
             <div class="deal-notify-modal-card">
@@ -2132,6 +2133,37 @@ function dbNotifyChannelsHtml(contact, dealId) {
                 <input type="checkbox" class="deal-notify-ch" value="telegram" ${tgChecked ? "checked" : ""} onchange="dbNotifyChannelToggle(${dealId})"> ${icon("telegram")} Telegram${hasTg ? "" : ` <span class="deal-notify-ch-hint">(по подписке)</span>`}
             </label>
         </div>`;
+}
+// Статус Telegram-подписки контакта + кнопка «Скопировать приглашение».
+const DB_TG_BOT = "HeavenPrint_bot";
+function dbNotifyTgStatusHtml(contact, dealId) {
+    const nick = contactTelegramNick(contact);
+    if (nick && contact.tgSubscribed) {
+        return `<div class="deal-notify-tgstatus is-ok">${icon("telegram")} @${escapeHtml(nick)} — уже запускал бота, уведомление дойдёт</div>`;
+    }
+    // Ещё не подписан (или нет ника) — показываем кнопку с приглашением.
+    const who = nick ? `@${escapeHtml(nick)} ещё не запускал бота` : "у контакта нет @ника в Telegram";
+    return `<div class="deal-notify-tgstatus">
+        ${icon("telegram")} ${who} — Telegram-уведомление дойдёт только после того, как он нажмёт «Старт» у бота.
+        <button type="button" class="deal-notify-tg-sub" onclick="dbNotifyCopyTgLink(${dealId})">${icon("telegram")} Скопировать приглашение</button>
+    </div>`;
+}
+// Копирует текст-приглашение (номер заказа, состав, ссылку на бота) для отправки клиенту.
+function dbNotifyCopyTgLink(dealId) {
+    const link = `https://t.me/${DB_TG_BOT}`;
+    const d = dbCardData?.deal || {};
+    const num = d.num != null ? d.num : dealId;
+    const els = Array.isArray(dbCardData?.elements) ? dbCardData.elements : [];
+    const positions = els
+        .map(e => String((typeof dbElBaseName === "function" ? dbElBaseName(e) : "") || e.category_and_name || e.name || "").trim())
+        .filter(Boolean).map((n, i) => `${i + 1}. ${n}`);
+    const lines = [`Здравствуйте! Ваш заказ № ${num}.`];
+    if (positions.length) lines.push("", "Состав заказа:", ...positions);
+    lines.push("", "Подпишитесь на нашего Telegram-бота — и мы автоматически пришлём уведомление, как только заказ будет готов:", link);
+    const text = lines.join("\n");
+    const ok = () => { if (typeof showReadinessToast === "function") showReadinessToast("Приглашение скопировано — отправьте клиенту"); else alert("Скопировано:\n\n" + text); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(ok, () => prompt("Скопируйте приглашение для клиента:", text));
+    else prompt("Скопируйте приглашение для клиента:", text);
 }
 function dbNotifyStoredChannels(dealId) {
     try { const raw = localStorage.getItem(`calc_notify_ch_${dealId}`); return raw ? JSON.parse(raw) : null; } catch { return null; }
