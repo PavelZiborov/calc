@@ -483,33 +483,21 @@ function ccRenderDocs(data) {
         ${canGen ? `
         <div class="cc-doc-gen">
             ${reqSel}
-            <div class="cc-doc-genrow">
-                <div class="cc-doc-genblock">
-                    <div class="cc-doc-gentitle">Договор</div>
-                    <div class="cc-doc-fields">
-                        <label class="cc-doc-field">№<input type="text" id="ccDocContractNum" value="${escapeHtml(data.nextContract || "")}"></label>
-                        <label class="cc-doc-field">Дата<input type="text" id="ccDocContractDate" value="${escapeHtml(today)}"></label>
-                    </div>
-                    <div class="cc-doc-btns">
-                        <button type="button" class="dbo-btn dbo-btn-primary dbo-btn-sm" onclick="ccDocGenerate('contract','docx')">Word</button>
-                        <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocGenerate('contract','pdf')">PDF</button>
-                    </div>
+            <div class="cc-doc-genblock">
+                <div class="cc-doc-gentitle">Договор</div>
+                <div class="cc-doc-fields">
+                    <label class="cc-doc-field">№<input type="text" id="ccDocContractNum" value="${escapeHtml(data.nextContract || "")}"></label>
+                    <label class="cc-doc-field">Дата<input type="text" id="ccDocContractDate" value="${escapeHtml(today)}"></label>
                 </div>
-                <div class="cc-doc-genblock">
-                    <div class="cc-doc-gentitle">Приложение</div>
-                    <div class="cc-doc-fields">
-                        <label class="cc-doc-field">№ прил.<input type="text" id="ccDocAppNum" value="${escapeHtml(data.nextAppendix || "")}"></label>
-                        <label class="cc-doc-field">Дата<input type="text" id="ccDocAppDate" value="${escapeHtml(today)}"></label>
-                        <label class="cc-doc-field">к договору №<input type="text" id="ccDocAppContractNum" value=""></label>
-                        <label class="cc-doc-field">от<input type="text" id="ccDocAppContractDate" value=""></label>
-                    </div>
-                    <div class="cc-doc-btns">
-                        <button type="button" class="dbo-btn dbo-btn-primary dbo-btn-sm" onclick="ccDocGenerate('appendix','docx')">Word</button>
-                        <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocGenerate('appendix','pdf')">PDF</button>
-                    </div>
+                ${ccDocClauseFieldsHtml("cc")}
+                <div class="cc-doc-btns">
+                    <button type="button" class="dbo-btn dbo-btn-primary dbo-btn-sm" onclick="ccDocGenerate('contract','docx')">Word</button>
+                    <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocGenerate('contract','pdf')">PDF</button>
                 </div>
             </div>
+            <div class="cc-doc-hint">Приложения к договору формируются в конкретной сделке (раздел «Заказы БД» → карточка заказа) — там подставляются позиции заказа.</div>
         </div>` : ""}
+        ${ccDocVarsReferenceHtml()}
         <div class="cc-doc-saved"><div class="cc-doc-savedhead">Сохранённые документы</div>${savedRows}</div>`;
 }
 async function ccDocUpload(kind, clientId, input) {
@@ -537,11 +525,52 @@ function ccFileToBase64(file) {
         r.readAsDataURL(file);
     });
 }
+// Доп. поля клаузулы (подписант/основание/город) — общий рендер, id с префиксом.
+function ccDocClauseFieldsHtml(prefix) {
+    return `<details class="cc-doc-adv">
+        <summary>Доп. поля (подписант, основание, город)</summary>
+        <div class="cc-doc-fields">
+            <label class="cc-doc-field">Подписант (ФИО)<input type="text" id="${prefix}DocSigner" placeholder="пусто = из МоеДело"></label>
+            <label class="cc-doc-field">Должность<input type="text" id="${prefix}DocPosition" placeholder="пусто = из МоеДело"></label>
+            <label class="cc-doc-field">Основание<input type="text" id="${prefix}DocBasis" value="Устава"></label>
+            <label class="cc-doc-field">Город<input type="text" id="${prefix}DocCity" value="Москва"></label>
+        </div></details>`;
+}
+// Справочник переменных шаблонов (пользователь просил показать в программе).
+function ccDocVarsReferenceHtml() {
+    const groups = [
+        ["Контрагент (из МоеДело)", [
+            ["{client_name}", "Полное наименование"], ["{client_short_name}", "Краткое наименование"],
+            ["{client_inn}", "ИНН"], ["{client_kpp}", "КПП"], ["{client_ogrn}", "ОГРН"], ["{client_okpo}", "ОКПО"],
+            ["{client_legal_address}", "Юридический адрес"], ["{client_actual_address}", "Фактический адрес"],
+            ["{client_signer}", "Подписант (ФИО)"], ["{client_signer_position}", "Должность подписанта"], ["{client_basis}", "Основание (Устав/свидетельство)"]
+        ]],
+        ["Документ", [
+            ["{doc_number}", "Номер документа"], ["{doc_date}", "Дата документа"], ["{city}", "Город"], ["{today}", "Сегодняшняя дата"],
+            ["{appendix_number}", "Номер приложения"], ["{contract_number}", "Номер договора"], ["{contract_date}", "Дата договора"]
+        ]],
+        ["Позиции заказа (приложение из сделки)", [
+            ["{#items} … {/items}", "Цикл по позициям (обернуть строку таблицы)"],
+            ["{n}", "№ позиции"], ["{name}", "Наименование"], ["{units}", "Ед. изм."], ["{qty}", "Кол-во"], ["{price}", "Цена за шт."], ["{sum}", "Сумма"],
+            ["{total_amount}", "Итого сумма"], ["{total_amount_words}", "Сумма прописью"], ["{items_count}", "Кол-во позиций"], ["{total_qty}", "Общее кол-во"]
+        ]]
+    ];
+    return `<details class="cc-doc-vars">
+        <summary>📋 Переменные для шаблонов .docx</summary>
+        <div class="cc-doc-vars-body">
+            <p>Вставляйте метки в фигурных скобках в .docx. Свои (исполнителя) реквизиты пишите в шаблон текстом.</p>
+            ${groups.map(([g, rows]) => `<div class="cc-doc-vargroup"><div class="cc-doc-vargroup-title">${escapeHtml(g)}</div>${rows.map(([k, d]) => `<div class="cc-doc-varrow"><code>${escapeHtml(k)}</code><span>${escapeHtml(d)}</span></div>`).join("")}</div>`).join("")}
+            <p class="cc-doc-vars-note">Таблицу позиций в приложении: строку с {n} {name} … оберните в {#items} … {/items} (как в шаблоне КП).</p>
+        </div></details>`;
+}
 async function ccDocGenerate(kind, format) {
     const v = id => document.getElementById(id)?.value?.trim() || "";
     const inn = v("ccDocInn");
     if (!inn) { alert("Выберите реквизит (контрагента)"); return; }
-    const body = { clientId: Number(ccDocsClientId), kind, inn, format };
+    const body = {
+        clientId: Number(ccDocsClientId), kind, inn, format,
+        signer: v("ccDocSigner"), signerPosition: v("ccDocPosition"), basis: v("ccDocBasis"), city: v("ccDocCity")
+    };
     if (kind === "contract") { body.number = v("ccDocContractNum"); body.date = v("ccDocContractDate"); }
     else { body.appendixNumber = v("ccDocAppNum"); body.date = v("ccDocAppDate"); body.contractNumber = v("ccDocAppContractNum"); body.contractDate = v("ccDocAppContractDate"); }
     if (typeof showReadinessToast === "function") showReadinessToast("Формируем документ…");

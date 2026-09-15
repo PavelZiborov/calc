@@ -2056,6 +2056,10 @@ function renderDbDealCard(data, crmId) {
                 ${invoiceBlock}
                 ${dealAfBlock}
                 ${costBlock}
+                ${d.client_crm_id ? `<div class="dbo-section cc-docs-section" id="dbDocsSection" data-deal-id="${crmId}" data-client-id="${Number(d.client_crm_id)}">
+                    <div class="dbo-section-title">Приложение к договору</div>
+                    <div id="dbDocsHost"><div class="dbo-asset-empty">Загрузка…</div></div>
+                </div>` : ""}
                 <div class="dbo-card-actions">
                     <button type="button" class="dbo-btn" onclick="dbCopyForClient(${crmId}, this)" title="Скопировать список позиций с ценами для отправки клиенту">Скопировать для заказчика</button>
                     <div class="dbo-kp-wrap">
@@ -2070,12 +2074,104 @@ function renderDbDealCard(data, crmId) {
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
     dboLoadAllAssets(crmId, d.num, elements);
+    // Приложение к договору (по позициям заказа) — грузим асинхронно.
+    if (d.client_crm_id) dbDocsLoad(crmId, Number(d.client_crm_id));
     // Уведомление о готовности — контакты (наша БД) грузим асинхронно.
     if (d.client_crm_id) dbNotifyLoad(crmId, Number(d.client_crm_id));
     else {
         const b = document.querySelector("#dbNotifySection .deal-notify-body");
         if (b) b.innerHTML = `<div class="deal-notify-empty">Клиент не привязан к сделке — уведомления недоступны</div>`;
     }
+}
+
+// ==================== Приложение к договору (из карточки заказа) ====================
+// Переиспользуем глобальные хелперы из js/clients.js: ccDocClauseFieldsHtml,
+// ccDocVarsReferenceHtml, ccDocReqOptions, ccDownloadDocBlob.
+let dbDocsState = { dealId: null, clientId: null };
+async function dbDocsLoad(dealId, clientId) {
+    dbDocsState = { dealId: Number(dealId), clientId: Number(clientId) };
+    const host = document.getElementById("dbDocsHost");
+    if (!host) return;
+    try {
+        const data = await clientsApi("getDocData", { clientId: Number(clientId) });
+        if (Number(dbCardDealId) !== Number(dealId)) return;
+        dbDocsRender(data);
+    } catch (e) {
+        console.error("getDocData(deal)", e);
+        const h = document.getElementById("dbDocsHost"); if (h) h.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить.</div>`;
+    }
+}
+function dbDocsRender(data) {
+    const host = document.getElementById("dbDocsHost");
+    if (!host) return;
+    const reqs = Array.isArray(data.requisites) ? data.requisites : [];
+    const appTpl = (data.templates && data.templates.appendix) || {};
+    const hasTpl = !!(appTpl.client || appTpl.global);
+    const today = new Date().toLocaleDateString("ru-RU");
+    // Только приложения этой сделки.
+    const docs = (Array.isArray(data.documents) ? data.documents : []).filter(d => d.kind === "appendix" && Number(d.deal_crm_id) === Number(dbDocsState.dealId));
+    const savedRows = docs.length
+        ? docs.map(d => `
+            <div class="cc-doc-row">
+                <div class="cc-doc-rowmain"><span class="cc-doc-kind cc-doc-kind--appendix">Приложение</span><span class="cc-doc-title">${escapeHtml(d.title || "")}</span><span class="cc-doc-date">${escapeHtml(new Date(d.created_at).toLocaleString("ru-RU"))}</span></div>
+                <div class="cc-doc-rowact">
+                    <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbDocDownload(${d.id},'docx')">Word</button>
+                    <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbDocDownload(${d.id},'pdf')">PDF</button>
+                    <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbDocDelete(${d.id})">×</button>
+                </div>
+            </div>`).join("")
+        : `<div class="dbo-asset-empty">Приложений по этому заказу пока нет.</div>`;
+    if (!reqs.length) {
+        host.innerHTML = `<div class="payment-alert" style="font-size:13px">У клиента нет реквизитов — добавьте контрагента в карточке клиента. ${ccDocVarsReferenceHtml()}</div><div class="cc-doc-saved">${savedRows}</div>`;
+        return;
+    }
+    host.innerHTML = `
+        ${!hasTpl ? `<div class="payment-alert" style="font-size:13px;margin-bottom:8px">Не загружен шаблон приложения — загрузите его в карточке клиента.</div>` : ""}
+        <div class="cc-doc-gen">
+            <label class="cc-doc-field">Реквизит (контрагент)<select id="dbDocInn">${ccDocReqOptions(reqs)}</select></label>
+            <div class="cc-doc-genblock">
+                <div class="cc-doc-gentitle">Приложение (позиции — из этого заказа)</div>
+                <div class="cc-doc-fields">
+                    <label class="cc-doc-field">№ прил.<input type="text" id="dbDocAppNum" value="${escapeHtml(data.nextAppendix || "")}"></label>
+                    <label class="cc-doc-field">Дата<input type="text" id="dbDocAppDate" value="${escapeHtml(today)}"></label>
+                    <label class="cc-doc-field">к договору №<input type="text" id="dbDocAppContractNum" value=""></label>
+                    <label class="cc-doc-field">от<input type="text" id="dbDocAppContractDate" value=""></label>
+                </div>
+                ${ccDocClauseFieldsHtml("db")}
+                <div class="cc-doc-btns">
+                    <button type="button" class="dbo-btn dbo-btn-primary dbo-btn-sm" onclick="dbDocGenerateAppendix('docx')" ${hasTpl ? "" : "disabled"}>Word</button>
+                    <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbDocGenerateAppendix('pdf')" ${hasTpl ? "" : "disabled"}>PDF</button>
+                </div>
+            </div>
+        </div>
+        ${ccDocVarsReferenceHtml()}
+        <div class="cc-doc-saved"><div class="cc-doc-savedhead">Приложения по заказу</div>${savedRows}</div>`;
+}
+async function dbDocGenerateAppendix(format) {
+    const v = id => document.getElementById(id)?.value?.trim() || "";
+    const inn = v("dbDocInn");
+    if (!inn) { alert("Выберите реквизит (контрагента)"); return; }
+    const body = {
+        action: "generateDocument", clientId: Number(dbDocsState.clientId), kind: "appendix", inn, format,
+        dealId: Number(dbDocsState.dealId),
+        appendixNumber: v("dbDocAppNum"), date: v("dbDocAppDate"),
+        contractNumber: v("dbDocAppContractNum"), contractDate: v("dbDocAppContractDate"),
+        signer: v("dbDocSigner"), signerPosition: v("dbDocPosition"), basis: v("dbDocBasis"), city: v("dbDocCity")
+    };
+    if (typeof showReadinessToast === "function") showReadinessToast("Формируем приложение…");
+    try {
+        await ccDownloadDocBlob(body, "appendix", format);
+        dbDocsLoad(dbDocsState.dealId, dbDocsState.clientId);
+    } catch (e) { console.error("generateDocument(appendix)", e); alert("Не удалось сформировать приложение: " + (e.message || "")); }
+}
+async function dbDocDownload(id, format) {
+    try { await ccDownloadDocBlob({ action: "downloadClientDocument", id: Number(id), format }, "document", format); }
+    catch (e) { console.error("downloadClientDocument", e); alert("Не удалось скачать: " + (e.message || "")); }
+}
+async function dbDocDelete(id) {
+    if (!confirm("Удалить сохранённое приложение?")) return;
+    try { await clientsApi("deleteClientDocument", { id: Number(id) }); dbDocsLoad(dbDocsState.dealId, dbDocsState.clientId); }
+    catch (e) { console.error("deleteClientDocument", e); alert("Не удалось удалить."); }
 }
 
 // ==================== Уведомление о готовности (контакты + отправка) ====================
