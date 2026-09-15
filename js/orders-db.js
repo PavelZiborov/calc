@@ -2026,6 +2026,11 @@ function renderDbDealCard(data, crmId) {
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-body">
+                <div class="dbo-tabs">
+                    <button type="button" class="dbo-tab is-active" data-dbtab="order" onclick="dbSwitchCardTab('order')">Заказ</button>
+                    ${d.client_crm_id ? `<button type="button" class="dbo-tab" id="dbTabDocs" data-dbtab="docs" onclick="dbSwitchCardTab('docs')" hidden>Приложения</button>` : ""}
+                </div>
+                <div class="dbo-tabpanel" id="dbPanel-order">
                 <div class="dbo-elements">
                     ${elHead}
                     ${elBody}
@@ -2056,10 +2061,6 @@ function renderDbDealCard(data, crmId) {
                 ${invoiceBlock}
                 ${dealAfBlock}
                 ${costBlock}
-                ${d.client_crm_id ? `<div class="dbo-section cc-docs-section" id="dbDocsSection" data-deal-id="${crmId}" data-client-id="${Number(d.client_crm_id)}">
-                    <div class="dbo-section-title">Приложение к договору</div>
-                    <div id="dbDocsHost"><div class="dbo-asset-empty">Загрузка…</div></div>
-                </div>` : ""}
                 <div class="dbo-card-actions">
                     <button type="button" class="dbo-btn" onclick="dbCopyForClient(${crmId}, this)" title="Скопировать список позиций с ценами для отправки клиенту">Скопировать для заказчика</button>
                     <div class="dbo-kp-wrap">
@@ -2070,6 +2071,10 @@ function renderDbDealCard(data, crmId) {
                 <div class="dbo-danger-zone">
                     <button type="button" class="dbo-btn dbo-btn-danger dbo-del-deal" onclick="dbDeleteDeal(${crmId}, this)">Удалить заказ</button>
                 </div>
+                </div><!-- /dbPanel-order -->
+                ${d.client_crm_id ? `<div class="dbo-tabpanel cc-docs-section" id="dbPanel-docs" data-deal-id="${crmId}" data-client-id="${Number(d.client_crm_id)}" hidden>
+                    <div id="dbDocsHost"><div class="dbo-asset-empty">Загрузка…</div></div>
+                </div>` : ""}
             </div>
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
@@ -2103,13 +2108,25 @@ async function dbDocsLoad(dealId, clientId) {
 }
 function dbDocsRender(data) {
     const host = document.getElementById("dbDocsHost");
-    if (!host) return;
+    const tabBtn = document.getElementById("dbTabDocs");
     const reqs = Array.isArray(data.requisites) ? data.requisites : [];
     const appTpl = (data.templates && data.templates.appendix) || {};
     const hasTpl = !!(appTpl.client || appTpl.global);
+    const allDocs = Array.isArray(data.documents) ? data.documents : [];
+    const contracts = allDocs.filter(d => d.kind === "contract");
+    dbDocsState.contracts = contracts;
+    // (1) Нет созданного договора у клиента → приложение не показываем (скрываем вкладку).
+    if (!contracts.length) {
+        if (tabBtn) tabBtn.hidden = true;
+        const panel = document.getElementById("dbPanel-docs");
+        if (panel && !panel.hidden) dbSwitchCardTab("order");
+        if (host) host.innerHTML = "";
+        return;
+    }
+    if (tabBtn) tabBtn.hidden = false;
+    if (!host) return;
     const today = new Date().toLocaleDateString("ru-RU");
-    // Только приложения этой сделки.
-    const docs = (Array.isArray(data.documents) ? data.documents : []).filter(d => d.kind === "appendix" && Number(d.deal_crm_id) === Number(dbDocsState.dealId));
+    const docs = allDocs.filter(d => d.kind === "appendix" && Number(d.deal_crm_id) === Number(dbDocsState.dealId));
     const savedRows = docs.length
         ? docs.map(d => `
             <div class="cc-doc-row">
@@ -2121,21 +2138,24 @@ function dbDocsRender(data) {
                 </div>
             </div>`).join("")
         : `<div class="dbo-asset-empty">Приложений по этому заказу пока нет.</div>`;
+    // (3) Договор — выбор из уже созданных (а не ручной ввод № и даты).
+    const contractOpts = contracts.map((c, i) => `<option value="${i}">${escapeHtml(c.title || ("Договор № " + (c.number || "")))}</option>`).join("");
     if (!reqs.length) {
-        host.innerHTML = `<div class="payment-alert" style="font-size:13px">У клиента нет реквизитов — добавьте контрагента в карточке клиента. ${ccDocVarsReferenceHtml()}</div><div class="cc-doc-saved">${savedRows}</div>`;
+        host.innerHTML = `<div class="payment-alert" style="font-size:13px">У клиента нет реквизитов — добавьте контрагента в карточке клиента.</div><div class="cc-doc-saved">${savedRows}</div>`;
         return;
     }
     host.innerHTML = `
         ${!hasTpl ? `<div class="payment-alert" style="font-size:13px;margin-bottom:8px">Не загружен шаблон приложения — загрузите его в карточке клиента.</div>` : ""}
         <div class="cc-doc-gen">
-            <label class="cc-doc-field">Реквизит (контрагент)<select id="dbDocInn">${ccDocReqOptions(reqs)}</select></label>
+            <div class="cc-doc-fields">
+                <label class="cc-doc-field">Договор<select id="dbDocContractSel">${contractOpts}</select></label>
+                <label class="cc-doc-field">Реквизит (контрагент)<select id="dbDocInn">${ccDocReqOptions(reqs)}</select></label>
+            </div>
             <div class="cc-doc-genblock">
                 <div class="cc-doc-gentitle">Приложение (позиции — из этого заказа)</div>
                 <div class="cc-doc-fields">
                     <label class="cc-doc-field">№ прил.<input type="text" id="dbDocAppNum" value="${escapeHtml(data.nextAppendix || "")}"></label>
                     <label class="cc-doc-field">Дата<input type="text" id="dbDocAppDate" value="${escapeHtml(today)}"></label>
-                    <label class="cc-doc-field">к договору №<input type="text" id="dbDocAppContractNum" value=""></label>
-                    <label class="cc-doc-field">от<input type="text" id="dbDocAppContractDate" value=""></label>
                 </div>
                 ${ccDocClauseFieldsHtml("db")}
                 <div class="cc-doc-btns">
@@ -2151,11 +2171,14 @@ async function dbDocGenerateAppendix(format) {
     const v = id => document.getElementById(id)?.value?.trim() || "";
     const inn = v("dbDocInn");
     if (!inn) { alert("Выберите реквизит (контрагента)"); return; }
+    const ci = Number(document.getElementById("dbDocContractSel")?.value);
+    const contract = (dbDocsState.contracts || [])[ci];
+    if (!contract) { alert("Выберите договор"); return; }
     const body = {
         action: "generateDocument", clientId: Number(dbDocsState.clientId), kind: "appendix", inn, format,
         dealId: Number(dbDocsState.dealId),
         appendixNumber: v("dbDocAppNum"), date: v("dbDocAppDate"),
-        contractNumber: v("dbDocAppContractNum"), contractDate: v("dbDocAppContractDate"),
+        contractNumber: contract.number || "", contractDate: contract.doc_date || "",
         signer: v("dbDocSigner"), signerPosition: v("dbDocPosition"), basis: v("dbDocBasis"), city: v("dbDocCity")
     };
     if (typeof showReadinessToast === "function") showReadinessToast("Формируем приложение…");
@@ -2163,6 +2186,13 @@ async function dbDocGenerateAppendix(format) {
         await ccDownloadDocBlob(body, "appendix", format);
         dbDocsLoad(dbDocsState.dealId, dbDocsState.clientId);
     } catch (e) { console.error("generateDocument(appendix)", e); alert("Не удалось сформировать приложение: " + (e.message || "")); }
+}
+// Переключение вкладок карточки заказа: «Заказ» / «Приложения».
+function dbSwitchCardTab(tab) {
+    document.querySelectorAll(".dbo-card .dbo-tab").forEach(b => b.classList.toggle("is-active", b.dataset.dbtab === tab));
+    const order = document.getElementById("dbPanel-order"), docs = document.getElementById("dbPanel-docs");
+    if (order) order.hidden = (tab !== "order");
+    if (docs) docs.hidden = (tab !== "docs");
 }
 async function dbDocDownload(id, format) {
     try { await ccDownloadDocBlob({ action: "downloadClientDocument", id: Number(id), format }, "document", format); }
