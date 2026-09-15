@@ -2026,6 +2026,14 @@ function renderDbDealCard(data, crmId) {
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-body">
+                <details class="deal-notify-section dbo-notify-drop" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
+                    <summary class="dbo-notify-drop-summary">
+                        <span class="dbo-notify-drop-head">${icon("mail")}<span class="dbo-notify-drop-title">Уведомление о готовности</span></span>
+                        <span class="dbo-notify-drop-status" id="dbNotifyStatus"></span>
+                        <span class="dbo-notify-drop-caret">▾</span>
+                    </summary>
+                    <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
+                </details>
                 <div class="hp-tabs" id="dbCardTabs" hidden>
                     <button type="button" class="hp-tab is-active" data-dbtab="order" onclick="dbSwitchCardTab('order')">Заказ</button>
                     ${d.client_crm_id ? `<button type="button" class="hp-tab" id="dbTabDocs" data-dbtab="docs" onclick="dbSwitchCardTab('docs')">Приложения</button>` : ""}
@@ -2041,10 +2049,6 @@ function renderDbDealCard(data, crmId) {
                         <button type="button" onclick="dbAddElManual()">Добавить вручную</button>
                         <button type="button" onclick="dbAddElFromCalc()">Добавить из калькулятора</button>
                     </div>
-                </div>
-                <div class="deal-notify-section dbo-notify-block" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
-                    <div class="dbo-section-title">Уведомление о готовности</div>
-                    <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
                 </div>
                 <div class="dbo-mid">
                     <div class="dbo-meta">
@@ -2256,6 +2260,21 @@ function dbNotifyRender(dealId) {
     const currentLabel = notifyDisabled ? (icon("bellOff") + " Не уведомлять")
         : (hasSelection ? escapeHtml(buildContactLabel(selectedContact)) : "— выберите контакт —");
     section.classList.toggle("is-unset", !isDecided);
+    // Компактный статус в шапке дропдауна + авто-раскрытие, если контакт не выбран.
+    const statusEl = section.querySelector(".dbo-notify-drop-status");
+    if (statusEl) {
+        if (notifyDisabled) {
+            statusEl.className = "dbo-notify-drop-status is-off";
+            statusEl.textContent = "Не уведомлять";
+        } else if (hasSelection) {
+            statusEl.className = "dbo-notify-drop-status" + (sentAt ? " is-sent" : "");
+            statusEl.textContent = sentAt ? "Отправлено ✓" : buildContactLabel(selectedContact);
+        } else {
+            statusEl.className = "dbo-notify-drop-status is-unset";
+            statusEl.textContent = "Не выбран";
+        }
+    }
+    if (!isDecided) section.open = true;
     body.innerHTML = `
         ${!isDecided ? `<div class="deal-notify-alert">${icon("alert")} Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
         <div class="deal-notify-row">
@@ -2525,8 +2544,8 @@ function dbInvoiceBlock(d, crmId) {
     const num = dbAfById(af, 477), date = dbAfById(af, 1105), inn = dbAfById(af, 560);
     const link = dbAfById(af, 1104), prev = dbAfById(af, 1106);
     return `
-        <div class="dbo-section">
-            <div class="dbo-section-title">Информация о связанных счетах</div>
+        <details class="dbo-pay-section dbo-invoice-section">
+            <summary class="dbo-pay-caption">Информация о связанных счетах</summary>
             <div class="dbo-invoice-card">
                 <div class="dbo-inv-row">
                     <span class="dbo-inv-label">Счёт</span>
@@ -2542,7 +2561,7 @@ function dbInvoiceBlock(d, crmId) {
                     <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbOpenInvoiceCreate(${crmId})">Создать счёт</button>
                 </div>
             </div>
-        </div>`;
+        </details>`;
 }
 function dbInvResetVal(el, v) { el.innerHTML = v ? escapeHtml(v) : `<span class="dbo-inv-empty">—</span>`; el.dataset.val = v; }
 function dbInvEditStart(el) {

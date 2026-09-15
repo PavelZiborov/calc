@@ -618,6 +618,9 @@
 
     /* Информация о связанных счетах */
     .dbo-invoice-card { padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); display: flex; flex-direction: column; gap: 9px; }
+    /* Счета: без заливки (не отвлекает), внутри раскрывающегося блока */
+    .dbo-invoice-section { margin-top: 12px; }
+    .dbo-invoice-section .dbo-invoice-card { background: transparent; border: none; padding: 8px 0 0; }
     .dbo-inv-row { display: flex; align-items: baseline; gap: 12px; }
     .dbo-inv-label { flex: 0 0 150px; color: var(--text-muted); font-size: 13px; }
     .dbo-inv-value { min-width: 0; word-break: break-word; }
@@ -3250,6 +3253,7 @@
     .legacy-n8n-hidden { display: none !important; }
     /* Компактные вкладки (карточка заказа и карточка клиента) */
     .hp-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; padding: 0; }
+    .hp-tabs[hidden] { display: none !important; }   /* иначе display:flex перебивает атрибут hidden */
     .hp-tab {
         flex: 0 0 auto; width: auto; margin: 0 0 -1px; padding: 7px 14px;
         border: none !important; background: transparent !important; box-shadow: none !important;
@@ -3311,9 +3315,21 @@
     .dbo-confirm-text { font-size: 14px; color: var(--text-muted, #7a766c); line-height: 1.5; margin-bottom: 22px; }
     .dbo-confirm-actions { display: flex; gap: 12px; }
     .dbo-confirm-actions .dbo-btn { flex: 1 1 0; padding: 13px 10px; font-size: 15px; border-radius: 10px; }
-    /* Блок «Уведомление о готовности» в карточке Заказы БД (переиспользует .deal-notify-*) */
-    .dbo-notify-block { margin-top: 14px; }
-    .dbo-notify-block .dbo-section-title { margin-bottom: 2px; }
+    /* Компактный дропдаун «Уведомление о готовности» в шапке карточки заказа */
+    .dbo-notify-drop { padding: 0; gap: 0; margin: 0 0 12px; background: #f7faff; }
+    .dbo-notify-drop-summary { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; list-style: none; user-select: none; }
+    .dbo-notify-drop-summary::-webkit-details-marker { display: none; }
+    .dbo-notify-drop-head { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+    .dbo-notify-drop-head .icn { width: 16px; height: 16px; color: var(--accent); }
+    .dbo-notify-drop-title { font-size: 13px; font-weight: 600; color: #1c1b19; }
+    .dbo-notify-drop-status { flex: 1 1 auto; min-width: 0; text-align: right; font-size: 12px; color: #6b675e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-notify-drop-status.is-unset { color: #b03434; font-weight: 600; }
+    .dbo-notify-drop-status.is-sent { color: #2e7d32; }
+    .dbo-notify-drop-status.is-off { color: #9a988f; }
+    .dbo-notify-drop[open] .dbo-notify-drop-status { display: none; }
+    .dbo-notify-drop-caret { flex: 0 0 auto; color: #9a988f; font-size: 11px; transition: transform .15s ease; }
+    .dbo-notify-drop[open] .dbo-notify-drop-caret { transform: rotate(180deg); }
+    .dbo-notify-drop .deal-notify-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid #ebe8df; }
     .deal-notify-tgstatus { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: #6b675e; line-height: 1.4; }
     .deal-notify-tgstatus.is-ok { color: #2e7d32; font-weight: 600; }
     .deal-notify-tgstatus .icn { width: 1.05em; height: 1.05em; flex: 0 0 auto; }
