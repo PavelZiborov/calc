@@ -545,6 +545,9 @@ function ccDocVarsReferenceHtml() {
             ["{client_legal_address}", "Юридический адрес"], ["{client_actual_address}", "Фактический адрес"],
             ["{client_signer}", "Подписант (ФИО)"], ["{client_signer_position}", "Должность подписанта"], ["{client_basis}", "Основание (Устав/свидетельство)"]
         ]],
+        ["Банк контрагента (в МоеДело нет — пока пусто, заполняется вручную)", [
+            ["{client_rs}", "Расчётный счёт"], ["{client_bank}", "Банк"], ["{client_bik}", "БИК"], ["{client_ks}", "Корр. счёт"]
+        ]],
         ["Документ", [
             ["{doc_number}", "Номер документа"], ["{doc_date}", "Дата документа"], ["{city}", "Город"], ["{today}", "Сегодняшняя дата"],
             ["{appendix_number}", "Номер приложения"], ["{contract_number}", "Номер договора"], ["{contract_date}", "Дата договора"]
