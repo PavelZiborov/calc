@@ -371,20 +371,20 @@
 
     /* ==== Карточка заказа (в стиле детальной карточки «Заказы») ==== */
     .dbo-card { background: var(--surface); border-radius: 14px; box-shadow: 0 16px 50px rgba(28,27,25,0.28); width: min(1000px, 100%); max-height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
-    .dbo-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
-    .dbo-head > .dbo-notify-drop { flex: 1 1 100%; margin: 4px 0 0; }
+    .dbo-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
     .dbo-head-left { min-width: 0; }
     .dbo-num { font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1.1; display: inline-flex; align-items: center; gap: 9px; }
     .dbo-num-copy { flex: 0 0 auto; width: 26px; height: 26px; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease; }
     .dbo-num-copy:hover { background: var(--surface-2); color: var(--accent); border-color: var(--accent); }
     .dbo-num-copy:disabled, .dbo-num-copy.is-busy { opacity: 0.5; cursor: default; }
     .dbo-num-copy svg { width: 15px; height: 15px; }
+    .dbo-num-crm { margin-left: 10px; font-size: 16px; font-weight: 700; text-decoration: none; }
     .dbo-client { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text); }
     .dbo-client .dbo-ic { color: var(--text-muted); flex: 0 0 auto; }
     .dbo-client--link { cursor: pointer; }
     .dbo-client--link:hover { color: var(--accent); text-decoration: underline; }
     .dbo-head-meta { display: none; }   /* дата · менеджер — только на мобиле (в шапке) */
-    .dbo-head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
+    .dbo-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 9px; flex: 0 0 auto; margin-left: auto; }
     .dbo-head-right .dbk-status-pill { width: auto; min-width: 128px; font-size: 12.5px; padding: 7px 16px; }
     .dbo-crm { color: var(--accent); font-weight: 700; font-size: 16px; text-decoration: none; padding: 2px 6px; }
     .dbo-crm:hover { color: var(--accent-strong); }
@@ -460,7 +460,8 @@
     .dbo-calc-body #calcContainer { max-width: 100%; margin: 0; box-shadow: none; border: none; padding: 0; background: transparent; }
     /* Зона удаления заказа (низ карточки) */
     .dbo-danger-zone { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
-    .dbo-del-deal { width: auto; margin: 0; padding: 8px 16px; cursor: pointer; }
+    .dbo-del-deal { width: auto; margin: 0; padding: 8px 16px; cursor: pointer; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-weight: 500; }
+    .dbo-del-deal:hover { background: rgba(192,57,43,0.08); border-color: var(--danger); color: var(--danger); }
     /* Кружок-статус элемента */
     .dbo-el-status { align-self: start; }
     /* Превью элемента — не мельче значка статуса (двойная специфичность бьёт .element-preview-thumb) */
@@ -717,7 +718,6 @@
             row-gap: 10px;
         }
         .dbo-head-left { grid-area: left; }
-        .dbo-head > .dbo-notify-drop { grid-column: 1 / -1; margin: 2px 0 0; }
         .dbo-close { grid-area: close; align-self: start; }
         .dbo-head-right { grid-area: right; margin-left: 0; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: 100%; }
         .dbo-head-right .dbk-status-pill { min-width: 0; }
@@ -3337,21 +3337,25 @@
     .dbo-confirm-text { font-size: 14px; color: var(--text-muted, #7a766c); line-height: 1.5; margin-bottom: 22px; }
     .dbo-confirm-actions { display: flex; gap: 12px; }
     .dbo-confirm-actions .dbo-btn { flex: 1 1 0; padding: 13px 10px; font-size: 15px; border-radius: 10px; }
-    /* Компактный дропдаун «Уведомление о готовности» в шапке карточки заказа */
-    .dbo-notify-drop { padding: 0; gap: 0; margin: 0 0 12px; background: #f7faff; }
-    .dbo-notify-drop-summary { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; list-style: none; user-select: none; }
+    /* Дропдаун «Уведомление о готовности» в шапке заказа: компактный триггер справа
+       под статусом + плавающий поповер (не меняет высоту шапки). */
+    .dbo-notify-drop { position: relative; display: block; padding: 0; gap: 0; margin: 0; background: transparent; border: none; border-radius: 8px; max-width: 260px; }
+    .dbo-notify-drop-summary { display: flex; align-items: center; gap: 6px; max-width: 260px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; list-style: none; user-select: none; }
     .dbo-notify-drop-summary::-webkit-details-marker { display: none; }
-    .dbo-notify-drop-head { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
-    .dbo-notify-drop-head .icn { width: 16px; height: 16px; color: var(--accent); }
-    .dbo-notify-drop-title { font-size: 13px; font-weight: 600; color: #1c1b19; }
-    .dbo-notify-drop-status { flex: 1 1 auto; min-width: 0; text-align: right; font-size: 12px; color: #6b675e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-notify-drop-summary:hover { border-color: var(--accent); }
+    .dbo-notify-drop-head { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+    .dbo-notify-drop-head .icn { width: 15px; height: 15px; color: var(--accent); }
+    .dbo-notify-drop-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+    .dbo-notify-drop-status { flex: 0 1 auto; min-width: 0; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbo-notify-drop-status:not(:empty)::before { content: "· "; color: var(--text-muted); }
     .dbo-notify-drop-status.is-unset { color: #b03434; font-weight: 600; }
     .dbo-notify-drop-status.is-sent { color: #2e7d32; }
     .dbo-notify-drop-status.is-off { color: #9a988f; }
-    .dbo-notify-drop[open] .dbo-notify-drop-status { display: none; }
-    .dbo-notify-drop-caret { flex: 0 0 auto; color: #9a988f; font-size: 11px; transition: transform .15s ease; }
+    .dbo-notify-drop.is-unset { background: transparent; box-shadow: none; }
+    .dbo-notify-drop.is-unset .dbo-notify-drop-summary { border-color: #e7b3b3; background: #fdf4f4; }
+    .dbo-notify-drop-caret { flex: 0 0 auto; margin-left: auto; color: #9a988f; font-size: 11px; transition: transform .15s ease; }
     .dbo-notify-drop[open] .dbo-notify-drop-caret { transform: rotate(180deg); }
-    .dbo-notify-drop .deal-notify-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid #ebe8df; }
+    .dbo-notify-drop .deal-notify-body { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; display: flex; flex-direction: column; gap: 8px; width: 340px; max-width: 86vw; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 14px 36px rgba(28,27,25,0.22); text-align: left; }
     .deal-notify-tgstatus { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: #6b675e; line-height: 1.4; }
     .deal-notify-tgstatus.is-ok { color: #2e7d32; font-weight: 600; }
     .deal-notify-tgstatus .icn { width: 1.05em; height: 1.05em; flex: 0 0 auto; }

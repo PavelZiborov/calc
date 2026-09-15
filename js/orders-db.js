@@ -2053,7 +2053,7 @@ function renderDbDealCard(data, crmId) {
         <div class="dbo-card" role="dialog" aria-modal="true">
             <div class="dbo-head">
                 <div class="dbo-head-left">
-                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button>${dbClientClickable ? `<button type="button" class="dbo-num-copy" onclick="dbNewDealForClient(${Number(d.client_crm_id)}, this)" title="Создать новый пустой заказ для этого клиента" aria-label="Новый заказ для клиента">${DBO_NEWDEAL_ICON}</button>` : ""}</div>
+                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button>${dbClientClickable ? `<button type="button" class="dbo-num-copy" onclick="dbNewDealForClient(${Number(d.client_crm_id)}, this)" title="Создать новый пустой заказ для этого клиента" aria-label="Новый заказ для клиента">${DBO_NEWDEAL_ICON}</button>` : ""}<a class="dbo-num-copy dbo-num-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в PrintOffice" aria-label="Открыть в PrintOffice">↗</a></div>
                     ${(d.created_at_crm || d.employee_name) ? `<div class="dbo-head-meta">${[
                         d.created_at_crm ? `<b>${escapeHtml(d.created_at_crm)}</b>` : "",
                         d.employee_name ? `Менеджер: <b>${escapeHtml(d.employee_name)}</b>` : ""
@@ -2062,17 +2062,16 @@ function renderDbDealCard(data, crmId) {
                 </div>
                 <div class="dbo-head-right">
                     ${dealStatusControl}
-                    <a class="dbo-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в CRM">↗</a>
+                    <details class="deal-notify-section dbo-notify-drop" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
+                        <summary class="dbo-notify-drop-summary">
+                            <span class="dbo-notify-drop-head">${icon("mail")}<span class="dbo-notify-drop-title">Уведомление</span></span>
+                            <span class="dbo-notify-drop-status" id="dbNotifyStatus"></span>
+                            <span class="dbo-notify-drop-caret">▾</span>
+                        </summary>
+                        <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
+                    </details>
                 </div>
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
-                <details class="deal-notify-section dbo-notify-drop" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
-                    <summary class="dbo-notify-drop-summary">
-                        <span class="dbo-notify-drop-head">${icon("mail")}<span class="dbo-notify-drop-title">Уведомление о готовности</span></span>
-                        <span class="dbo-notify-drop-status" id="dbNotifyStatus"></span>
-                        <span class="dbo-notify-drop-caret">▾</span>
-                    </summary>
-                    <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
-                </details>
             </div>
             <div class="dbo-body">
                 <div class="hp-tabs" id="dbCardTabs" hidden>
@@ -2114,7 +2113,7 @@ function renderDbDealCard(data, crmId) {
                     </div>
                 </div>
                 <div class="dbo-danger-zone">
-                    <button type="button" class="dbo-btn dbo-btn-danger dbo-del-deal" onclick="dbDeleteDeal(${crmId}, this)">Удалить заказ</button>
+                    <button type="button" class="dbo-btn dbo-del-deal" onclick="dbDeleteDeal(${crmId}, this)">Удалить заказ</button>
                 </div>
                 </div><!-- /dbPanel-order -->
                 ${d.client_crm_id ? `<div class="dbo-tabpanel cc-docs-section" id="dbPanel-docs" data-deal-id="${crmId}" data-client-id="${Number(d.client_crm_id)}" hidden>
@@ -2260,6 +2259,11 @@ async function dbDocDelete(id) {
 // contactTelegramNick, contactEmailAddr, formatNotifySentAt, maskRuPhone, icon.
 const dbNotifyCache = new Map();
 function dbNotifySection() { return document.getElementById("dbNotifySection"); }
+// Дропдаун уведомлений — плавающий поповер в шапке: закрываем по клику вне блока.
+document.addEventListener("mousedown", (e) => {
+    const sec = document.getElementById("dbNotifySection");
+    if (sec && sec.open && !sec.contains(e.target)) sec.open = false;
+});
 async function dbNotifyLoad(dealId, clientId) {
     const section = dbNotifySection();
     if (!section) return;
@@ -2316,7 +2320,6 @@ function dbNotifyRender(dealId) {
             statusEl.textContent = "Не выбран";
         }
     }
-    if (!isDecided) section.open = true;
     body.innerHTML = `
         ${!isDecided ? `<div class="deal-notify-alert">${icon("alert")} Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
         <div class="deal-notify-row">
