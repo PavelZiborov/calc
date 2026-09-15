@@ -404,10 +404,180 @@ function renderClientCard(data, crmId) {
                 ${stats}
                 ${data?.crmError ? `<div class="client-card-warn">Свежие данные из CRM недоступны — показаны сохранённые.</div>` : ""}
                 ${clientCardRequisitesBlock()}
+                ${ccDocsBlock()}
                 ${dealsBlock}
             </div>
         </div>`;
     ccLoadRequisites(crmId);
+    ccLoadDocs(crmId);
+}
+
+// ==================== Документы клиента (договоры и приложения) ====================
+let ccDocsClientId = null;
+function ccDocsBlock() {
+    return `
+        <div class="cc-req-section cc-docs-section">
+            <div class="dbo-inv-req-head"><span>Документы (договоры и приложения)</span></div>
+            <div id="ccDocsHost"><div class="dbo-asset-empty">Загрузка…</div></div>
+        </div>`;
+}
+async function ccLoadDocs(crmId) {
+    ccDocsClientId = Number(crmId);
+    const host = document.getElementById("ccDocsHost");
+    if (!host) return;
+    let data;
+    try { data = await clientsApi("getDocData", { clientId: Number(crmId) }); }
+    catch (e) { console.error("getDocData", e); host.innerHTML = `<div class="dbo-asset-empty">Не удалось загрузить документы.</div>`; return; }
+    ccRenderDocs(data);
+}
+function ccDocReqOptions(requisites) {
+    if (!requisites || !requisites.length) return "";
+    return requisites.map(r => `<option value="${escapeHtml(r.inn)}">${escapeHtml(r.name || r.inn)} (ИНН ${escapeHtml(r.inn)})</option>`).join("");
+}
+function ccRenderDocs(data) {
+    const host = document.getElementById("ccDocsHost");
+    if (!host) return;
+    const isAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
+    const t = data.templates || { contract: {}, appendix: {} };
+    const reqs = Array.isArray(data.requisites) ? data.requisites : [];
+    const docs = Array.isArray(data.documents) ? data.documents : [];
+    const today = new Date().toLocaleDateString("ru-RU");
+    const tplStatus = (k) => {
+        const s = t[k] || {};
+        const parts = [];
+        if (s.client) parts.push("свой шаблон");
+        else if (s.global) parts.push("общий шаблон");
+        else parts.push('<span class="payment-alert">шаблон не загружен</span>');
+        return parts.join("");
+    };
+    const adminTpl = (k, label) => `
+        <div class="cc-doc-tplrow">
+            <span class="cc-doc-tpllabel">${label}:</span> <span class="cc-doc-tplstate">${tplStatus(k)}</span>
+            <label class="dbo-btn dbo-btn-sm cc-doc-upl">Общий шаблон<input type="file" accept=".docx" hidden onchange="ccDocUpload('${k}', null, this)"></label>
+            <label class="dbo-btn dbo-btn-sm cc-doc-upl">Для клиента<input type="file" accept=".docx" hidden onchange="ccDocUpload('${k}', ${ccDocsClientId}, this)"></label>
+            ${(t[k]||{}).client ? `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="ccDocDeleteTpl('${k}', ${ccDocsClientId})">Убрать свой</button>` : ""}
+        </div>`;
+    const reqSel = reqs.length
+        ? `<label class="cc-doc-field">Реквизит (контрагент)
+             <select id="ccDocInn">${ccDocReqOptions(reqs)}</select></label>`
+        : `<div class="payment-alert" style="font-size:13px">Нет реквизитов — добавьте контрагента в блоке «Реквизиты клиента» выше.</div>`;
+    const canGen = reqs.length > 0;
+    const savedRows = docs.length
+        ? docs.map(d => `
+            <div class="cc-doc-row">
+                <div class="cc-doc-rowmain">
+                    <span class="cc-doc-kind cc-doc-kind--${d.kind}">${d.kind === "contract" ? "Договор" : "Приложение"}</span>
+                    <span class="cc-doc-title">${escapeHtml(d.title || "")}</span>
+                    <span class="cc-doc-date">${escapeHtml(new Date(d.created_at).toLocaleString("ru-RU"))}</span>
+                </div>
+                <div class="cc-doc-rowact">
+                    <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocDownload(${d.id}, 'docx')">Word</button>
+                    <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocDownload(${d.id}, 'pdf')">PDF</button>
+                    <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="ccDocDelete(${d.id})">×</button>
+                </div>
+            </div>`).join("")
+        : `<div class="dbo-asset-empty">Пока нет сформированных документов.</div>`;
+
+    host.innerHTML = `
+        ${isAdmin ? `<div class="cc-doc-templates">${adminTpl("contract", "Договор")}${adminTpl("appendix", "Приложение")}</div>` : ""}
+        ${canGen ? `
+        <div class="cc-doc-gen">
+            ${reqSel}
+            <div class="cc-doc-genrow">
+                <div class="cc-doc-genblock">
+                    <div class="cc-doc-gentitle">Договор</div>
+                    <div class="cc-doc-fields">
+                        <label class="cc-doc-field">№<input type="text" id="ccDocContractNum" value="${escapeHtml(data.nextContract || "")}"></label>
+                        <label class="cc-doc-field">Дата<input type="text" id="ccDocContractDate" value="${escapeHtml(today)}"></label>
+                    </div>
+                    <div class="cc-doc-btns">
+                        <button type="button" class="dbo-btn dbo-btn-primary dbo-btn-sm" onclick="ccDocGenerate('contract','docx')">Word</button>
+                        <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocGenerate('contract','pdf')">PDF</button>
+                    </div>
+                </div>
+                <div class="cc-doc-genblock">
+                    <div class="cc-doc-gentitle">Приложение</div>
+                    <div class="cc-doc-fields">
+                        <label class="cc-doc-field">№ прил.<input type="text" id="ccDocAppNum" value="${escapeHtml(data.nextAppendix || "")}"></label>
+                        <label class="cc-doc-field">Дата<input type="text" id="ccDocAppDate" value="${escapeHtml(today)}"></label>
+                        <label class="cc-doc-field">к договору №<input type="text" id="ccDocAppContractNum" value=""></label>
+                        <label class="cc-doc-field">от<input type="text" id="ccDocAppContractDate" value=""></label>
+                    </div>
+                    <div class="cc-doc-btns">
+                        <button type="button" class="dbo-btn dbo-btn-primary dbo-btn-sm" onclick="ccDocGenerate('appendix','docx')">Word</button>
+                        <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccDocGenerate('appendix','pdf')">PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>` : ""}
+        <div class="cc-doc-saved"><div class="cc-doc-savedhead">Сохранённые документы</div>${savedRows}</div>`;
+}
+async function ccDocUpload(kind, clientId, input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+    if (!/\.docx$/i.test(file.name)) { alert("Нужен файл .docx"); input.value = ""; return; }
+    try {
+        const b64 = await ccFileToBase64(file);
+        await clientsApi("uploadDocTemplate", { kind, clientId: clientId ?? null, template_base64: b64, template_name: file.name });
+        if (typeof showReadinessToast === "function") showReadinessToast("Шаблон загружен");
+        ccLoadDocs(ccDocsClientId);
+    } catch (e) { console.error("uploadDocTemplate", e); alert("Не удалось загрузить шаблон: " + (e.message || "")); }
+    finally { input.value = ""; }
+}
+async function ccDocDeleteTpl(kind, clientId) {
+    if (!confirm("Убрать индивидуальный шаблон клиента? Будет использоваться общий.")) return;
+    try { await clientsApi("deleteDocTemplate", { kind, clientId }); ccLoadDocs(ccDocsClientId); }
+    catch (e) { console.error("deleteDocTemplate", e); alert("Не удалось удалить шаблон."); }
+}
+function ccFileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).replace(/^data:.*;base64,/, ""));
+        r.onerror = reject;
+        r.readAsDataURL(file);
+    });
+}
+async function ccDocGenerate(kind, format) {
+    const v = id => document.getElementById(id)?.value?.trim() || "";
+    const inn = v("ccDocInn");
+    if (!inn) { alert("Выберите реквизит (контрагента)"); return; }
+    const body = { clientId: Number(ccDocsClientId), kind, inn, format };
+    if (kind === "contract") { body.number = v("ccDocContractNum"); body.date = v("ccDocContractDate"); }
+    else { body.appendixNumber = v("ccDocAppNum"); body.date = v("ccDocAppDate"); body.contractNumber = v("ccDocAppContractNum"); body.contractDate = v("ccDocAppContractDate"); }
+    if (typeof showReadinessToast === "function") showReadinessToast("Формируем документ…");
+    try {
+        await ccDownloadDocBlob({ action: "generateDocument", ...body }, kind, format);
+        ccLoadDocs(ccDocsClientId);   // обновить список сохранённых
+    } catch (e) { console.error("generateDocument", e); alert("Не удалось сформировать документ: " + (e.message || "")); }
+}
+async function ccDocDownload(id, format) {
+    try { await ccDownloadDocBlob({ action: "downloadClientDocument", id: Number(id), format }, "document", format); }
+    catch (e) { console.error("downloadClientDocument", e); alert("Не удалось скачать: " + (e.message || "")); }
+}
+async function ccDocDelete(id) {
+    if (!confirm("Удалить сохранённый документ?")) return;
+    try { await clientsApi("deleteClientDocument", { id: Number(id) }); ccLoadDocs(ccDocsClientId); }
+    catch (e) { console.error("deleteClientDocument", e); alert("Не удалось удалить документ."); }
+}
+// Скачивание бинарного ответа (docx/pdf) с сервера.
+async function ccDownloadDocBlob(payload, base, format) {
+    const resp = await fetchWithTimeout(CLIENTS_URL, { method: "POST", headers: authHeaders(), body: JSON.stringify(payload) }, UPLOAD_TIMEOUT_MS);
+    if (resp.status === 401) { handleUnauthorized(); throw new Error("Unauthorized"); }
+    if (!resp.ok) {
+        let msg = "";
+        try { msg = (await resp.json())?.error || ""; } catch (_) {}
+        throw new Error(msg || `HTTP ${resp.status}`);
+    }
+    const blob = await resp.blob();
+    let filename = `${base}.${format}`;
+    const cd = resp.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (m) { try { filename = decodeURIComponent(m[1]); } catch (_) {} }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    if (typeof showReadinessToast === "function") showReadinessToast("Документ скачан");
 }
 
 // ==================== Реквизиты клиента в карточке ====================

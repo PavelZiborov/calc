@@ -748,6 +748,8 @@ async function setDealStatusFromKanban(dealId, statusId) {
     const deal = dbFindDeal(dealId);
     const prev = deal ? { status_id: deal.status_id, status_name: deal.status_name } : null;
     const st = (dbOrdersState.statuses || []).find(s => Number(s.id) === Number(statusId));
+    // Закрытие сделки (перетаскивание в «Завершено») — тоже с предупреждением.
+    if (dbIsClosingStatus(statusId) && !(await dbConfirmCloseDeal())) { renderDbOrders(); return; }
     dbSetDealStatusLocal(dealId, Number(statusId), st ? st.name : (deal ? deal.status_name : ""));
     if (!dbKanbanMoveCardDom(dealId, statusId)) renderDbOrders();
     try {
@@ -886,10 +888,51 @@ function dbCloseStatusMenu() {
     document.removeEventListener("click", dbStatusMenuOutside);
     dbStatusMenuDealId = null;
 }
-function dbPickDealStatus(statusId) {
+// Стилизованное подтверждение (Promise<bool>). Используем для «закрытия сделки».
+function dbConfirmDialog({ title, text, okText = "Да", cancelText = "Отмена", danger = false } = {}) {
+    return new Promise(resolve => {
+        const ov = document.createElement("div");
+        ov.className = "client-card-overlay dbo-confirm-overlay";
+        ov.style.display = "flex";
+        const done = (val) => { document.removeEventListener("keydown", onKey); ov.remove(); resolve(val); };
+        const onKey = (e) => { if (e.key === "Escape") done(false); };
+        ov.addEventListener("mousedown", (e) => { if (e.target === ov) done(false); });
+        ov.innerHTML = `
+            <div class="dbo-confirm" role="dialog" aria-modal="true">
+                <div class="dbo-confirm-icon">!</div>
+                <div class="dbo-confirm-title">${escapeHtml(title || "Подтверждение")}</div>
+                ${text ? `<div class="dbo-confirm-text">${escapeHtml(text)}</div>` : ""}
+                <div class="dbo-confirm-actions">
+                    <button type="button" class="dbo-btn dbo-confirm-cancel">${escapeHtml(cancelText)}</button>
+                    <button type="button" class="dbo-btn ${danger ? "dbo-btn-danger" : "dbo-btn-primary"} dbo-confirm-ok">${escapeHtml(okText)}</button>
+                </div>
+            </div>`;
+        ov.querySelector(".dbo-confirm-cancel").onclick = () => done(false);
+        ov.querySelector(".dbo-confirm-ok").onclick = () => done(true);
+        document.body.appendChild(ov);
+        document.addEventListener("keydown", onKey);
+        setTimeout(() => ov.querySelector(".dbo-confirm-ok")?.focus(), 0);
+    });
+}
+// Предупреждение при закрытии/завершении сделки (как в PrintOffice).
+function dbConfirmCloseDeal() {
+    return dbConfirmDialog({
+        title: "Действительно закрыть сделку?",
+        text: "После закрытия сделка станет недоступной для редактирования. Переплата (отрицательный долг по сделке) перейдёт на баланс клиента. Также уже сгенерированные документы нельзя будет редактировать.",
+        okText: "Да, закрывайте!", cancelText: "Нет, я передумал!"
+    });
+}
+// Является ли статус «закрывающим» сделку (PrintOffice type=1 «Завершено»).
+function dbIsClosingStatus(statusId) {
+    const st = (dbOrdersState.statuses || []).find(s => Number(s.id) === Number(statusId));
+    return !!(st && Number(st.type) === 1);
+}
+async function dbPickDealStatus(statusId) {
     const id = dbStatusMenuDealId;
     dbCloseStatusMenu();
-    if (id != null) setDealStatus(id, statusId);
+    if (id == null) return;
+    if (dbIsClosingStatus(statusId) && !(await dbConfirmCloseDeal())) return;
+    setDealStatus(id, statusId);
 }
 
 // ---- Список заказов (стиль раздела «Заказы») ----
