@@ -361,7 +361,10 @@ function renderClientCard(data, crmId) {
         dealsBlock = `
             <div class="client-card-deals-head">
                 <span>Сделки <b>(${deals.length})</b></span>
-                <button class="clients-btn clients-btn-sync cc-sync-deals" onclick="syncDeals(this, ${crmId})">Обновить сделки</button>
+                <div class="cc-deals-head-actions">
+                    <button class="clients-btn clients-btn-add cc-new-deal" onclick="ccNewDeal(${crmId}, this)">+ Новый заказ</button>
+                    <button class="clients-btn clients-btn-sync cc-sync-deals" onclick="syncDeals(this, ${crmId})">Обновить сделки</button>
+                </div>
             </div>
             <div class="clients-table-wrap">
                 <table class="clients-table cc-deals-table">
@@ -383,8 +386,11 @@ function renderClientCard(data, crmId) {
         dealsBlock = `
             <div class="client-card-deals-empty">
                 <p>Сделок в базе нет.</p>
-                <p class="cc-hint">Если у клиента есть сделки в CRM — синхронизируйте их в базу.</p>
-                <button class="clients-btn clients-btn-add cc-sync-deals" onclick="syncDeals(this, ${crmId})">Синхронизировать сделки из CRM</button>
+                <p class="cc-hint">Создайте новый заказ или синхронизируйте существующие из CRM.</p>
+                <div class="cc-deals-empty-actions">
+                    <button class="clients-btn clients-btn-add cc-new-deal" onclick="ccNewDeal(${crmId}, this)">+ Новый заказ</button>
+                    <button class="clients-btn clients-btn-sync cc-sync-deals" onclick="syncDeals(this, ${crmId})">Синхронизировать сделки из CRM</button>
+                </div>
             </div>`;
     }
 
@@ -423,6 +429,25 @@ function ccSwitchTab(tab) {
         const p = document.getElementById("ccPanel-" + t);
         if (p) p.hidden = (t !== tab);
     });
+}
+
+// Создать новый пустой заказ прямо из карточки клиента (для этого клиента).
+async function ccNewDeal(clientId, btn) {
+    if (!Number.isFinite(Number(clientId)) || Number(clientId) <= 0) { alert("Не удалось определить клиента."); return; }
+    if (!confirm("Создать новый пустой заказ для этого клиента?")) return;
+    if (btn) { btn.disabled = true; btn.textContent = "Создаём…"; }
+    try {
+        const data = await clientsApi("createDealForClient", { clientId: Number(clientId) });
+        const newId = Number(data?.newDealId);
+        if (!Number.isFinite(newId)) throw new Error("бэкенд не вернул id новой сделки");
+        // Обновим список сделок клиента и откроем карточку нового заказа поверх.
+        if (typeof openClientCard === "function") await openClientCard(Number(clientId));
+        if (typeof openDbDealCard === "function") openDbDealCard(newId);
+    } catch (e) {
+        console.error("createDealForClient(cc)", e);
+        alert("Не удалось создать заказ: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = "+ Новый заказ"; }
+    }
 }
 
 // ==================== Документы клиента (договоры и приложения) ====================

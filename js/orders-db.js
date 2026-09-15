@@ -1732,6 +1732,7 @@ function money2(n) {
 }
 const DBO_USER_ICON = '<svg class="dbo-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></svg>';
 const DBO_COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+const DBO_NEWDEAL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><path d="M12 11l0 6"/><path d="M9 14l6 0"/></svg>';
 
 // Копирование в буфер (с фолбэком на execCommand для незащищённого контекста).
 function dbCopyText(text, okMsg) {
@@ -1900,6 +1901,44 @@ async function dbCopyDeal(crmId, btn) {
     }
 }
 
+// Новый ПУСТОЙ заказ для того же клиента (без позиций). Кнопка рядом с «копировать сделку».
+async function dbNewDealForClient(clientId, btn) {
+    if (!Number.isFinite(Number(clientId)) || Number(clientId) <= 0) {
+        alert("У заказа не указан клиент — новый заказ создать нельзя.");
+        return;
+    }
+    if (!confirm("Создать новый пустой заказ для этого клиента?")) return;
+    if (btn) { btn.disabled = true; btn.classList.add("is-busy"); }
+    try {
+        const data = await clientsApi("createDealForClient", { clientId: Number(clientId) });
+        const newId = Number(data?.newDealId);
+        if (!Number.isFinite(newId)) throw new Error("бэкенд не вернул id новой сделки");
+        if (typeof showReadinessToast === "function") showReadinessToast(`Создан новый заказ № ${data?.deal?.num || newId}`);
+        if (typeof loadDbDeals === "function") loadDbDeals();
+        openDbDealCard(newId);
+    } catch (e) {
+        console.error("createDealForClient", e);
+        alert("Не удалось создать заказ: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.classList.remove("is-busy"); }
+    }
+}
+
+// Режим «показать экран клиенту»: скрывает себестоимость (колонка/строка) и служебные
+// доп-поля позиций (Себест. HQ, Кол-во листов) + блок «Информация по себестоимости».
+let dbCostHidden = false;
+function dbToggleCostVisibility() {
+    dbCostHidden = !dbCostHidden;
+    dbApplyCostVisibility();
+}
+function dbApplyCostVisibility() {
+    const card = document.querySelector("#dbDealCardOverlay .dbo-card");
+    if (card) card.classList.toggle("dbo-cost-hidden", dbCostHidden);
+    document.querySelectorAll("#dbDealCardOverlay .dbo-cost-eye").forEach(b => {
+        b.classList.toggle("is-hidden", dbCostHidden);
+        b.title = dbCostHidden ? "Показать себестоимость" : "Скрыть себестоимость (режим для клиента)";
+    });
+}
+
 // Доп-инфо под элементом: «Название поля: значение · …»
 function dbElAfLine(e) {
     const af = dbAfWithValue(e.additional_fields);
@@ -1968,6 +2007,8 @@ function renderDbDealCard(data, crmId) {
     if (!ov) return;
     const d = data?.deal || {};
     const elements = Array.isArray(data?.elements) ? data.elements : [];
+    // Открываем ДРУГОЙ заказ — сбрасываем режим «скрыть себестоимость»; при рефреше того же — сохраняем.
+    if (Number(dbCardDealId) !== Number(crmId)) dbCostHidden = false;
     dbCardDealId = crmId;
     dbCardData = data;
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
@@ -1983,7 +2024,7 @@ function renderDbDealCard(data, crmId) {
         ? dbDealStatusSelectHtml({ crm_deal_id: crmId, status_id: d.status_id, status_name: d.status_name })
         : `<span class="dbk-status-pill" style="background:#dfdfdf;color:#555">${escapeHtml(d.status_name || "Статус не установлен")}</span>`;
 
-    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Цена/шт</span><span>Себес.</span><span>Сумма</span><span></span></div>`;
+    const elHead = `<div class="dbo-el-head"><span>Статус</span><span>Название</span><span>Кол-во</span><span>Цена/шт</span><span class="dbo-el-costhead">Себес.<button type="button" class="dbo-cost-eye" onclick="dbToggleCostVisibility()" title="Скрыть себестоимость (режим для клиента)" aria-label="Скрыть себестоимость"><span class="dbo-eye-on">${icon("eye")}</span><span class="dbo-eye-off">${icon("eyeOff")}</span></button></span><span>Сумма</span><span></span></div>`;
     const elBody = elements.length
         ? elements.map(dbElementRow).join("")
         : `<div class="dbo-el-empty">Элементов в базе нет — нажмите «⟳ Элементы» в разделе.</div>`;
@@ -2002,7 +2043,7 @@ function renderDbDealCard(data, crmId) {
     // Информация по себестоимости (доп-поле 476) — большое редактируемое поле, сохраняется в CRM.
     const costInfo = dbAfById(d.additional_fields, 476);
     const costBlock = `
-        <div class="dbo-section">
+        <div class="dbo-section dbo-costinfo-section">
             <div class="dbo-section-title">Информация по себестоимости</div>
             <textarea class="dbo-costinfo-input" rows="3" placeholder="Заметки по себестоимости заказа…"
                 onblur="dbSaveCostInfo(${crmId}, this.value)">${escapeHtml(costInfo)}</textarea>
@@ -2012,7 +2053,7 @@ function renderDbDealCard(data, crmId) {
         <div class="dbo-card" role="dialog" aria-modal="true">
             <div class="dbo-head">
                 <div class="dbo-head-left">
-                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button></div>
+                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button>${dbClientClickable ? `<button type="button" class="dbo-num-copy" onclick="dbNewDealForClient(${Number(d.client_crm_id)}, this)" title="Создать новый пустой заказ для этого клиента" aria-label="Новый заказ для клиента">${DBO_NEWDEAL_ICON}</button>` : ""}</div>
                     ${(d.created_at_crm || d.employee_name) ? `<div class="dbo-head-meta">${[
                         d.created_at_crm ? `<b>${escapeHtml(d.created_at_crm)}</b>` : "",
                         d.employee_name ? `Менеджер: <b>${escapeHtml(d.employee_name)}</b>` : ""
@@ -2024,8 +2065,6 @@ function renderDbDealCard(data, crmId) {
                     <a class="dbo-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в CRM">↗</a>
                 </div>
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
-            </div>
-            <div class="dbo-body">
                 <details class="deal-notify-section dbo-notify-drop" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
                     <summary class="dbo-notify-drop-summary">
                         <span class="dbo-notify-drop-head">${icon("mail")}<span class="dbo-notify-drop-title">Уведомление о готовности</span></span>
@@ -2034,6 +2073,8 @@ function renderDbDealCard(data, crmId) {
                     </summary>
                     <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
                 </details>
+            </div>
+            <div class="dbo-body">
                 <div class="hp-tabs" id="dbCardTabs" hidden>
                     <button type="button" class="hp-tab is-active" data-dbtab="order" onclick="dbSwitchCardTab('order')">Заказ</button>
                     ${d.client_crm_id ? `<button type="button" class="hp-tab" id="dbTabDocs" data-dbtab="docs" onclick="dbSwitchCardTab('docs')">Приложения</button>` : ""}
@@ -2083,6 +2124,7 @@ function renderDbDealCard(data, crmId) {
         </div>`;
     // Подгружаем превью/макеты элементов (Я.Диск) — миниатюры рядом со статусом.
     dboLoadAllAssets(crmId, d.num, elements);
+    dbApplyCostVisibility();   // восстановить режим «скрыть себестоимость» после ре-рендера
     // Приложение к договору (по позициям заказа) — грузим асинхронно.
     if (d.client_crm_id) dbDocsLoad(crmId, Number(d.client_crm_id));
     // Уведомление о готовности — контакты (наша БД) грузим асинхронно.
@@ -2543,9 +2585,10 @@ function dbInvoiceBlock(d, crmId) {
     const af = d.additional_fields;
     const num = dbAfById(af, 477), date = dbAfById(af, 1105), inn = dbAfById(af, 560);
     const link = dbAfById(af, 1104), prev = dbAfById(af, 1106);
+    const hasInvoice = !!(String(num || "").trim() || String(link || "").trim());
     return `
-        <details class="dbo-pay-section dbo-invoice-section">
-            <summary class="dbo-pay-caption">Информация о связанных счетах</summary>
+        <details class="dbo-pay-section dbo-invoice-section"${hasInvoice ? " open" : ""}>
+            <summary class="dbo-pay-caption">Информация о связанных счетах <span class="dbo-pay-count${hasInvoice ? " is-linked" : ""}">${hasInvoice ? "1" : "0"}</span></summary>
             <div class="dbo-invoice-card">
                 <div class="dbo-inv-row">
                     <span class="dbo-inv-label">Счёт</span>
