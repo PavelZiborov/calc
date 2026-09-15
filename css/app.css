@@ -3248,11 +3248,17 @@
     }
     /* Легаси-разделы на n8n («Заказы»/«Канбан») временно скрыты (перенос не завершён). */
     .legacy-n8n-hidden { display: none !important; }
-    /* Вкладки карточки заказа (Заказ / Приложения) */
-    .dbo-tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
-    .dbo-tab { margin: 0; padding: 9px 16px; border: none; background: transparent; color: var(--text-muted); font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
-    .dbo-tab:hover { color: var(--text); }
-    .dbo-tab.is-active { color: var(--accent, #2f7df6); border-bottom-color: var(--accent, #2f7df6); }
+    /* Компактные вкладки (карточка заказа и карточка клиента) */
+    .hp-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; padding: 0; }
+    .hp-tab {
+        flex: 0 0 auto; width: auto; margin: 0 0 -1px; padding: 7px 14px;
+        border: none !important; background: transparent !important; box-shadow: none !important;
+        color: var(--text-muted); font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer;
+        border-radius: 0; border-bottom: 2px solid transparent !important; transition: color .12s ease, border-color .12s ease;
+    }
+    .hp-tab:hover { color: var(--text); background: transparent !important; }
+    .hp-tab.is-active { color: var(--accent, #2f7df6); border-bottom-color: var(--accent, #2f7df6) !important; }
+    @media (max-width: 640px) { .hp-tab { padding: 7px 10px; font-size: 12.5px; } }
     /* Документы клиента (договоры/приложения) в карточке клиента */
     .cc-docs-section { margin-top: 14px; }
     .cc-doc-templates { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--border); }

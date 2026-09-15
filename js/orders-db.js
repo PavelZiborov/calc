@@ -2026,9 +2026,9 @@ function renderDbDealCard(data, crmId) {
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-body">
-                <div class="dbo-tabs">
-                    <button type="button" class="dbo-tab is-active" data-dbtab="order" onclick="dbSwitchCardTab('order')">Заказ</button>
-                    ${d.client_crm_id ? `<button type="button" class="dbo-tab" id="dbTabDocs" data-dbtab="docs" onclick="dbSwitchCardTab('docs')" hidden>Приложения</button>` : ""}
+                <div class="hp-tabs" id="dbCardTabs" hidden>
+                    <button type="button" class="hp-tab is-active" data-dbtab="order" onclick="dbSwitchCardTab('order')">Заказ</button>
+                    ${d.client_crm_id ? `<button type="button" class="hp-tab" id="dbTabDocs" data-dbtab="docs" onclick="dbSwitchCardTab('docs')">Приложения</button>` : ""}
                 </div>
                 <div class="dbo-tabpanel" id="dbPanel-order">
                 <div class="dbo-elements">
@@ -2115,14 +2115,19 @@ function dbDocsRender(data) {
     const allDocs = Array.isArray(data.documents) ? data.documents : [];
     const contracts = allDocs.filter(d => d.kind === "contract");
     dbDocsState.contracts = contracts;
-    // (1) Нет созданного договора у клиента → приложение не показываем (скрываем вкладку).
-    if (!contracts.length) {
+    const tabsBar = document.getElementById("dbCardTabs");
+    // Вкладки показываем только когда приложение реально можно создать:
+    // загружен шаблон приложения И у клиента есть созданный договор.
+    const showDocsTab = contracts.length > 0 && hasTpl;
+    if (!showDocsTab) {
+        if (tabsBar) tabsBar.hidden = true;
         if (tabBtn) tabBtn.hidden = true;
         const panel = document.getElementById("dbPanel-docs");
         if (panel && !panel.hidden) dbSwitchCardTab("order");
         if (host) host.innerHTML = "";
         return;
     }
+    if (tabsBar) tabsBar.hidden = false;
     if (tabBtn) tabBtn.hidden = false;
     if (!host) return;
     const today = new Date().toLocaleDateString("ru-RU");
@@ -2189,7 +2194,7 @@ async function dbDocGenerateAppendix(format) {
 }
 // Переключение вкладок карточки заказа: «Заказ» / «Приложения».
 function dbSwitchCardTab(tab) {
-    document.querySelectorAll(".dbo-card .dbo-tab").forEach(b => b.classList.toggle("is-active", b.dataset.dbtab === tab));
+    document.querySelectorAll(".dbo-card .hp-tab").forEach(b => b.classList.toggle("is-active", b.dataset.dbtab === tab));
     const order = document.getElementById("dbPanel-order"), docs = document.getElementById("dbPanel-docs");
     if (order) order.hidden = (tab !== "order");
     if (docs) docs.hidden = (tab !== "docs");

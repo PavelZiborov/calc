@@ -403,13 +403,26 @@ function renderClientCard(data, crmId) {
             <div class="client-card-body">
                 ${stats}
                 ${data?.crmError ? `<div class="client-card-warn">Свежие данные из CRM недоступны — показаны сохранённые.</div>` : ""}
-                ${clientCardRequisitesBlock()}
-                ${ccDocsBlock()}
-                ${dealsBlock}
+                <div class="hp-tabs">
+                    <button type="button" class="hp-tab is-active" data-cctab="deals" onclick="ccSwitchTab('deals')">Заказы</button>
+                    <button type="button" class="hp-tab" data-cctab="req" onclick="ccSwitchTab('req')">Реквизиты</button>
+                    <button type="button" class="hp-tab" data-cctab="docs" onclick="ccSwitchTab('docs')">Шаблоны документов</button>
+                </div>
+                <div class="hp-tabpanel" id="ccPanel-deals">${dealsBlock}</div>
+                <div class="hp-tabpanel" id="ccPanel-req" hidden>${clientCardRequisitesBlock()}</div>
+                <div class="hp-tabpanel" id="ccPanel-docs" hidden>${ccDocsBlock()}</div>
             </div>
         </div>`;
     ccLoadRequisites(crmId);
     ccLoadDocs(crmId);
+}
+// Переключение вкладок карточки клиента: Заказы / Реквизиты / Шаблоны документов.
+function ccSwitchTab(tab) {
+    document.querySelectorAll("#clientCardOverlay .hp-tab").forEach(b => b.classList.toggle("is-active", b.dataset.cctab === tab));
+    ["deals", "req", "docs"].forEach(t => {
+        const p = document.getElementById("ccPanel-" + t);
+        if (p) p.hidden = (t !== tab);
+    });
 }
 
 // ==================== Документы клиента (договоры и приложения) ====================
