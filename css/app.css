@@ -570,8 +570,24 @@
     .dbo-layout-item a:hover { text-decoration: underline; }
     .dbo-asset-del { flex: 0 0 auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--danger); font-size: 16px; line-height: 1; cursor: pointer; }
     .dbo-asset-del:hover { background: var(--danger); color: #fff; }
-    .dbo-preview-box .dbo-asset-del { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 6px; }
+    .dbo-preview-box .dbo-asset-del { position: absolute; top: 4px; right: 4px; bottom: auto; left: auto; width: 22px; height: 22px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 6px; z-index: 2; }
     .dbo-preview-box .dbo-asset-del:hover { background: var(--danger); }
+    /* Кнопка «загрузить новое превью» — снизу слева в окошке превью */
+    .dbo-preview-upload { position: absolute; left: 4px; bottom: 4px; width: 26px; height: 26px; min-width: 0; margin: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: rgba(0,0,0,0.5); color: #fff; cursor: pointer; z-index: 2; }
+    .dbo-preview-upload:hover { background: var(--accent); }
+    .dbo-preview-upload svg { width: 15px; height: 15px; }
+    /* Прогресс-бар загрузки (превью/макеты) со шкалой процентов */
+    .dbo-progress { width: 100%; box-sizing: border-box; }
+    .dbo-progress-label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 12px; color: var(--accent-strong, var(--accent)); }
+    .dbo-progress-pct { font-variant-numeric: tabular-nums; font-weight: 700; flex: 0 0 auto; }
+    .dbo-progress-track { height: 6px; border-radius: 999px; background: #eae8e2; overflow: hidden; }
+    .dbo-progress-bar { height: 100%; width: 38%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), #5b9dff); animation: dboProgressSlide 1.15s ease-in-out infinite; }
+    .dbo-progress-bar.determinate { width: 0; animation: none; transition: width 0.15s ease; }
+    @keyframes dboProgressSlide { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+    .dbo-layouts-col .dbo-progress { margin-top: 8px; }
+    /* Прогресс поверх области превью — прямо в месте перетаскивания файла */
+    .dbo-preview-overlay { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; box-sizing: border-box; background: rgba(255,255,255,0.9); }
+    .dbo-preview-overlay .dbo-progress-label { flex-direction: column; align-items: center; gap: 2px; text-align: center; }
     .dbo-layout-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .dbo-layout-add input[type="url"] { flex: 1 1 160px; min-width: 140px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
     .dbo-layout-add .dbo-btn { width: auto; margin: 0; padding: 6px 10px; font-size: 13px; cursor: pointer; }

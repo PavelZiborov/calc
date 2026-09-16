@@ -3127,24 +3127,34 @@ function dboRenderEditAssets(elementId) {
 function dboAssetsInnerHtml(elementId) {
     const cached = dboAssets.get(dboAssetKey(elementId)) || { status: "loading", preview: null, layouts: [] };
     const busy = dboUploadBusy === elementId;
+    const previewBusy = busy && dboUploadTarget === "preview";
+    const layoutBusy = busy && dboUploadTarget === "layout";
     const preview = cached.preview;
     const purl = preview?.thumbUrl || preview?.url;
-    // Область превью — кликабельна и принимает перетаскивание (загрузка/замена превью).
+    // Область превью — при наличии картинки клик открывает её (лайтбокс); загрузка нового —
+    // кнопкой снизу слева или перетаскиванием. Пустая — клик открывает выбор файла.
     const hasPreview = dboIsImageUrl(purl);
-    const previewInner = hasPreview
-        ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">
-           <button type="button" class="dbo-asset-del" title="Удалить превью" onclick="event.stopPropagation(); dboDeletePreview(${elementId})">×</button>`
-        : `<span class="dbo-asset-empty">${cached.status === "loading" ? "загрузка…" : "＋ превью"}</span>`;
+    let previewInner;
+    if (previewBusy) {
+        previewInner = `${hasPreview ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">` : ""}
+           <div class="dbo-preview-overlay">${dboProgressHtml(dboUploadLabel || "Загрузка…")}</div>`;
+    } else if (hasPreview) {
+        previewInner = `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">
+           <button type="button" class="dbo-asset-del dbo-preview-del" title="Удалить превью" onclick="event.stopPropagation(); dboDeletePreview(${elementId})">×</button>
+           <button type="button" class="dbo-preview-upload" title="Загрузить новое превью" onclick="event.stopPropagation(); document.getElementById('dboPreviewInput_${elementId}').click()">${icon("camera")}</button>`;
+    } else {
+        previewInner = `<span class="dbo-asset-empty">${cached.status === "loading" ? "загрузка…" : "＋ превью"}</span>`;
+    }
     const layouts = (cached.layouts || []).map(l => {
-        const icon = l.type === "link" ? "🔗" : "📄";
+        const ic = l.type === "link" ? "🔗" : "📄";
         const del = l.isCanDelete !== false
             ? `<button type="button" class="dbo-asset-del" title="Удалить макет" onclick="dboDeleteLayout(${elementId}, ${Number(l.id)})">×</button>` : "";
-        return `<div class="dbo-layout-item"><a href="${escapeHtml(l.url || "#")}" target="_blank" rel="noopener">${icon} ${escapeHtml(l.name || l.file_name || "файл")}</a>${del}</div>`;
+        return `<div class="dbo-layout-item"><a href="${escapeHtml(l.url || "#")}" target="_blank" rel="noopener">${ic} ${escapeHtml(l.name || l.file_name || "файл")}</a>${del}</div>`;
     }).join("") || `<div class="dbo-asset-empty">макетов нет</div>`;
     return `
         <div class="dbo-assets-row">
-            <div class="dbo-preview-box dbo-drop" title="Нажмите или перетащите изображение"
-                 onclick="document.getElementById('dboPreviewInput_${elementId}').click()"
+            <div class="dbo-preview-box dbo-drop${hasPreview ? " has-img" : ""}" title="${hasPreview ? "Нажмите, чтобы открыть; перетащите изображение для замены" : "Нажмите или перетащите изображение"}"
+                 onclick="dboPreviewBoxClick(${elementId})"
                  ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropPreview(event, ${elementId})">
                 ${previewInner}
                 <input type="file" id="dboPreviewInput_${elementId}" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)">
@@ -3157,10 +3167,27 @@ function dboAssetsInnerHtml(elementId) {
                     <button type="button" class="dbo-btn" onclick="dboAddLayoutLink(${elementId})">+ ссылка</button>
                     <label class="dbo-btn">📎 файл<input type="file" hidden multiple onchange="dboUploadLayout(${elementId}, this)"></label>
                 </div>
-                <div class="dbo-layout-drophint">Перетащите файлы макетов сюда</div>
-                ${busy ? `<div class="dbo-asset-progress">${escapeHtml(dboUploadLabel || "Загрузка…")}</div>` : ""}
+                ${layoutBusy ? dboProgressHtml(dboUploadLabel || "Загрузка…") : `<div class="dbo-layout-drophint">Перетащите файлы макетов сюда</div>`}
             </div>
         </div>`;
+}
+// Клик по превью-боксу: есть картинка → лайтбокс; нет → выбор файла. Во время загрузки — ничего.
+function dboPreviewBoxClick(elementId) {
+    if (dboUploadBusy === elementId) return;
+    const cached = dboAssets.get(dboAssetKey(elementId));
+    const url = cached?.preview?.url || cached?.preview?.thumbUrl;
+    if (dboIsImageUrl(url)) dboOpenLightbox(url);
+    else document.getElementById(`dboPreviewInput_${elementId}`)?.click();
+}
+// Разметка прогресс-бара со шкалой в процентах (индетерминантная, пока нет ratio).
+function dboProgressHtml(label) {
+    const pct = dboUploadProgress != null ? Math.max(0, Math.min(100, Math.round(dboUploadProgress * 100))) : null;
+    const det = pct != null ? " determinate" : "";
+    const w = pct != null ? ` style="width:${pct}%"` : "";
+    return `<div class="dbo-progress">
+        <div class="dbo-progress-label"><span>${escapeHtml(label)}</span><span class="dbo-progress-pct">${pct != null ? pct + "%" : ""}</span></div>
+        <div class="dbo-progress-track"><div class="dbo-progress-bar${det}"${w}></div></div>
+    </div>`;
 }
 // Перетаскивание файлов в области превью/макетов.
 function dboDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("dbo-drop-active"); }
@@ -3179,8 +3206,26 @@ function dboDropLayout(e, elementId) {
 
 let dboUploadBusy = null;    // elementId, пока идёт загрузка
 let dboUploadLabel = "";
-function dboSetBusy(elementId, label) { dboUploadBusy = elementId; dboUploadLabel = label || ""; dboRenderEditAssets(elementId); }
-function dboClearBusy(elementId) { dboUploadBusy = null; dboUploadLabel = ""; dboRenderEditAssets(elementId); }
+let dboUploadTarget = null;  // 'preview' | 'layout' — где показывать прогресс
+let dboUploadProgress = null; // 0..1 или null (индетерминантный)
+function dboSetBusy(elementId, label, target) {
+    dboUploadBusy = elementId;
+    dboUploadLabel = label || "";
+    if (target !== undefined) dboUploadTarget = target;
+    dboUploadProgress = null;   // смена фазы — сбрасываем шкалу
+    dboRenderEditAssets(elementId);
+}
+// Лёгкое обновление шкалы во время XHR-прогресса — без полного ре-рендера блока.
+function dboSetProgress(elementId, ratio) {
+    if (dboUploadBusy !== elementId) return;
+    dboUploadProgress = ratio;
+    const box = document.getElementById(`dboAssets_${elementId}`);
+    if (!box) return;
+    const pct = Math.max(0, Math.min(100, Math.round((ratio || 0) * 100)));
+    box.querySelectorAll(".dbo-progress-bar").forEach(b => { b.classList.add("determinate"); b.style.width = pct + "%"; });
+    box.querySelectorAll(".dbo-progress-pct").forEach(t => { t.textContent = pct + "%"; });
+}
+function dboClearBusy(elementId) { dboUploadBusy = null; dboUploadLabel = ""; dboUploadTarget = null; dboUploadProgress = null; dboRenderEditAssets(elementId); }
 
 // Загрузка превью из <input> (клик) — делегирует на файловый core.
 function dboUploadPreview(elementId, input) {
@@ -3191,19 +3236,19 @@ function dboUploadPreview(elementId, input) {
 async function dboUploadPreviewFile(elementId, file) {
     if (!file) return;
     if (!dboAssetsDeal.num) { alert("У сделки нет номера — загрузка на Я.Диск недоступна."); return; }
-    dboSetBusy(elementId, "Подготовка превью…");
+    dboSetBusy(elementId, "Подготовка превью…", "preview");
     try {
         let up = file;
         if (typeof compressPreviewImage === "function") { try { up = await compressPreviewImage(file); } catch (_) {} }
-        dboSetBusy(elementId, "Регистрация превью…");
+        dboSetBusy(elementId, "Регистрация превью…", "preview");
         const prep = await clientsApi("uploadElementPreview", {
             dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num),
             fileName: up.name || "preview.jpg", mimeType: up.type || "image/jpeg"
         });
         if (!prep?.uploadUrl) throw new Error("нет uploadUrl");
-        dboSetBusy(elementId, "Загрузка на Я.Диск…");
-        await uploadFileToYandexUrl(prep.uploadUrl, up, up.type || "image/jpeg");
-        dboSetBusy(elementId, "Сохранение…");
+        dboSetBusy(elementId, "Загрузка на Я.Диск…", "preview");
+        await uploadFileToYandexUrl(prep.uploadUrl, up, up.type || "image/jpeg", (r) => dboSetProgress(elementId, r));
+        dboSetBusy(elementId, "Сохранение…", "preview");
         const data = await clientsApi("uploadElementPreview", {
             dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num), uploadComplete: true
         });
@@ -3226,21 +3271,21 @@ async function dboUploadLayoutFiles(elementId, files) {
     if (!dboAssetsDeal.num) { alert("У сделки нет номера — загрузка на Я.Диск недоступна."); return; }
     // Было ли уже превью до загрузки (чтобы авто-превью из PDF ставить только при первом макете).
     const hadPreview = !!dboAssets.get(dboAssetKey(elementId))?.preview;
-    dboSetBusy(elementId, "Загрузка макетов…");
+    dboSetBusy(elementId, "Загрузка макетов…", "layout");
     let firstPdf = null;
     try {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const pfx = files.length > 1 ? `(${i + 1}/${files.length}) ` : "";
-            dboSetBusy(elementId, `${pfx}Регистрация…`);
+            dboSetBusy(elementId, `${pfx}Регистрация…`, "layout");
             const prep = await clientsApi("addElementLayout", {
                 dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num),
                 type: "file", fileName: file.name || "layout", mimeType: file.type || "application/octet-stream"
             });
             if (!prep?.uploadUrl) throw new Error("нет uploadUrl");
-            dboSetBusy(elementId, `${pfx}Загрузка на Я.Диск…`);
-            await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream");
-            dboSetBusy(elementId, `${pfx}Сохранение…`);
+            dboSetBusy(elementId, `${pfx}Загрузка на Я.Диск…`, "layout");
+            await uploadFileToYandexUrl(prep.uploadUrl, file, file.type || "application/octet-stream", (r) => dboSetProgress(elementId, r));
+            dboSetBusy(elementId, `${pfx}Сохранение…`, "layout");
             const data = await clientsApi("addElementLayout", {
                 dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num),
                 type: "file", uploadComplete: true
@@ -3268,7 +3313,7 @@ async function dboAddLayoutLink(elementId) {
     const url = String(inp?.value || "").trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) { alert("Ссылка должна начинаться с http:// или https://"); return; }
-    dboSetBusy(elementId, "Добавление ссылки…");
+    dboSetBusy(elementId, "Добавление ссылки…", "layout");
     try {
         const data = await clientsApi("addElementLayout", {
             dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num || ""), type: "link", url
@@ -3282,7 +3327,7 @@ async function dboAddLayoutLink(elementId) {
 
 async function dboDeletePreview(elementId) {
     if (!confirm("Удалить превью позиции?")) return;
-    dboSetBusy(elementId, "Удаление превью…");
+    dboSetBusy(elementId, "Удаление превью…", "preview");
     try {
         const data = await clientsApi("deleteElementPreview", {
             dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), dealNum: String(dboAssetsDeal.num || "")
@@ -3296,7 +3341,7 @@ async function dboDeletePreview(elementId) {
 
 async function dboDeleteLayout(elementId, layoutId) {
     if (!confirm("Удалить макет?")) return;
-    dboSetBusy(elementId, "Удаление макета…");
+    dboSetBusy(elementId, "Удаление макета…", "layout");
     try {
         const data = await clientsApi("deleteElementLayout", {
             dealId: Number(dboAssetsDeal.id), elementId: Number(elementId), layoutId: Number(layoutId), dealNum: String(dboAssetsDeal.num || "")
