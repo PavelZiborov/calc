@@ -142,7 +142,6 @@ function applyCatalogFormat() {
     const binding = document.getElementById("binding")?.value;
     const fmtSel = document.getElementById("format");
     const orSel = document.getElementById("orientation");
-    const note = document.getElementById("catalogBindingNote");
     if (!fmtSel || !orSel) return;
     const firstVisible = sel => [...sel.options].find(o => !o.hidden)?.value;
     if (binding === "staple") {
@@ -154,11 +153,9 @@ function applyCatalogFormat() {
         // Ориентация: прячем недопустимую для текущего формата.
         [...orSel.options].forEach(o => { o.hidden = !catalogStapleAllowed(fmtSel.value, o.value); });
         if (orSel.options[orSel.selectedIndex]?.hidden) { const v = firstVisible(orSel); if (v) orSel.value = v; }
-        if (note) { note.textContent = "Скоба: печать разворотами. Максимум — A4 вертикальный и A5 горизонтальный (лист 450×320); меньшие форматы доступны."; note.style.display = "block"; }
     } else {
         [...fmtSel.options].forEach(o => o.hidden = false);
         [...orSel.options].forEach(o => o.hidden = false);
-        if (note) note.style.display = "none";
     }
     const dims = catalogFormatDims(fmtSel.value);
     if (dims) {
@@ -452,13 +449,17 @@ function buildFullNameForCatalog() {
 
     const pages = Number(document.getElementById("pages")?.value || 0);
     const paperCover = getSelectedOptionText("paperCover");
+    const colorCover = getSelectedOptionText("colorCover");
     const coverLaminationPart = formatLaminationPart(getSelectedOptionText("lamCover"));
-    const coverPart = coverLaminationPart ? `${paperCover}, ${coverLaminationPart}` : paperCover;
+    const coverPart = [paperCover, colorCover, coverLaminationPart].filter(Boolean).join(", ");
     const paperBlock = getSelectedOptionText("paperBlock");
+    const colorBlock = getSelectedOptionText("colorBlock");
+    const blockLaminationPart = formatLaminationPart(getSelectedOptionText("lamBlock"));
+    const blockPart = [paperBlock, colorBlock, blockLaminationPart].filter(Boolean).join(", ");
     const binding = document.getElementById("binding")?.value;
     const bindingText = binding === "spring" ? "сборка на пружину" : "сборка на скобы";
 
-    return `${product} ${size}; ${pages} полосы; Обложка ${coverPart}; Блок: ${paperBlock}; ${bindingText}`;
+    return `${product} ${size}; ${pages} полосы; Обложка ${coverPart}; Блок: ${blockPart}; ${bindingText}`;
 }
 
 async function copyCustomerOrderText() {

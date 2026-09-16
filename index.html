@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=120">
+<link rel="stylesheet" href="css/app.css?v=122">
 </head>
 <body>
 
@@ -96,6 +96,11 @@
             </div>
         </div>
 
+        <div class="row">
+            <div class="col"><label>Ширина (мм)</label><input id="width" value="210" type="number" inputmode="numeric" oninput="customFormat()"></div>
+            <div class="col"><label>Высота (мм)</label><input id="height" value="297" type="number" inputmode="numeric" oninput="customFormat()"></div>
+        </div>
+
         <div id="catalogFields" style="display:none">
             <label>Количество полос</label>
             <input id="pages" type="number" inputmode="numeric" value="12" onchange="validatePages()">
@@ -109,12 +114,6 @@
                 <option value="portrait">Вертикальная</option>
                 <option value="landscape">Горизонтальная</option>
             </select>
-            <p id="catalogBindingNote" class="calc-note" style="display:none;"></p>
-        </div>
-
-        <div class="row">
-            <div class="col"><label>Ширина (мм)</label><input id="width" value="210" type="number" inputmode="numeric" oninput="customFormat()"></div>
-            <div class="col"><label>Высота (мм)</label><input id="height" value="297" type="number" inputmode="numeric" oninput="customFormat()"></div>
         </div>
 
         <div class="row">
@@ -420,6 +419,10 @@
                 <div id="settingsDadataHost"></div>
             </section>
             <section class="settings-card">
+                <h3>Прибыль и налог</h3>
+                <div id="settingsProfitHost"></div>
+            </section>
+            <section class="settings-card">
                 <h3>Уведомления о готовности (Telegram-бот)</h3>
                 <div id="settingsNotifyHost"></div>
             </section>
@@ -439,19 +442,19 @@
     </div>
 </div>
 
-<script src="js/config.js?v=120"></script>
-<script src="js/calculator-data.js?v=120"></script>
-<script src="js/calc-settings.js?v=120"></script>
-<script src="js/calc-settings-ui.js?v=120"></script>
-<script src="js/utils.js?v=120"></script>
-<script src="js/auth.js?v=120"></script>
-<script src="js/calculator.js?v=120"></script>
-<script src="js/crm.js?v=120"></script>
-<script src="js/element-editor.js?v=120"></script>
-<script src="js/kp-docx.js?v=120"></script>
-<script src="js/calc-sheet.js?v=120"></script>
-<script src="js/clients.js?v=120"></script>
-<script src="js/orders-db.js?v=120"></script>
-<script src="js/main.js?v=120"></script>
+<script src="js/config.js?v=122"></script>
+<script src="js/calculator-data.js?v=122"></script>
+<script src="js/calc-settings.js?v=122"></script>
+<script src="js/calc-settings-ui.js?v=122"></script>
+<script src="js/utils.js?v=122"></script>
+<script src="js/auth.js?v=122"></script>
+<script src="js/calculator.js?v=122"></script>
+<script src="js/crm.js?v=122"></script>
+<script src="js/element-editor.js?v=122"></script>
+<script src="js/kp-docx.js?v=122"></script>
+<script src="js/calc-sheet.js?v=122"></script>
+<script src="js/clients.js?v=122"></script>
+<script src="js/orders-db.js?v=122"></script>
+<script src="js/main.js?v=122"></script>
 </body>
 </html>

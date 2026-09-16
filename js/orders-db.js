@@ -1154,6 +1154,7 @@ let dbCardElementStatuses = [];
 let dbCardData = null;   // текущие данные карточки (для оптимистичного апдейта статусов)
 let dbCardCategories = []; // категории прайс-листа (для смены категории элемента)
 let dbCardPayMethods = []; // методы оплаты CRM (для ручного ввода оплат)
+let dbCardTaxPercent = 0;  // процент налога для расчёта чистой прибыли (из настроек)
 
 // ---- Редактирование элемента (поля; имя/категорию — через пересоздание в CRM) ----
 function dbElEditEsc(e) { if (e.key === "Escape") closeDbElEdit(); }
@@ -1939,6 +1940,37 @@ function dbApplyCostVisibility() {
     });
 }
 
+// Прибыль по заказу: грязная (доход−расход) и чистая (доход − налог − расход),
+// где налог = доход × процент (настраивается в Настройках).
+function dbProfitPanelHtml(amount, cost, taxPercent) {
+    amount = Number(amount) || 0;
+    cost = Number(cost) || 0;
+    const tax = Number(taxPercent) || 0;
+    const gross = amount - cost;
+    const taxAmount = amount * tax / 100;
+    const net = amount - taxAmount - cost;
+    const cls = v => v >= 0 ? "dbo-profit-pos" : "dbo-profit-neg";
+    return `
+        <div class="dbo-profit-row"><span>Доход</span><b>${money2(amount)}</b></div>
+        <div class="dbo-profit-row"><span>Расход (себес.)</span><b>${money2(cost)}</b></div>
+        <div class="dbo-profit-row dbo-profit-total"><span>Грязная прибыль</span><b class="${cls(gross)}">${money2(gross)}</b></div>
+        <div class="dbo-profit-row dbo-profit-sub"><span>Налог${tax ? ` (${tax}%)` : ""}</span><b>−${money2(taxAmount)}</b></div>
+        <div class="dbo-profit-row dbo-profit-total"><span>Чистая прибыль</span><b class="${cls(net)}">${money2(net)}</b></div>
+        ${tax ? "" : `<div class="dbo-profit-hint">Налог не задан — укажите процент в разделе «Настройки».</div>`}`;
+}
+function dbToggleProfit(btn) {
+    const panel = document.getElementById("dbProfitPanel");
+    if (!panel) return;
+    const show = panel.hidden;
+    panel.hidden = !show;
+    if (btn) {
+        btn.setAttribute("aria-expanded", show ? "true" : "false");
+        btn.classList.toggle("is-open", show);
+        const label = btn.querySelector("span");
+        if (label) label.textContent = show ? "Скрыть прибыль" : "Показать прибыль";
+    }
+}
+
 // Доп-инфо под элементом: «Название поля: значение · …»
 function dbElAfLine(e) {
     const af = dbAfWithValue(e.additional_fields);
@@ -2014,9 +2046,12 @@ function renderDbDealCard(data, crmId) {
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
     dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
     if (Array.isArray(data?.payMethods) && data.payMethods.length) dbCardPayMethods = data.payMethods;
+    dbCardTaxPercent = Number(data?.taxPercent) || 0;
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
+    // Расход = сумма себестоимости всех позиций (колонка «Себес.»).
+    const totalCost = elements.reduce((s, e) => s + (Number(e.cost) || 0), 0);
     const dbClientClickable = Number.isFinite(Number(d.client_crm_id)) && Number(d.client_crm_id) > 0;
 
     // Статус — цветная пилюля с меню (как в «Заказах»).
@@ -2095,10 +2130,16 @@ function renderDbDealCard(data, crmId) {
                         ${d.created_at_crm ? `<div>Дата заказа: <b>${escapeHtml(d.created_at_crm)}</b></div>` : ""}
                         ${d.employee_name ? `<div>Менеджер: <b>${escapeHtml(d.employee_name)}</b></div>` : ""}
                     </div>
-                    <div class="payment-summary dbo-totals">
-                        <div class="payment-summary-row"><span class="payment-summary-label">Всего</span><span class="payment-summary-value">${money2(amount)}</span><span></span></div>
-                        <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span class="payment-actions">${debt > 0.009 ? `<button type="button" class="payment-action-btn payment-partial-btn" title="Добавить частичную сумму к оплате" aria-label="Добавить частичную сумму к оплате" onclick="dbOpenPayModal('partial')"><span class="payment-action-icon">+</span></button><button type="button" class="payment-action-btn payment-full-btn" title="Добавить всю сумму" aria-label="Добавить всю сумму" onclick="dbOpenPayModal('full')"><span class="payment-action-icon">+</span></button>` : ""}</span></div>
-                        <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
+                    <div class="dbo-totals-col">
+                        <div class="payment-summary dbo-totals">
+                            <div class="payment-summary-row"><span class="payment-summary-label">Всего</span><span class="payment-summary-value">${money2(amount)}</span><span></span></div>
+                            <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span class="payment-actions">${debt > 0.009 ? `<button type="button" class="payment-action-btn payment-partial-btn" title="Добавить частичную сумму к оплате" aria-label="Добавить частичную сумму к оплате" onclick="dbOpenPayModal('partial')"><span class="payment-action-icon">+</span></button><button type="button" class="payment-action-btn payment-full-btn" title="Добавить всю сумму" aria-label="Добавить всю сумму" onclick="dbOpenPayModal('full')"><span class="payment-action-icon">+</span></button>` : ""}</span></div>
+                            <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
+                        </div>
+                        <div class="dbo-profit">
+                            <button type="button" class="dbo-profit-toggle" onclick="dbToggleProfit(this)" aria-expanded="false">${icon("eye")}<span>Показать прибыль</span></button>
+                            <div class="dbo-profit-panel" id="dbProfitPanel" hidden>${dbProfitPanelHtml(amount, totalCost, dbCardTaxPercent)}</div>
+                        </div>
                     </div>
                 </div>
                 ${dbPaymentsBlock(data?.payments)}
@@ -3375,6 +3416,7 @@ function openSettingsPage() {
     renderYandexSettingsInline();
     renderMoedeloSettingsInline();
     renderDadataSettingsInline();
+    renderProfitSettingsInline();
     renderNotifySettingsInline();
     renderKpSettingsInline();
 }
@@ -3820,6 +3862,42 @@ async function dboSaveDadataToken(clear = false) {
     } catch (e) {
         console.error("dboSaveDadataToken", e);
         alert("Не удалось сохранить ключ.");
+    }
+}
+
+// ——— Настройки: налог для расчёта чистой прибыли (только админ сохраняет) ———
+async function renderProfitSettingsInline() {
+    const host = document.getElementById("settingsProfitHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let taxPercent = 0;
+    try { const s = await clientsApi("getProfitSettings", {}); taxPercent = Number(s?.taxPercent) || 0; } catch (_) {}
+    host.innerHTML = `
+        <p class="dbo-ya-note">Процент налога с дохода — используется в карточке заказа при расчёте чистой прибыли: <b>чистая = доход − доход×налог% − расход</b>. Грязная прибыль = доход − расход.</p>
+        <label class="dbo-edit-wide">Налог, %
+            <input type="text" inputmode="decimal" id="dboTaxPercent" value="${taxPercent}" placeholder="напр. 6">
+        </label>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dboSaveProfitSettings()">Сохранить</button>
+        </div>
+        <div id="dboTaxMsg" class="dbo-ya-note"></div>`;
+}
+async function dboSaveProfitSettings() {
+    const raw = String(document.getElementById("dboTaxPercent")?.value || "").replace(",", ".").trim();
+    const val = Number(raw);
+    const msg = document.getElementById("dboTaxMsg");
+    if (!Number.isFinite(val) || val < 0 || val > 100) {
+        if (msg) { msg.textContent = "Введите число от 0 до 100."; msg.className = "dbo-ya-note payment-alert"; }
+        return;
+    }
+    try {
+        const s = await clientsApi("setProfitSettings", { taxPercent: val });
+        dbCardTaxPercent = Number(s?.taxPercent) || 0;
+        if (msg) { msg.textContent = "Сохранено. Новый расчёт прибыли использует этот процент."; msg.className = "dbo-ya-note payment-ok"; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Налог сохранён");
+    } catch (e) {
+        console.error("dboSaveProfitSettings", e);
+        if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
     }
 }
 

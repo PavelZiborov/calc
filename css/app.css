@@ -508,6 +508,21 @@
     .dbo-meta { font-size: 14px; color: var(--text-muted); line-height: 1.75; }
     .dbo-meta b { color: var(--text); }
     .dbo-totals { flex: 0 0 auto; }
+    /* Прибыль по заказу — кнопка рядом с суммой + раскрывающаяся панель */
+    .dbo-totals-col { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 0 auto; }
+    .dbo-profit { width: 100%; }
+    .dbo-profit-toggle { width: auto; margin: 0; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-2, var(--text)); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .dbo-profit-toggle:hover, .dbo-profit-toggle.is-open { border-color: var(--accent); color: var(--accent); }
+    .dbo-profit-toggle svg { width: 15px; height: 15px; }
+    .dbo-profit-panel { margin-top: 8px; width: 100%; min-width: 230px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); box-sizing: border-box; }
+    .dbo-profit-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-muted); padding: 3px 0; }
+    .dbo-profit-row b { color: var(--text); font-variant-numeric: tabular-nums; }
+    .dbo-profit-row.dbo-profit-sub { font-size: 12px; }
+    .dbo-profit-row.dbo-profit-total { border-top: 1px dashed var(--border); margin-top: 2px; padding-top: 6px; font-weight: 600; color: var(--text); }
+    .dbo-profit-pos { color: #2e7d32 !important; }
+    .dbo-profit-neg { color: var(--danger) !important; }
+    .dbo-profit-hint { margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.35; }
+    .dbo-card.dbo-cost-hidden .dbo-profit { display: none !important; }
 
     .dbo-section { margin-top: 18px; }
     .dbo-section-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
