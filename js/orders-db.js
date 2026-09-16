@@ -1950,13 +1950,13 @@ function dbProfitPanelHtml(amount, cost, taxPercent) {
     const taxAmount = amount * tax / 100;
     const net = amount - taxAmount - cost;
     const cls = v => v >= 0 ? "dbo-profit-pos" : "dbo-profit-neg";
+    const taxRow = tax
+        ? `<div class="dbo-profit-row"><span>Налог (${tax}%)</span><b>−${money2(taxAmount)}</b></div>`
+        : `<div class="dbo-profit-row" title="Налог не задан — укажите процент в разделе «Настройки»"><span>Налог</span><b>—</b></div>`;
     return `
-        <div class="dbo-profit-row"><span>Доход</span><b>${money2(amount)}</b></div>
-        <div class="dbo-profit-row"><span>Расход (себес.)</span><b>${money2(cost)}</b></div>
-        <div class="dbo-profit-row dbo-profit-total"><span>Грязная прибыль</span><b class="${cls(gross)}">${money2(gross)}</b></div>
-        <div class="dbo-profit-row dbo-profit-sub"><span>Налог${tax ? ` (${tax}%)` : ""}</span><b>−${money2(taxAmount)}</b></div>
-        <div class="dbo-profit-row dbo-profit-total"><span>Чистая прибыль</span><b class="${cls(net)}">${money2(net)}</b></div>
-        ${tax ? "" : `<div class="dbo-profit-hint">Налог не задан — укажите процент в разделе «Настройки».</div>`}`;
+        <div class="dbo-profit-row"><span>Грязная прибыль</span><b class="${cls(gross)}">${money2(gross)}</b></div>
+        ${taxRow}
+        <div class="dbo-profit-row dbo-profit-total"><span>Чистая прибыль</span><b class="${cls(net)}">${money2(net)}</b></div>`;
 }
 function dbToggleProfit(btn) {
     const panel = document.getElementById("dbProfitPanel");
@@ -1966,8 +1966,7 @@ function dbToggleProfit(btn) {
     if (btn) {
         btn.setAttribute("aria-expanded", show ? "true" : "false");
         btn.classList.toggle("is-open", show);
-        const label = btn.querySelector("span");
-        if (label) label.textContent = show ? "Скрыть прибыль" : "Показать прибыль";
+        btn.title = show ? "Скрыть прибыль по заказу" : "Показать прибыль по заказу";
     }
 }
 
@@ -2130,15 +2129,13 @@ function renderDbDealCard(data, crmId) {
                         ${d.created_at_crm ? `<div>Дата заказа: <b>${escapeHtml(d.created_at_crm)}</b></div>` : ""}
                         ${d.employee_name ? `<div>Менеджер: <b>${escapeHtml(d.employee_name)}</b></div>` : ""}
                     </div>
-                    <div class="dbo-totals-col">
+                    <div class="dbo-summary-group">
+                        <button type="button" class="dbo-profit-toggle" onclick="dbToggleProfit(this)" aria-expanded="false" title="Показать прибыль по заказу">${icon("eye")}<span>Прибыль</span></button>
+                        <div class="dbo-profit-panel" id="dbProfitPanel" hidden>${dbProfitPanelHtml(amount, totalCost, dbCardTaxPercent)}</div>
                         <div class="payment-summary dbo-totals">
                             <div class="payment-summary-row"><span class="payment-summary-label">Всего</span><span class="payment-summary-value">${money2(amount)}</span><span></span></div>
                             <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span class="payment-actions">${debt > 0.009 ? `<button type="button" class="payment-action-btn payment-partial-btn" title="Добавить частичную сумму к оплате" aria-label="Добавить частичную сумму к оплате" onclick="dbOpenPayModal('partial')"><span class="payment-action-icon">+</span></button><button type="button" class="payment-action-btn payment-full-btn" title="Добавить всю сумму" aria-label="Добавить всю сумму" onclick="dbOpenPayModal('full')"><span class="payment-action-icon">+</span></button>` : ""}</span></div>
                             <div class="payment-summary-row"><span class="payment-summary-label">Долг</span><span class="payment-summary-value ${debt > 0.009 ? "payment-alert" : "payment-ok"}">${money2(debt)}</span><span></span></div>
-                        </div>
-                        <div class="dbo-profit">
-                            <button type="button" class="dbo-profit-toggle" onclick="dbToggleProfit(this)" aria-expanded="false">${icon("eye")}<span>Показать прибыль</span></button>
-                            <div class="dbo-profit-panel" id="dbProfitPanel" hidden>${dbProfitPanelHtml(amount, totalCost, dbCardTaxPercent)}</div>
                         </div>
                     </div>
                 </div>

@@ -508,21 +508,20 @@
     .dbo-meta { font-size: 14px; color: var(--text-muted); line-height: 1.75; }
     .dbo-meta b { color: var(--text); }
     .dbo-totals { flex: 0 0 auto; }
-    /* Прибыль по заказу — кнопка рядом с суммой + раскрывающаяся панель */
-    .dbo-totals-col { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 0 auto; }
-    .dbo-profit { width: 100%; }
-    .dbo-profit-toggle { width: auto; margin: 0; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-2, var(--text)); font-size: 13px; font-weight: 600; cursor: pointer; }
-    .dbo-profit-toggle:hover, .dbo-profit-toggle.is-open { border-color: var(--accent); color: var(--accent); }
+    /* Прибыль по заказу — компактная кнопка + панель СЛЕВА от блока сумм (десктоп) */
+    .dbo-summary-group { display: flex; align-items: stretch; justify-content: flex-end; gap: 12px; flex: 0 0 auto; }
+    .dbo-profit-toggle { align-self: center; width: auto !important; margin: 0 !important; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px !important; border: 1px solid var(--border) !important; border-radius: 999px !important; background: var(--surface) !important; color: var(--text-2, var(--text)) !important; font-size: 13px; font-weight: 600; box-shadow: none !important; cursor: pointer; white-space: nowrap; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+    .dbo-profit-toggle:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+    .dbo-profit-toggle.is-open { border-color: var(--accent) !important; color: var(--accent) !important; background: var(--accent-tint, #eef4ff) !important; }
     .dbo-profit-toggle svg { width: 15px; height: 15px; }
-    .dbo-profit-panel { margin-top: 8px; width: 100%; min-width: 230px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); box-sizing: border-box; }
-    .dbo-profit-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-muted); padding: 3px 0; }
+    .dbo-profit-panel { align-self: stretch; min-width: 210px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+    .dbo-profit-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; font-size: 12.5px; color: var(--text-muted); padding: 1px 0; white-space: nowrap; }
     .dbo-profit-row b { color: var(--text); font-variant-numeric: tabular-nums; }
-    .dbo-profit-row.dbo-profit-sub { font-size: 12px; }
-    .dbo-profit-row.dbo-profit-total { border-top: 1px dashed var(--border); margin-top: 2px; padding-top: 6px; font-weight: 600; color: var(--text); }
+    .dbo-profit-row.dbo-profit-total { font-weight: 700; color: var(--text); }
     .dbo-profit-pos { color: #2e7d32 !important; }
     .dbo-profit-neg { color: var(--danger) !important; }
-    .dbo-profit-hint { margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.35; }
-    .dbo-card.dbo-cost-hidden .dbo-profit { display: none !important; }
+    .dbo-card.dbo-cost-hidden .dbo-profit-toggle,
+    .dbo-card.dbo-cost-hidden .dbo-profit-panel { display: none !important; }
 
     .dbo-section { margin-top: 18px; }
     .dbo-section-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
@@ -789,6 +788,11 @@
         .dbo-meta { display: none; }
         /* Блок оплаты — на всю ширину, в стиле таблицы элементов */
         .dbo-mid { flex-direction: column; align-items: stretch; gap: 12px; margin-top: 12px; }
+        /* Прибыль на мобиле — в столбик: сумма, затем кнопка, затем панель */
+        .dbo-summary-group { flex-direction: column; align-items: stretch; gap: 10px; width: 100%; }
+        .dbo-summary-group .dbo-totals { order: -1; }
+        .dbo-profit-toggle { align-self: flex-start; }
+        .dbo-profit-panel { min-width: 0; width: 100%; padding: 10px 14px; }
         .dbo-totals.payment-summary { width: 100% !important; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
         .dbo-totals .payment-summary-row { grid-template-columns: 1fr auto auto; gap: 10px; padding: 7px 14px !important; background: transparent !important; border-bottom: 1px dashed var(--border); line-height: 1.25; }
         .dbo-totals .payment-summary-row:last-child { border-bottom: none; }
@@ -2198,10 +2202,11 @@
     .deal-notify-sent b { font-weight: 700; }
     .readiness-toast {
         position: fixed;
-        left: 50%;
-        bottom: 24px;
-        transform: translate(-50%, 16px);
-        max-width: 92vw;
+        right: 20px;
+        left: auto;
+        bottom: 20px;
+        transform: translateX(24px);
+        max-width: min(340px, calc(100vw - 32px));
         padding: 12px 18px;
         background: #1f9d55;
         color: #fff;
@@ -2214,7 +2219,7 @@
         z-index: 4000;
         transition: opacity .2s ease, transform .2s ease;
     }
-    .readiness-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+    .readiness-toast.is-visible { opacity: 1; transform: translateX(0); }
     .deal-cost-info-input {
         width: 100%;
         box-sizing: border-box;
