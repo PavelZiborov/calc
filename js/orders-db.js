@@ -3416,6 +3416,15 @@ function openSettingsPage() {
     renderProfitSettingsInline();
     renderNotifySettingsInline();
     renderKpSettingsInline();
+    settingsSwitchTab("calc");
+}
+// Вкладки раздела «Настройки»: Калькулятор / Финансы / Интеграции / Уведомления / Система.
+function settingsSwitchTab(tab) {
+    document.querySelectorAll("#settingsTabs .hp-tab").forEach(b => b.classList.toggle("is-active", b.dataset.settab === tab));
+    ["calc", "finance", "integrations", "notify", "system"].forEach(t => {
+        const p = document.getElementById("setPanel-" + t);
+        if (p) p.hidden = (t !== tab);
+    });
 }
 
 // ——— Настройки Telegram-бота уведомлений (только админ) ———

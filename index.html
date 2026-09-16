@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=125">
+<link rel="stylesheet" href="css/app.css?v=126">
 </head>
 <body>
 
@@ -390,71 +390,101 @@
             <h2>Настройки</h2>
             <p class="settings-sub">Настройки калькулятора и интеграции.</p>
         </div>
-        <div class="settings-sections">
-            <section class="settings-card" id="settingsUsersCard">
-                <h3>Пользователи</h3>
-                <p class="settings-card-note">Учётные записи менеджеров: вход по email и паролю, права администратора, привязка к PrintOffice.</p>
-                <div id="settingsUsersHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Калькулятор</h3>
-                <p class="settings-card-note">Лист и зазоры, материалы, правила продуктов.</p>
-                <button type="button" class="dbk-btn dbk-btn-sync" onclick="openCalcSettings()">Открыть настройки калькулятора</button>
-            </section>
-            <section class="settings-card" id="settingsPricesCard">
-                <h3>Цены калькулятора</h3>
-                <p class="settings-card-note">Себестоимость бумаг, печати, ламинации, операций и таблица наценок. Используется при расчёте.</p>
-                <div id="settingsPricesHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Интеграция с Яндекс.Диском</h3>
-                <div id="settingsYandexHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Интеграция с МоеДело</h3>
-                <div id="settingsMoedeloHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Автозаполнение по ИНН (DaData)</h3>
-                <div id="settingsDadataHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Прибыль и налог</h3>
-                <div id="settingsProfitHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Уведомления о готовности (Telegram-бот)</h3>
-                <div id="settingsNotifyHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Шаблоны коммерческих предложений</h3>
-                <div id="settingsKpHost"></div>
-            </section>
-            <section class="settings-card">
-                <h3>Синхронизация «Заказы БД»</h3>
-                <p class="settings-card-note">Обычно данные приходят автоматически (вебхуки PrintOffice). Ручная синхронизация — на случай расхождений.</p>
-                <div class="settings-actions">
-                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
-                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
-                </div>
-            </section>
+        <div class="hp-tabs settings-tabs" id="settingsTabs">
+            <button type="button" class="hp-tab is-active" data-settab="calc" onclick="settingsSwitchTab('calc')">Калькулятор</button>
+            <button type="button" class="hp-tab" data-settab="finance" onclick="settingsSwitchTab('finance')">Финансы</button>
+            <button type="button" class="hp-tab" data-settab="integrations" onclick="settingsSwitchTab('integrations')">Интеграции</button>
+            <button type="button" class="hp-tab" data-settab="notify" onclick="settingsSwitchTab('notify')">Уведомления</button>
+            <button type="button" class="hp-tab" data-settab="system" onclick="settingsSwitchTab('system')">Система</button>
+        </div>
+
+        <div class="hp-tabpanel" id="setPanel-calc">
+            <div class="settings-sections">
+                <section class="settings-card">
+                    <h3>Калькулятор</h3>
+                    <p class="settings-card-note">Лист и зазоры, материалы, правила продуктов.</p>
+                    <button type="button" class="dbk-btn dbk-btn-sync" onclick="openCalcSettings()">Открыть настройки калькулятора</button>
+                </section>
+                <section class="settings-card" id="settingsPricesCard">
+                    <h3>Цены калькулятора</h3>
+                    <p class="settings-card-note">Себестоимость бумаг, печати, ламинации, операций и таблица наценок. Используется при расчёте.</p>
+                    <div id="settingsPricesHost"></div>
+                </section>
+            </div>
+        </div>
+
+        <div class="hp-tabpanel" id="setPanel-finance" hidden>
+            <div class="settings-sections">
+                <section class="settings-card">
+                    <h3>Прибыль и налог</h3>
+                    <div id="settingsProfitHost"></div>
+                </section>
+                <section class="settings-card">
+                    <h3>Шаблоны коммерческих предложений</h3>
+                    <div id="settingsKpHost"></div>
+                </section>
+            </div>
+        </div>
+
+        <div class="hp-tabpanel" id="setPanel-integrations" hidden>
+            <div class="settings-sections">
+                <section class="settings-card">
+                    <h3>Интеграция с Яндекс.Диском</h3>
+                    <div id="settingsYandexHost"></div>
+                </section>
+                <section class="settings-card">
+                    <h3>Интеграция с МоеДело</h3>
+                    <div id="settingsMoedeloHost"></div>
+                </section>
+                <section class="settings-card">
+                    <h3>Автозаполнение по ИНН (DaData)</h3>
+                    <div id="settingsDadataHost"></div>
+                </section>
+            </div>
+        </div>
+
+        <div class="hp-tabpanel" id="setPanel-notify" hidden>
+            <div class="settings-sections">
+                <section class="settings-card">
+                    <h3>Уведомления о готовности (Telegram-бот)</h3>
+                    <div id="settingsNotifyHost"></div>
+                </section>
+            </div>
+        </div>
+
+        <div class="hp-tabpanel" id="setPanel-system" hidden>
+            <div class="settings-sections">
+                <section class="settings-card" id="settingsUsersCard">
+                    <h3>Пользователи</h3>
+                    <p class="settings-card-note">Учётные записи менеджеров: вход по email и паролю, права администратора, привязка к PrintOffice.</p>
+                    <div id="settingsUsersHost"></div>
+                </section>
+                <section class="settings-card">
+                    <h3>Синхронизация «Заказы БД»</h3>
+                    <p class="settings-card-note">Обычно данные приходят автоматически (вебхуки PrintOffice). Ручная синхронизация — на случай расхождений.</p>
+                    <div class="settings-actions">
+                        <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbDeals(this)" title="Загрузить сделки из CRM в свою базу">⟳ Сделки</button>
+                        <button type="button" class="dbk-btn dbk-btn-sync" onclick="syncDbElements(this)" title="Загрузить элементы всех сделок (может занять время)">⟳ Элементы</button>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 </div>
 
-<script src="js/config.js?v=125"></script>
-<script src="js/calculator-data.js?v=125"></script>
-<script src="js/calc-settings.js?v=125"></script>
-<script src="js/calc-settings-ui.js?v=125"></script>
-<script src="js/utils.js?v=125"></script>
-<script src="js/auth.js?v=125"></script>
-<script src="js/calculator.js?v=125"></script>
-<script src="js/crm.js?v=125"></script>
-<script src="js/element-editor.js?v=125"></script>
-<script src="js/kp-docx.js?v=125"></script>
-<script src="js/calc-sheet.js?v=125"></script>
-<script src="js/clients.js?v=125"></script>
-<script src="js/orders-db.js?v=125"></script>
-<script src="js/main.js?v=125"></script>
+<script src="js/config.js?v=126"></script>
+<script src="js/calculator-data.js?v=126"></script>
+<script src="js/calc-settings.js?v=126"></script>
+<script src="js/calc-settings-ui.js?v=126"></script>
+<script src="js/utils.js?v=126"></script>
+<script src="js/auth.js?v=126"></script>
+<script src="js/calculator.js?v=126"></script>
+<script src="js/crm.js?v=126"></script>
+<script src="js/element-editor.js?v=126"></script>
+<script src="js/kp-docx.js?v=126"></script>
+<script src="js/calc-sheet.js?v=126"></script>
+<script src="js/clients.js?v=126"></script>
+<script src="js/orders-db.js?v=126"></script>
+<script src="js/main.js?v=126"></script>
 </body>
 </html>
