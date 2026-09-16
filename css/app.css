@@ -515,6 +515,7 @@
     .dbo-profit-toggle.is-open { border-color: var(--accent) !important; color: var(--accent) !important; background: var(--accent-tint, #eef4ff) !important; }
     .dbo-profit-toggle svg { width: 15px; height: 15px; }
     .dbo-profit-panel { align-self: stretch; min-width: 210px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+    .dbo-profit-panel[hidden] { display: none !important; }   /* иначе display:flex перебивает атрибут hidden */
     .dbo-profit-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; font-size: 12.5px; color: var(--text-muted); padding: 1px 0; white-space: nowrap; }
     .dbo-profit-row b { color: var(--text); font-variant-numeric: tabular-nums; }
     .dbo-profit-row.dbo-profit-total { font-weight: 700; color: var(--text); }
