@@ -4020,7 +4020,7 @@ async function renderSalaryReport() {
         const isCur = (d.year === d.curYear && m.month === d.curMonth);
         return `<tr class="${isCur ? "salary-row-cur" : ""}">
             <td>${SALARY_MONTHS[m.month - 1]}</td>
-            <td class="num">${m.deals || ""}</td>
+            <td class="num">${m.deals ? `<button type="button" class="salary-deals-link" onclick="dbOpenSalaryMonth(${m.month})" title="Разбивка по заказам">${m.deals}</button>` : ""}</td>
             <td class="num">${m.turnover ? money2(m.turnover) : "—"}</td>
             <td class="num">${m.premium ? money2(m.premium) : "—"}</td>
             <td class="num">${m.oklad ? money2(m.oklad) : "—"}</td>
@@ -4095,6 +4095,60 @@ async function dbDeleteSalaryAdj(id) {
     if (!confirm("Удалить корректировку?")) return;
     try { await clientsApi("deleteSalaryAdjustment", { id: Number(id) }); renderSalaryReport(); }
     catch (e) { console.error("deleteSalaryAdjustment", e); alert("Не удалось удалить."); }
+}
+// Разбивка премии по заказам за месяц (клик по «Заказов»).
+async function dbOpenSalaryMonth(month) {
+    let d;
+    try {
+        d = await clientsApi("getSalaryMonthDeals", { managerName: salaryState.managerName || undefined, year: salaryState.year, month });
+    } catch (e) { console.error("getSalaryMonthDeals", e); alert("Не удалось загрузить разбивку по заказам."); return; }
+    const baseLabel = { net: "Чистая", gross: "Грязная", turnover: "Оборот" }[d.method] || "База";
+    const list = Array.isArray(d.deals) ? d.deals : [];
+    const totalPrem = list.reduce((s, x) => s + x.premium, 0);
+    const rows = list.length ? list.map(x => `
+        <tr class="salary-deal-row" onclick="dbSalaryOpenDeal(${x.crmDealId})" title="Открыть заказ">
+            <td>№ ${escapeHtml(x.num)}</td>
+            <td class="salary-deal-client">${escapeHtml(x.clientName || "—")}</td>
+            <td class="num">${money2(x.turnover)}</td>
+            <td class="num">${money2(x.base)}</td>
+            <td class="num"><b>${money2(x.premium)}</b></td>
+        </tr>`).join("") : `<tr><td colspan="5" class="dbo-asset-empty">Завершённых заказов за месяц нет.</td></tr>`;
+    let ov = document.getElementById("salaryDealsOverlay");
+    if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "salaryDealsOverlay";
+        ov.className = "client-card-overlay dbo-edit-overlay";
+        ov.setAttribute("onmousedown", "overlayDown(event)");
+        ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeSalaryDeals()");
+        document.body.appendChild(ov);
+    }
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit salary-deals-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head"><h3>Премия · ${SALARY_MONTHS[month - 1]} ${d.year}${d.managerName ? " — " + escapeHtml(d.managerName) : ""}</h3>
+                <button class="dbo-close" onclick="closeSalaryDeals()" aria-label="Закрыть">×</button></div>
+            <div class="dbo-edit-body">
+                <p class="dbo-ya-hint">Премия по заказу = <b>${baseLabel}</b> × <b>${d.percent}%</b>. Клик по строке — открыть заказ.</p>
+                <div class="clients-table-wrap">
+                <table class="clients-table salary-deals-table">
+                    <thead><tr><th>Заказ</th><th>Клиент</th><th class="num">Оборот</th><th class="num">${baseLabel}</th><th class="num">Премия</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                    ${list.length ? `<tfoot><tr><td colspan="4">Итого премия · ${list.length} зак.</td><td class="num"><b>${money2(totalPrem)}</b></td></tr></tfoot>` : ""}
+                </table>
+                </div>
+            </div>
+        </div>`;
+    document.addEventListener("keydown", dbSalaryDealsEsc);
+}
+function dbSalaryDealsEsc(e) { if (e.key === "Escape") closeSalaryDeals(); }
+function closeSalaryDeals() {
+    const ov = document.getElementById("salaryDealsOverlay");
+    if (ov) ov.remove();
+    document.removeEventListener("keydown", dbSalaryDealsEsc);
+}
+function dbSalaryOpenDeal(id) {
+    closeSalaryDeals();
+    if (typeof openDbDealCard === "function") openDbDealCard(Number(id));
 }
 function salaryChangeYear(v) { salaryState.year = Number(v) || salaryState.year; renderSalaryReport(); }
 function salaryChangeManager(v) { salaryState.managerName = v; renderSalaryReport(); }
