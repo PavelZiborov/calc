@@ -603,6 +603,12 @@
     /* Прогресс поверх области превью — прямо в месте перетаскивания файла */
     .dbo-preview-overlay { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; box-sizing: border-box; background: rgba(255,255,255,0.9); }
     .dbo-preview-overlay .dbo-progress-label { flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+    /* Прогресс загрузки — В ВЕРХНЕЙ части блока (видно без прокрутки) */
+    .dbo-assets-progress { margin: 0 0 12px; }
+    /* Шиммер поверх окошка превью во время любой загрузки (в т.ч. генерации превью из PDF) */
+    .dbo-preview-box.is-loading { pointer-events: none; }
+    .dbo-preview-box.is-loading::after { content: ""; position: absolute; inset: 0; z-index: 3; background: linear-gradient(100deg, rgba(255,255,255,0) 20%, rgba(91,157,255,0.35) 45%, rgba(255,255,255,0) 70%); background-size: 220% 100%; animation: dboShimmer 1.15s linear infinite; }
+    @keyframes dboShimmer { 0% { background-position: 200% 0; } 100% { background-position: -100% 0; } }
     .dbo-layout-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .dbo-layout-add input[type="url"] { flex: 1 1 160px; min-width: 140px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
     .dbo-layout-add .dbo-btn { width: auto; margin: 0; padding: 6px 10px; font-size: 13px; cursor: pointer; }

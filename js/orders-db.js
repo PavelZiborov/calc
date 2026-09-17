@@ -3166,17 +3166,18 @@ function dboRenderEditAssets(elementId) {
 function dboAssetsInnerHtml(elementId) {
     const cached = dboAssets.get(dboAssetKey(elementId)) || { status: "loading", preview: null, layouts: [] };
     const busy = dboUploadBusy === elementId;
-    const previewBusy = busy && dboUploadTarget === "preview";
-    const layoutBusy = busy && dboUploadTarget === "layout";
     const preview = cached.preview;
     const purl = preview?.thumbUrl || preview?.url;
     // Область превью — при наличии картинки клик открывает её (лайтбокс); загрузка нового —
     // кнопкой снизу слева или перетаскиванием. Пустая — клик открывает выбор файла.
     const hasPreview = dboIsImageUrl(purl);
     let previewInner;
-    if (previewBusy) {
-        previewInner = `${hasPreview ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">` : ""}
-           <div class="dbo-preview-overlay">${dboProgressHtml(dboUploadLabel || "Загрузка…")}</div>`;
+    if (busy) {
+        // Во время любой загрузки (в т.ч. PDF-макета до генерации превью) — сразу показываем
+        // «загрузку» в самом окошке превью (шиммер + текст). Кнопки прячем.
+        previewInner = hasPreview
+            ? `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">`
+            : `<span class="dbo-asset-empty">загрузка…</span>`;
     } else if (hasPreview) {
         previewInner = `<img src="${escapeHtml(purl)}" alt="превью" referrerpolicy="no-referrer">
            <button type="button" class="dbo-asset-del dbo-preview-del" title="Удалить превью" onclick="event.stopPropagation(); dboDeletePreview(${elementId})">×</button>
@@ -3190,9 +3191,12 @@ function dboAssetsInnerHtml(elementId) {
             ? `<button type="button" class="dbo-asset-del" title="Удалить макет" onclick="dboDeleteLayout(${elementId}, ${Number(l.id)})">×</button>` : "";
         return `<div class="dbo-layout-item"><a href="${escapeHtml(l.url || "#")}" target="_blank" rel="noopener">${ic} ${escapeHtml(l.name || l.file_name || "файл")}</a>${del}</div>`;
     }).join("") || `<div class="dbo-asset-empty">макетов нет</div>`;
+    // Прогресс — В ВЕРХНЕЙ части блока (видно без прокрутки), на всю ширину.
+    const topProgress = busy ? `<div class="dbo-assets-progress">${dboProgressHtml(dboUploadLabel || "Загрузка…")}</div>` : "";
     return `
-        <div class="dbo-assets-row">
-            <div class="dbo-preview-box dbo-drop${hasPreview ? " has-img" : ""}" title="${hasPreview ? "Нажмите, чтобы открыть; перетащите изображение для замены" : "Нажмите или перетащите изображение"}"
+        ${topProgress}
+        <div class="dbo-assets-row${busy ? " is-busy" : ""}">
+            <div class="dbo-preview-box dbo-drop${hasPreview ? " has-img" : ""}${busy ? " is-loading" : ""}" title="${hasPreview ? "Нажмите, чтобы открыть; перетащите изображение для замены" : "Нажмите или перетащите изображение"}"
                  onclick="dboPreviewBoxClick(${elementId})"
                  ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropPreview(event, ${elementId})">
                 ${previewInner}
@@ -3206,7 +3210,7 @@ function dboAssetsInnerHtml(elementId) {
                     <button type="button" class="dbo-btn" onclick="dboAddLayoutLink(${elementId})">+ ссылка</button>
                     <label class="dbo-btn">📎 файл<input type="file" hidden multiple onchange="dboUploadLayout(${elementId}, this)"></label>
                 </div>
-                ${layoutBusy ? dboProgressHtml(dboUploadLabel || "Загрузка…") : `<div class="dbo-layout-drophint">Перетащите файлы макетов сюда</div>`}
+                <div class="dbo-layout-drophint">Перетащите файлы макетов сюда</div>
             </div>
         </div>`;
 }
