@@ -1617,7 +1617,8 @@ async function dbAddCalcToDeal(btn) {
         total: Number(lastCalcData.total) || 0,
         cost: Math.round(Number(lastCalcData.costTotal ?? s.totalCost ?? 0)),
         costHq: Math.round(Number(lastCalcData.costHQ ?? lastCalcData.costTotal ?? s.totalCost ?? 0)),
-        sheets: Number(lastCalcData.sra3Sheets ?? 0)
+        sheets: Number(lastCalcData.sra3Sheets ?? 0),
+        fromCalc: true   // просчёт из калькулятора → ответственный по умолчанию «Печатник»
     };
     if (btn) { btn.disabled = true; btn.textContent = "Добавляем…"; }
     try {
@@ -3195,8 +3196,8 @@ function dboAssetsInnerHtml(elementId) {
                  onclick="dboPreviewBoxClick(${elementId})"
                  ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropPreview(event, ${elementId})">
                 ${previewInner}
-                <input type="file" id="dboPreviewInput_${elementId}" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)">
             </div>
+            <input type="file" id="dboPreviewInput_${elementId}" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)">
             <div class="dbo-layouts-col dbo-drop" ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropLayout(event, ${elementId})">
                 <div class="dbo-assets-title">Макеты</div>
                 <div class="dbo-layouts-list">${layouts}</div>
@@ -3414,6 +3415,7 @@ function openSettingsPage() {
     renderMoedeloSettingsInline();
     renderDadataSettingsInline();
     renderProfitSettingsInline();
+    renderCalcResponsibleSettingsInline();
     renderNotifySettingsInline();
     renderKpSettingsInline();
     settingsSwitchTab("calc");
@@ -3918,6 +3920,54 @@ async function dboSaveProfitSettings() {
         if (typeof showReadinessToast === "function") showReadinessToast("Налог сохранён");
     } catch (e) {
         console.error("dboSaveProfitSettings", e);
+        if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
+    }
+}
+
+// ——— Настройки: ответственный по умолчанию для просчётов из калькулятора ———
+async function renderCalcResponsibleSettingsInline() {
+    const host = document.getElementById("settingsCalcRespHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let managers = [], cur = {};
+    try {
+        const [m, s] = await Promise.all([
+            clientsApi("getManagers", {}),
+            clientsApi("getCalcResponsibleSettings", {}),
+        ]);
+        managers = Array.isArray(m?.managers) ? m.managers : [];
+        cur = s || {};
+    } catch (_) {
+        host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить список менеджеров.</p>`;
+        return;
+    }
+    const selId = cur.responsibleId != null ? Number(cur.responsibleId) : null;
+    const opts = [`<option value="">— Авто: «Печатник» по имени —</option>`]
+        .concat(managers.map(m => `<option value="${m.id}"${selId === Number(m.id) ? " selected" : ""}>${escapeHtml(m.name || m.email || ("#" + m.id))}</option>`))
+        .join("");
+    const resolvedNote = cur.resolvedId
+        ? `Сейчас применяется: <b>${escapeHtml(cur.resolvedName || ("#" + cur.resolvedId))}</b>`
+        : `<b class="payment-alert">Не определён</b> — пользователь «Печатник» не найден, выберите вручную`;
+    host.innerHTML = `
+        <p class="dbo-ya-note">Кого назначать ответственным за позиции, добавленные из калькулятора («Добавить из калькулятора» в заказе). По умолчанию — пользователь «Печатник».</p>
+        <label class="dbo-edit-wide">Ответственный по умолчанию
+            <select id="calcRespSel">${opts}</select>
+        </label>
+        <p class="dbo-ya-hint">${resolvedNote}. Ручной выбор в самой позиции это не отменяет.</p>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dbSaveCalcResponsible()">Сохранить</button>
+        </div>
+        <div id="calcRespMsg" class="dbo-ya-note"></div>`;
+}
+async function dbSaveCalcResponsible() {
+    const raw = document.getElementById("calcRespSel")?.value || "";
+    const msg = document.getElementById("calcRespMsg");
+    try {
+        await clientsApi("setCalcResponsibleSettings", { responsibleId: raw === "" ? 0 : Number(raw) });
+        if (msg) { msg.textContent = "Сохранено. Новые просчёты будут назначаться этому ответственному."; msg.className = "dbo-ya-note payment-ok"; }
+        renderCalcResponsibleSettingsInline();
+    } catch (e) {
+        console.error("setCalcResponsibleSettings", e);
         if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
     }
 }

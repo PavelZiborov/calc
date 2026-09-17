@@ -583,7 +583,7 @@
     .dbo-layout-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; padding: 3px 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; }
     .dbo-layout-item a { color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .dbo-layout-item a:hover { text-decoration: underline; }
-    .dbo-asset-del { flex: 0 0 auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--danger); font-size: 16px; line-height: 1; cursor: pointer; }
+    .dbo-asset-del { flex: 0 0 auto; width: 20px; height: 20px; margin: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--danger); font-size: 16px; line-height: 1; cursor: pointer; }
     .dbo-asset-del:hover { background: var(--danger); color: #fff; }
     .dbo-preview-box .dbo-asset-del { position: absolute; top: 4px; right: 4px; bottom: auto; left: auto; width: 22px; height: 22px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 6px; z-index: 2; }
     .dbo-preview-box .dbo-asset-del:hover { background: var(--danger); }
