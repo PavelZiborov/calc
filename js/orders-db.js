@@ -3987,7 +3987,8 @@ let salaryState = { year: 0, managerName: "" };
 
 function openSalaryView(trigger) {
     if (!ensureActiveSession()) return;
-    switchTab("salary-tab", trigger || document.querySelector('.tab-btn[data-tab-target="salary-tab"]'));
+    if (typeof toggleAuthModal === "function") toggleAuthModal(false);
+    switchTab("salary-tab", trigger || null);
     renderSalaryReport();
 }
 async function renderSalaryReport() {
@@ -4003,6 +4004,7 @@ async function renderSalaryReport() {
         return;
     }
     salaryState.year = d.year;
+    salaryState._curMonth = d.curMonth;
     salaryState.managerName = d.managerName || "";
     const methodLabel = SALARY_METHOD_LABELS[d.method] || d.method;
     const years = []; for (let y = d.curYear; y >= d.curYear - 4; y--) years.push(y);
@@ -4011,6 +4013,7 @@ async function renderSalaryReport() {
         <select onchange="salaryChangeManager(this.value)">${(d.managers || []).map(n => `<option value="${escapeHtml(n)}"${n === d.managerName ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>` : "";
     const cur = d.current || null;
     const curMonthName = SALARY_MONTHS[(d.curMonth || 1) - 1];
+    const adjCell = v => v ? `<span class="${v >= 0 ? "salary-pos" : "salary-neg"}">${v >= 0 ? "+" : "−"}${money2(Math.abs(v))}</span>` : "—";
     const rows = (d.months || []).map(m => {
         const isCur = (d.year === d.curYear && m.month === d.curMonth);
         return `<tr class="${isCur ? "salary-row-cur" : ""}">
@@ -4019,10 +4022,12 @@ async function renderSalaryReport() {
             <td class="num">${m.turnover ? money2(m.turnover) : "—"}</td>
             <td class="num">${m.premium ? money2(m.premium) : "—"}</td>
             <td class="num">${m.oklad ? money2(m.oklad) : "—"}</td>
+            <td class="num">${adjCell(m.adjust || 0)}</td>
             <td class="num"><b>${m.total ? money2(m.total) : "—"}</b></td>
         </tr>`;
     }).join("");
     const yearPrem = (d.months || []).reduce((s, m) => s + m.premium, 0);
+    const yearAdj = (d.months || []).reduce((s, m) => s + (m.adjust || 0), 0);
     const yearTotal = (d.months || []).reduce((s, m) => s + m.total, 0);
     host.innerHTML = `
         <div class="salary-controls">${mgrSel}
@@ -4036,11 +4041,58 @@ async function renderSalaryReport() {
         <p class="dbo-ya-hint">Премия: <b>${methodLabel}</b> × <b>${d.percent}%</b>, начисляется при переводе заказа в «Завершено».${d.managerName ? "" : ` <span class="payment-alert">Менеджер не определён — проверьте имя пользователя.</span>`}</p>
         <div class="clients-table-wrap">
         <table class="clients-table salary-table">
-            <thead><tr><th>Месяц</th><th class="num">Заказов</th><th class="num">Оборот</th><th class="num">Премия</th><th class="num">Оклад</th><th class="num">Итого</th></tr></thead>
+            <thead><tr><th>Месяц</th><th class="num">Заказов</th><th class="num">Оборот</th><th class="num">Премия</th><th class="num">Оклад</th><th class="num">Корр.</th><th class="num">Итого</th></tr></thead>
             <tbody>${rows}</tbody>
-            <tfoot><tr><td>Итого за ${d.year}</td><td class="num"></td><td class="num"></td><td class="num">${money2(yearPrem)}</td><td class="num"></td><td class="num"><b>${money2(yearTotal)}</b></td></tr></tfoot>
+            <tfoot><tr><td>Итого за ${d.year}</td><td class="num"></td><td class="num"></td><td class="num">${money2(yearPrem)}</td><td class="num"></td><td class="num">${adjCell(yearAdj)}</td><td class="num"><b>${money2(yearTotal)}</b></td></tr></tfoot>
         </table>
-        </div>`;
+        </div>
+        ${dbSalaryAdjBlockHtml(d)}`;
+}
+// Блок ручных корректировок (бонус/штраф/аванс) под таблицей.
+const SALARY_ADJ_LABELS = { bonus: "Бонус", penalty: "Штраф", advance: "Аванс" };
+function dbSalaryAdjBlockHtml(d) {
+    const list = (d.adjustments || []).map(a => `
+        <div class="salary-adj-row">
+            <span class="salary-adj-per">${String(a.month).padStart(2, "0")}.${d.year}</span>
+            <span class="salary-adj-kind salary-adj-kind--${a.kind}">${SALARY_ADJ_LABELS[a.kind] || a.kind}</span>
+            <span class="salary-adj-amt ${a.amount >= 0 ? "salary-pos" : "salary-neg"}">${a.amount >= 0 ? "+" : "−"}${money2(Math.abs(a.amount))} ₽</span>
+            <span class="salary-adj-com">${escapeHtml(a.comment || "")}</span>
+            ${d.isAdmin ? `<button type="button" class="dbo-asset-del salary-adj-del" title="Удалить" onclick="dbDeleteSalaryAdj(${a.id})">×</button>` : ""}
+        </div>`).join("") || `<div class="dbo-asset-empty">Корректировок нет.</div>`;
+    const monthOpts = SALARY_MONTHS.map((mn, i) => `<option value="${i + 1}"${(i + 1) === d.curMonth ? " selected" : ""}>${mn}</option>`).join("");
+    const form = (d.isAdmin && d.managerName) ? `
+        <div class="salary-adj-form">
+            <select id="salaryAdjMonth" title="Месяц">${monthOpts}</select>
+            <select id="salaryAdjKind" title="Тип"><option value="bonus">Бонус (+)</option><option value="penalty">Штраф (−)</option><option value="advance">Аванс (−)</option></select>
+            <input type="text" inputmode="decimal" id="salaryAdjAmount" placeholder="Сумма, ₽" oninput="dbCleanNum(this)">
+            <input type="text" id="salaryAdjComment" placeholder="Комментарий (необязательно)">
+            <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbAddSalaryAdj()">Добавить</button>
+        </div>` : "";
+    return `<div class="salary-adj-block">
+        <div class="salary-adj-title">Ручные начисления и удержания · ${d.year}</div>
+        <p class="dbo-ya-hint">Бонус увеличивает выплату, штраф и аванс (деньги вперёд в счёт будущей зарплаты) — уменьшают. Итог месяца пересчитывается автоматически.</p>
+        ${form}
+        <div class="salary-adj-list">${list}</div>
+    </div>`;
+}
+async function dbAddSalaryAdj() {
+    const month = Number(document.getElementById("salaryAdjMonth")?.value) || (salaryState._curMonth || 1);
+    const kind = document.getElementById("salaryAdjKind")?.value || "bonus";
+    const amount = Number(String(document.getElementById("salaryAdjAmount")?.value || "").replace(",", ".")) || 0;
+    const comment = document.getElementById("salaryAdjComment")?.value || "";
+    if (!(amount > 0)) { alert("Укажите сумму больше 0."); return; }
+    if (!salaryState.managerName) { alert("Не выбран менеджер."); return; }
+    const period = `${salaryState.year}-${String(month).padStart(2, "0")}`;
+    try {
+        await clientsApi("addSalaryAdjustment", { managerName: salaryState.managerName, period, kind, amount, comment });
+        if (typeof showReadinessToast === "function") showReadinessToast("Корректировка добавлена");
+        renderSalaryReport();
+    } catch (e) { console.error("addSalaryAdjustment", e); alert("Не удалось сохранить: " + (e.message || "")); }
+}
+async function dbDeleteSalaryAdj(id) {
+    if (!confirm("Удалить корректировку?")) return;
+    try { await clientsApi("deleteSalaryAdjustment", { id: Number(id) }); renderSalaryReport(); }
+    catch (e) { console.error("deleteSalaryAdjustment", e); alert("Не удалось удалить."); }
 }
 function salaryChangeYear(v) { salaryState.year = Number(v) || salaryState.year; renderSalaryReport(); }
 function salaryChangeManager(v) { salaryState.managerName = v; renderSalaryReport(); }

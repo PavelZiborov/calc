@@ -850,6 +850,25 @@
     .salary-oklad-row:last-child { border-bottom: none; }
     .salary-oklad-name { flex: 1 1 auto; font-size: 14px; color: var(--text); }
     .salary-oklad-input { flex: 0 0 150px; width: 150px; margin: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    .salary-pos { color: #2e7d32; }
+    .salary-neg { color: var(--danger); }
+    .salary-adj-block { margin-top: 20px; }
+    .salary-adj-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .salary-adj-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 12px; }
+    .salary-adj-form select, .salary-adj-form input { width: auto; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--surface); color: var(--text); box-sizing: border-box; }
+    .salary-adj-form #salaryAdjAmount { width: 130px; }
+    .salary-adj-form #salaryAdjComment { flex: 1 1 200px; min-width: 160px; }
+    .salary-adj-form .dbo-btn { width: auto; margin: 0; }
+    .salary-adj-list { display: flex; flex-direction: column; gap: 4px; }
+    .salary-adj-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+    .salary-adj-per { flex: 0 0 auto; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .salary-adj-kind { flex: 0 0 auto; font-weight: 600; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
+    .salary-adj-kind--bonus { background: #e2f0d9; color: #375623; }
+    .salary-adj-kind--penalty { background: #fbe3e3; color: #b03434; }
+    .salary-adj-kind--advance { background: #fdf0d5; color: #8a5a00; }
+    .salary-adj-amt { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .salary-adj-com { flex: 1 1 auto; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .salary-adj-del { flex: 0 0 auto; }
     /* Страница «Настройки» */
     .settings-page { max-width: 760px; }
     .settings-head { margin-bottom: 18px; }

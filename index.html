@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=132">
+<link rel="stylesheet" href="css/app.css?v=133">
 </head>
 <body>
 
@@ -28,7 +28,6 @@
             <button class="nav-tab tab-btn legacy-n8n-hidden" id="kanban-nav-btn" data-tab-target="search-tab" onclick="openOrdersView('kanban', this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Канбан</span></button>
             <button class="nav-tab tab-btn gated-nav" id="clients-nav-btn" data-tab-target="clients-tab" onclick="openClientsView(this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></svg><span>Клиенты</span></button>
             <button class="nav-tab tab-btn gated-nav" id="db-orders-nav-btn" data-tab-target="db-orders-tab" onclick="openDbOrders(this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l6 0"/><path d="M14 4l6 0"/><path d="M4 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -8"/><path d="M14 10a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2l0 -2"/></svg><span>Заказы БД</span></button>
-            <button class="nav-tab tab-btn gated-nav" id="salary-nav-btn" data-tab-target="salary-tab" onclick="openSalaryView(this)" style="display:none;"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"/><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4"/></svg><span>Зарплата</span></button>
         </nav>
         <div class="app-brand-actions">
             <button type="button" class="nav-newquote-btn" disabled title="Раздел в разработке" aria-label="Новый расчёт (скоро)"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg><span>New Quote</span></button>
@@ -50,7 +49,7 @@
                 <div id="user-display-name" class="auth-user-name">Режим просмотра</div>
             </div>
             <button type="button" id="calcSettingsBtn" class="auth-settings-btn" style="display:none;" onclick="openSettingsPage()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>Настройки</button>
-            <button type="button" id="usersBtn" class="auth-settings-btn" style="display:none;" onclick="openUsersPage()">Пользователи</button>
+            <button type="button" id="salaryBtn" class="auth-settings-btn" style="display:none;" onclick="openSalaryView()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"/><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4"/></svg>Премия</button>
             <button type="button" id="changePassBtn" class="auth-settings-btn" onclick="openChangePassword()">Сменить пароль</button>
             <button type="button" id="logoutBtn" class="auth-logout-btn" onclick="logout()">Выйти</button>
         </div>
@@ -425,7 +424,7 @@
                     <div id="settingsProfitHost"></div>
                 </section>
                 <section class="settings-card">
-                    <h3>Зарплата менеджеров</h3>
+                    <h3>Премия менеджеров</h3>
                     <div id="settingsSalaryHost"></div>
                 </section>
                 <section class="settings-card">
@@ -484,26 +483,26 @@
 <div id="salary-tab" class="tab-content">
     <div class="container settings-page">
         <div class="settings-head">
-            <h2>Зарплата</h2>
-            <p class="settings-sub">Оклад + премия с завершённых заказов. Премия — % от прибыли/оборота за календарный месяц.</p>
+            <h2>Премия</h2>
+            <p class="settings-sub">Оклад + премия с завершённых заказов и ручные корректировки. Премия — % от прибыли/оборота за календарный месяц.</p>
         </div>
         <div id="salaryHost"><p class="dbo-ya-note">Загрузка…</p></div>
     </div>
 </div>
 
-<script src="js/config.js?v=132"></script>
-<script src="js/calculator-data.js?v=132"></script>
-<script src="js/calc-settings.js?v=132"></script>
-<script src="js/calc-settings-ui.js?v=132"></script>
-<script src="js/utils.js?v=132"></script>
-<script src="js/auth.js?v=132"></script>
-<script src="js/calculator.js?v=132"></script>
-<script src="js/crm.js?v=132"></script>
-<script src="js/element-editor.js?v=132"></script>
-<script src="js/kp-docx.js?v=132"></script>
-<script src="js/calc-sheet.js?v=132"></script>
-<script src="js/clients.js?v=132"></script>
-<script src="js/orders-db.js?v=132"></script>
-<script src="js/main.js?v=132"></script>
+<script src="js/config.js?v=133"></script>
+<script src="js/calculator-data.js?v=133"></script>
+<script src="js/calc-settings.js?v=133"></script>
+<script src="js/calc-settings-ui.js?v=133"></script>
+<script src="js/utils.js?v=133"></script>
+<script src="js/auth.js?v=133"></script>
+<script src="js/calculator.js?v=133"></script>
+<script src="js/crm.js?v=133"></script>
+<script src="js/element-editor.js?v=133"></script>
+<script src="js/kp-docx.js?v=133"></script>
+<script src="js/calc-sheet.js?v=133"></script>
+<script src="js/clients.js?v=133"></script>
+<script src="js/orders-db.js?v=133"></script>
+<script src="js/main.js?v=133"></script>
 </body>
 </html>

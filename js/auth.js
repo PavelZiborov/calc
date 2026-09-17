@@ -15,8 +15,8 @@ function updateAuthModalUi() {
     if (loginPanel) loginPanel.hidden = loggedIn;
 
     const isAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
-    const usersBtn = document.getElementById("usersBtn");
     const settingsBtn = document.getElementById("calcSettingsBtn");
+    const salaryBtn = document.getElementById("salaryBtn");
 
     if (loggedIn) {
         if (badge) {
@@ -30,12 +30,12 @@ function updateAuthModalUi() {
             authBtn.classList.add("is-logged-in");
             authBtn.title = currentUser.login || "Аккаунт";
         }
-        // Управление пользователями и настройки калькулятора — только админам.
-        if (usersBtn) usersBtn.style.display = isAdmin ? "" : "none";
+        // Настройки — только админам; «Премия» — всем сотрудникам (свою видят все).
         if (settingsBtn) settingsBtn.style.display = isAdmin ? "" : "none";
+        if (salaryBtn) salaryBtn.style.display = currentUser.role === "staff" ? "" : "none";
     } else {
-        if (usersBtn) usersBtn.style.display = "none";
         if (settingsBtn) settingsBtn.style.display = "none";
+        if (salaryBtn) salaryBtn.style.display = "none";
         if (badge) {
             badge.innerText = "ГОСТЬ";
             badge.className = "auth-role-badge auth-role-badge--guest";
