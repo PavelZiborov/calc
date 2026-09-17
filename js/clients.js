@@ -517,7 +517,7 @@ function ccRenderDocs(data) {
         : `<div class="dbo-asset-empty">Пока нет сформированных документов.</div>`;
 
     host.innerHTML = `
-        ${isAdmin ? `<div class="cc-doc-templates">${adminTpl("contract", "Договор")}${adminTpl("appendix", "Приложение")}</div>` : ""}
+        <div class="cc-doc-templates">${adminTpl("contract", "Договор")}${adminTpl("appendix", "Приложение")}</div>
         ${canGen ? `
         <div class="cc-doc-gen">
             ${reqSel}

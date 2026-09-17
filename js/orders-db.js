@@ -1299,19 +1299,22 @@ function dbRespRender() {
     if (!dbEditRespOptions.length) {
         menu.innerHTML = `<div class="dbo-resp-empty">Список менеджеров пуст. Добавьте пользователей с привязкой к PrintOffice в разделе «Пользователи».</div>`;
     } else {
-        menu.innerHTML = dbEditRespOptions.map(o => `
-            <label class="dbo-resp-opt">
-                <input type="checkbox" value="${o.id}"${dbEditRespSelected.has(o.id) ? " checked" : ""} onchange="dbRespToggle(${o.id}, this.checked)">
-                <span>${escapeHtml(o.name)}</span>
-            </label>`).join("");
+        // Список как у единиц измерения: строки-опции; выбранные помечены галочкой (мультивыбор).
+        menu.innerHTML = dbEditRespOptions.map(o => {
+            const sel = dbEditRespSelected.has(o.id);
+            return `<button type="button" class="dbo-resp-opt${sel ? " is-sel" : ""}" onclick="dbRespToggle(${o.id})">
+                <span class="dbo-resp-check">${sel ? "✓" : ""}</span><span class="dbo-resp-name">${escapeHtml(o.name)}</span>
+            </button>`;
+        }).join("");
     }
     const names = dbEditRespOptions.filter(o => dbEditRespSelected.has(o.id)).map(o => o.name);
     txt.textContent = names.length ? names.join(", ") : "Не назначен";
 }
-function dbRespToggle(id, checked) {
-    if (checked) dbEditRespSelected.add(Number(id));
-    else dbEditRespSelected.delete(Number(id));
-    dbRespRender();
+function dbRespToggle(id) {
+    id = Number(id);
+    if (dbEditRespSelected.has(id)) dbEditRespSelected.delete(id);
+    else dbEditRespSelected.add(id);
+    dbRespRender();   // меню остаётся открытым — мультивыбор
 }
 function dbToggleResp(e) {
     if (e) e.stopPropagation();
@@ -3420,6 +3423,7 @@ function openSettingsPage() {
     renderDadataSettingsInline();
     renderProfitSettingsInline();
     renderCalcResponsibleSettingsInline();
+    renderSalarySettingsInline();
     renderNotifySettingsInline();
     renderKpSettingsInline();
     settingsSwitchTab("calc");
@@ -3972,6 +3976,119 @@ async function dbSaveCalcResponsible() {
         renderCalcResponsibleSettingsInline();
     } catch (e) {
         console.error("setCalcResponsibleSettings", e);
+        if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
+    }
+}
+
+// ==================== Зарплата менеджеров ====================
+const SALARY_METHOD_LABELS = { net: "% от чистой прибыли", gross: "% от грязной прибыли", turnover: "% от оборота" };
+const SALARY_MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+let salaryState = { year: 0, managerName: "" };
+
+function openSalaryView(trigger) {
+    if (!ensureActiveSession()) return;
+    switchTab("salary-tab", trigger || document.querySelector('.tab-btn[data-tab-target="salary-tab"]'));
+    renderSalaryReport();
+}
+async function renderSalaryReport() {
+    const host = document.getElementById("salaryHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let d;
+    try {
+        d = await clientsApi("getSalaryReport", { year: salaryState.year || undefined, managerName: salaryState.managerName || undefined });
+    } catch (e) {
+        console.error("getSalaryReport", e);
+        host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить отчёт по зарплате.</p>`;
+        return;
+    }
+    salaryState.year = d.year;
+    salaryState.managerName = d.managerName || "";
+    const methodLabel = SALARY_METHOD_LABELS[d.method] || d.method;
+    const years = []; for (let y = d.curYear; y >= d.curYear - 4; y--) years.push(y);
+    const yearOpts = years.map(y => `<option value="${y}"${y === d.year ? " selected" : ""}>${y}</option>`).join("");
+    const mgrSel = d.isAdmin ? `<label class="salary-ctl">Менеджер
+        <select onchange="salaryChangeManager(this.value)">${(d.managers || []).map(n => `<option value="${escapeHtml(n)}"${n === d.managerName ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>` : "";
+    const cur = d.current || null;
+    const curMonthName = SALARY_MONTHS[(d.curMonth || 1) - 1];
+    const rows = (d.months || []).map(m => {
+        const isCur = (d.year === d.curYear && m.month === d.curMonth);
+        return `<tr class="${isCur ? "salary-row-cur" : ""}">
+            <td>${SALARY_MONTHS[m.month - 1]}</td>
+            <td class="num">${m.deals || ""}</td>
+            <td class="num">${m.turnover ? money2(m.turnover) : "—"}</td>
+            <td class="num">${m.premium ? money2(m.premium) : "—"}</td>
+            <td class="num">${m.oklad ? money2(m.oklad) : "—"}</td>
+            <td class="num"><b>${m.total ? money2(m.total) : "—"}</b></td>
+        </tr>`;
+    }).join("");
+    const yearPrem = (d.months || []).reduce((s, m) => s + m.premium, 0);
+    const yearTotal = (d.months || []).reduce((s, m) => s + m.total, 0);
+    host.innerHTML = `
+        <div class="salary-controls">${mgrSel}
+            <label class="salary-ctl">Год <select onchange="salaryChangeYear(this.value)">${yearOpts}</select></label>
+        </div>
+        <div class="salary-cards">
+            <div class="salary-card"><span class="salary-card-label">Текущая премия · ${curMonthName}</span><span class="salary-card-value">${money2(cur ? cur.premium : 0)} ₽</span></div>
+            <div class="salary-card"><span class="salary-card-label">Оклад</span><span class="salary-card-value">${money2(d.baseSalary)} ₽</span></div>
+            <div class="salary-card salary-card--accent"><span class="salary-card-label">К выплате · ${curMonthName}</span><span class="salary-card-value">${money2(cur ? cur.total : d.baseSalary)} ₽</span></div>
+        </div>
+        <p class="dbo-ya-hint">Премия: <b>${methodLabel}</b> × <b>${d.percent}%</b>, начисляется при переводе заказа в «Завершено».${d.managerName ? "" : ` <span class="payment-alert">Менеджер не определён — проверьте имя пользователя.</span>`}</p>
+        <div class="clients-table-wrap">
+        <table class="clients-table salary-table">
+            <thead><tr><th>Месяц</th><th class="num">Заказов</th><th class="num">Оборот</th><th class="num">Премия</th><th class="num">Оклад</th><th class="num">Итого</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr><td>Итого за ${d.year}</td><td class="num"></td><td class="num"></td><td class="num">${money2(yearPrem)}</td><td class="num"></td><td class="num"><b>${money2(yearTotal)}</b></td></tr></tfoot>
+        </table>
+        </div>`;
+}
+function salaryChangeYear(v) { salaryState.year = Number(v) || salaryState.year; renderSalaryReport(); }
+function salaryChangeManager(v) { salaryState.managerName = v; renderSalaryReport(); }
+
+// ——— Настройки: формула зарплаты + оклады (только админ) ———
+async function renderSalarySettingsInline() {
+    const host = document.getElementById("settingsSalaryHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let s;
+    try { s = await clientsApi("getSalarySettings", {}); }
+    catch (e) { host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить настройки зарплаты.</p>`; return; }
+    if (!s.isAdmin) { host.innerHTML = `<p class="dbo-ya-note">Формулу зарплаты и оклады настраивает администратор. Свою зарплату смотрите в разделе «Зарплата».</p>`; return; }
+    const opt = (v, l) => `<option value="${v}"${s.method === v ? " selected" : ""}>${l}</option>`;
+    const mgrRows = (s.managers || []).map(m => `
+        <div class="salary-oklad-row" data-cid="${m.crmUserId}">
+            <span class="salary-oklad-name">${escapeHtml(m.name)}</span>
+            <input type="text" inputmode="decimal" class="salary-oklad-input" value="${Number(m.baseSalary) || 0}" oninput="dbCleanNum(this)">
+        </div>`).join("") || `<p class="dbo-ya-note">Менеджеров нет.</p>`;
+    host.innerHTML = `
+        <p class="dbo-ya-note">Премия = процент от базы за календарный месяц (по завершённым заказам). Плюс фиксированный оклад у каждого менеджера.</p>
+        <div class="salary-set-row">
+            <label class="dbo-edit-wide">Считать премию как
+                <select id="salaryMethodSel">${opt("net", "% от чистой прибыли")}${opt("gross", "% от грязной прибыли")}${opt("turnover", "% от оборота")}</select>
+            </label>
+            <label class="dbo-edit-wide">Процент премии, %
+                <input type="text" inputmode="decimal" id="salaryPercentInp" value="${s.percent}" oninput="dbCleanNum(this)">
+            </label>
+        </div>
+        <div class="salary-oklad-head">Оклад по менеджерам, ₽/мес</div>
+        <div id="salaryOkladList">${mgrRows}</div>
+        <div class="settings-actions"><button class="dbo-btn dbo-btn-primary" onclick="dbSaveSalarySettings()">Сохранить</button></div>
+        <div id="salarySetMsg" class="dbo-ya-note"></div>`;
+}
+async function dbSaveSalarySettings() {
+    const method = document.getElementById("salaryMethodSel")?.value || "net";
+    const percent = Number(String(document.getElementById("salaryPercentInp")?.value || "").replace(",", ".")) || 0;
+    const baseSalaries = Array.from(document.querySelectorAll("#salaryOkladList .salary-oklad-row")).map(r => ({
+        crmUserId: Number(r.dataset.cid),
+        baseSalary: Number(String(r.querySelector(".salary-oklad-input")?.value || "").replace(",", ".")) || 0
+    }));
+    const msg = document.getElementById("salarySetMsg");
+    try {
+        await clientsApi("setSalarySettings", { method, percent, baseSalaries });
+        if (msg) { msg.textContent = "Сохранено. Расчёт зарплаты обновлён."; msg.className = "dbo-ya-note payment-ok"; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Настройки зарплаты сохранены");
+    } catch (e) {
+        console.error("setSalarySettings", e);
         if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
     }
 }
