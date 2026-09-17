@@ -653,6 +653,15 @@
     .cp-section-head h4 { margin: 0; font-size: 14px; color: var(--text); }
     .cp-row { display: grid; grid-template-columns: 1.3fr 2fr 0.8fr 28px; gap: 6px; align-items: center; margin-bottom: 5px; }
     .cp-row--markup { grid-template-columns: 1fr 1fr 28px; }
+    /* Бумага: ID · Название · ₽ · лист Ш×В · HQ · удалить */
+    .cp-row--paper { grid-template-columns: 1.1fr 1.8fr 0.7fr 54px 12px 54px 48px 28px; }
+    .cp-x { text-align: center; color: var(--text-muted); font-size: 12px; }
+    .cp-hq { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    .cp-hq input { width: auto !important; margin: 0; }
+    @media (max-width: 720px) {
+        .cp-row--paper { min-width: 560px; }
+        .cp-section { overflow-x: auto; }
+    }
     .cp-row--head { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
     .cp-row--head span { padding: 0 4px; }
     .cp-row input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--surface); color: var(--text); box-sizing: border-box; }

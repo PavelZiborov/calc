@@ -3669,11 +3669,17 @@ async function renderCalcPricesSettingsInline() {
     dbRenderPricesEditor();
 }
 function dbMatRowsHtml(list, kind) {
+    const isPaper = kind === "papers";
     return (list || []).map((x, i) => `
-        <div class="cp-row" data-kind="${kind}" data-i="${i}">
+        <div class="cp-row${isPaper ? " cp-row--paper" : ""}" data-kind="${kind}" data-i="${i}">
             <input class="cp-id" value="${escapeHtml(x.ID || "")}" placeholder="ID" title="ID — должен совпадать с калькулятором">
             <input class="cp-name" value="${escapeHtml(x.Name || "")}" placeholder="Название">
             <input class="cp-price" type="text" inputmode="decimal" value="${Number(x.Price) || 0}" oninput="dbCleanNum(this)" placeholder="₽">
+            ${isPaper ? `
+            <input class="cp-sw" type="text" inputmode="numeric" value="${Number(x.sheetW) > 0 ? Number(x.sheetW) : 320}" oninput="dbCleanNum(this)" placeholder="Ш" title="Ширина печатного листа, мм">
+            <span class="cp-x">×</span>
+            <input class="cp-sh" type="text" inputmode="numeric" value="${Number(x.sheetH) > 0 ? Number(x.sheetH) : 450}" oninput="dbCleanNum(this)" placeholder="В" title="Высота печатного листа, мм">
+            <label class="cp-hq" title="Бумага не учитывается в себестоимости HQ (покупается отдельно)"><input type="checkbox" class="cp-hq-cb" ${x.hq ? "checked" : ""}> HQ</label>` : ""}
             <input type="hidden" class="cp-cat" value="${escapeHtml(x.Category || "")}">
             <button type="button" class="cp-del" title="Удалить" onclick="dbPricesDelRow('${kind}', ${i})">×</button>
         </div>`).join("");
@@ -3697,13 +3703,14 @@ function dbRenderPricesEditor() {
     const section = (title, kind, list, head) => `
         <div class="cp-section">
             <div class="cp-section-head"><h4>${title}</h4><button type="button" class="dbo-btn dbo-btn-sm" onclick="dbPricesAddRow('${kind}')">+ строка</button></div>
-            <div class="cp-row cp-row--head">${head}</div>
+            <div class="cp-row cp-row--head${kind === "papers" ? " cp-row--paper" : ""}">${head}</div>
             <div id="cp-${kind}">${dbMatRowsHtml(list, kind)}</div>
         </div>`;
     const matHead = `<span>ID</span><span>Название</span><span>₽/лист</span><span></span>`;
+    const paperHead = `<span>ID</span><span>Название</span><span>₽/лист</span><span>Лист Ш×В, мм</span><span></span><span></span><span>HQ</span><span></span>`;
     host.innerHTML = `
-        <p class="dbo-ya-hint">Цена бумаги/печати/ламинации — за печатный лист SRA3. ID менять только вместе с калькулятором.</p>
-        ${section("Бумага", "papers", d.papers, matHead)}
+        <p class="dbo-ya-hint">Цена бумаги/печати/ламинации — за печатный лист SRA3. У бумаги задаются размер печатного листа (Ш×В) и флаг HQ. ID менять только вместе с калькулятором.</p>
+        ${section("Бумага", "papers", d.papers, paperHead)}
         ${section("Печать", "printing", d.printing, matHead)}
         ${section("Ламинация", "lamination", d.lamination, matHead)}
         <div class="cp-section">
@@ -3728,6 +3735,12 @@ function dbPricesCollectFromDom() {
     const readMat = kind => Array.from(document.querySelectorAll(`#cp-${kind} .cp-row`)).map(r => {
         const o = { ID: r.querySelector(".cp-id").value.trim(), Name: r.querySelector(".cp-name").value.trim(), Price: num(r.querySelector(".cp-price").value) };
         const cat = r.querySelector(".cp-cat")?.value.trim(); if (cat) o.Category = cat;
+        if (kind === "papers") {
+            const sw = num(r.querySelector(".cp-sw")?.value), sh = num(r.querySelector(".cp-sh")?.value);
+            o.sheetW = sw > 0 ? sw : 320;
+            o.sheetH = sh > 0 ? sh : 450;
+            o.hq = !!r.querySelector(".cp-hq-cb")?.checked;
+        }
         return o;
     });
     calcPricesDraft.papers = readMat("papers");
@@ -3743,7 +3756,7 @@ function dbPricesCollectFromDom() {
 function dbPricesAddRow(kind) {
     dbPricesCollectFromDom();
     calcPricesDraft[kind] = calcPricesDraft[kind] || [];
-    calcPricesDraft[kind].push({ ID: "", Name: "", Price: 0 });
+    calcPricesDraft[kind].push(kind === "papers" ? { ID: "", Name: "", Price: 0, sheetW: 320, sheetH: 450, hq: false } : { ID: "", Name: "", Price: 0 });
     dbRenderPricesEditor();
 }
 function dbPricesDelRow(kind, i) {
@@ -3771,7 +3784,9 @@ async function dbSaveCalcPrices() {
     try {
         const data = await clientsApi("saveCalcPrices", { prices: calcPricesDraft });
         if (data?.prices) calcPricesDraft = data.prices;
-        if (msg) { msg.textContent = "Цены сохранены. Новый расчёт уже использует их."; msg.className = "dbo-ya-note payment-ok"; }
+        // Обновляем материалы калькулятора (списки/размеры/HQ берутся из прайса).
+        if (typeof setCalcPricesForSettings === "function" && data?.prices) setCalcPricesForSettings(data.prices);
+        if (msg) { msg.textContent = "Сохранено. Калькулятор уже использует новые цены и характеристики."; msg.className = "dbo-ya-note payment-ok"; }
         if (typeof showReadinessToast === "function") showReadinessToast("Цены калькулятора сохранены");
     } catch (e) {
         console.error("saveCalcPrices", e);

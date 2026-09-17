@@ -23,6 +23,44 @@ const CALC_STICKER_PRODUCTS = ["Наклейка", "Стикерпак"];
 
 let calcSettings = null; // кэш активных настроек
 
+// ЕДИНЫЙ ИСТОЧНИК материалов — серверный прайс (calc_prices). Когда он загружен
+// (для staff), список бумаг/цветности/ламинации + размер листа + флаг HQ берутся
+// ОТСЮДА, а не из локальных массивов calculator-data.js. Правка — в «Цены калькулятора».
+let calcPricesData = null;
+
+// Прайс → материалы в формате настроек (id/name/sheetW/sheetH/hqExcluded).
+function _materialsFromPrices() {
+    if (!calcPricesData) return null;
+    const papers = (calcPricesData.papers || []).map(p => ({
+        id: p.ID, name: p.Name,
+        sheetW: Number(p.sheetW) > 0 ? Number(p.sheetW) : 320,
+        sheetH: Number(p.sheetH) > 0 ? Number(p.sheetH) : 450,
+        hqExcluded: !!p.hq,
+    })).filter(p => p.id);
+    const colors = (calcPricesData.printing || []).map(p => ({ id: p.ID, name: p.Name })).filter(c => c.id);
+    const laminations = (calcPricesData.lamination || []).map(p => ({ id: p.ID, name: p.Name })).filter(l => l.id);
+    return { papers, colors, laminations };
+}
+
+// Подставить прайс как источник материалов и пересобрать настройки/выпадашки.
+function setCalcPricesForSettings(prices) {
+    calcPricesData = prices || null;
+    calcSettings = null;              // сброс кэша → пересборка с материалами из прайса
+    getCalcSettings();
+    applyCalcSettings();
+    if (typeof updateType === "function") { try { updateType(); } catch (_) {} }
+}
+
+// Загрузить прайс с сервера (staff) и сделать его источником материалов.
+async function refreshCalcMaterials() {
+    try {
+        if (typeof currentUser === "undefined" || !currentUser || currentUser.role !== "staff") return;
+        if (typeof clientsApi !== "function") return;
+        const data = await clientsApi("getCalcPrices", {});
+        if (data && data.prices) setCalcPricesForSettings(data.prices);
+    } catch (_) { /* гость/ошибка — остаёмся на дефолтных материалах */ }
+}
+
 function _idsOf(pairs) {
     return (pairs || []).map(p => p[1]);
 }
@@ -90,18 +128,29 @@ function defaultCalcSettings() {
 // Аккуратно слить сохранённое с дефолтом (чтобы новые поля не терялись)
 function mergeCalcSettings(saved) {
     const def = defaultCalcSettings();
-    if (!saved || typeof saved !== "object") return def;
-    const out = {
-        version: def.version,
-        sheet: { ...def.sheet, ...(saved.sheet || {}) },
-        materials: {
-            papers: Array.isArray(saved.materials?.papers) ? saved.materials.papers : def.materials.papers,
-            colors: Array.isArray(saved.materials?.colors) ? saved.materials.colors : def.materials.colors,
-            laminations: Array.isArray(saved.materials?.laminations) ? saved.materials.laminations : def.materials.laminations,
-            postpress: Array.isArray(saved.materials?.postpress) ? saved.materials.postpress : def.materials.postpress,
-        },
-        productRules: { ...def.productRules, ...(saved.productRules || {}) },
-    };
+    let out;
+    if (!saved || typeof saved !== "object") {
+        out = def;
+    } else {
+        out = {
+            version: def.version,
+            sheet: { ...def.sheet, ...(saved.sheet || {}) },
+            materials: {
+                papers: Array.isArray(saved.materials?.papers) ? saved.materials.papers : def.materials.papers,
+                colors: Array.isArray(saved.materials?.colors) ? saved.materials.colors : def.materials.colors,
+                laminations: Array.isArray(saved.materials?.laminations) ? saved.materials.laminations : def.materials.laminations,
+                postpress: Array.isArray(saved.materials?.postpress) ? saved.materials.postpress : def.materials.postpress,
+            },
+            productRules: { ...def.productRules, ...(saved.productRules || {}) },
+        };
+    }
+    // Если загружен серверный прайс — он единый источник списков материалов.
+    const mp = _materialsFromPrices();
+    if (mp) {
+        if (mp.papers.length) out.materials.papers = mp.papers;
+        if (mp.colors.length) out.materials.colors = mp.colors;
+        if (mp.laminations.length) out.materials.laminations = mp.laminations;
+    }
     return out;
 }
 

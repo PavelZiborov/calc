@@ -24,6 +24,8 @@ window.onload = () => {
     renderCalendar();
     validateStoredSessionOnLoad();
     applyPermissions();
+    // Материалы калькулятора (бумага/цветность/ламинация + размер листа + HQ) — из прайса (staff).
+    if (typeof refreshCalcMaterials === "function") refreshCalcMaterials();
     if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
     if (typeof restoreAdvSearchUiState === "function") restoreAdvSearchUiState();
     if (typeof initCrmViewToggle === "function") initCrmViewToggle();

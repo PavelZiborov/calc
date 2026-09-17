@@ -54,12 +54,10 @@ function renderCalcSettingsModal() {
         </div>
         <div class="cs-tabs" role="tablist">
           <button type="button" class="cs-tab ${csActiveTab==='sheet'?'is-active':''}" data-tab="sheet" onclick="csSwitchTab('sheet')">Лист и зазоры</button>
-          <button type="button" class="cs-tab ${csActiveTab==='materials'?'is-active':''}" data-tab="materials" onclick="csSwitchTab('materials')">Материалы</button>
           <button type="button" class="cs-tab ${csActiveTab==='products'?'is-active':''}" data-tab="products" onclick="csSwitchTab('products')">Продукты</button>
         </div>
         <div class="cs-body">
           <div class="cs-pane" data-pane="sheet" ${csActiveTab==='sheet'?'':'hidden'}>${renderCsSheetPane(d)}</div>
-          <div class="cs-pane" data-pane="materials" ${csActiveTab==='materials'?'':'hidden'}>${renderCsMaterialsPane(d)}</div>
           <div class="cs-pane" data-pane="products" ${csActiveTab==='products'?'':'hidden'}>${renderCsProductsPane(d)}</div>
         </div>
         <div class="cs-foot">
@@ -77,7 +75,7 @@ function renderCsSheetPane(d) {
         <input type="number" min="1" step="1" value="${_csEsc(d.sheet[key])}" onchange="csSheetChange('${key}', this.value)">
       </label>`;
     return `
-      <p class="cs-note">Отступы и размер листа по умолчанию. Свой размер листа для каждой бумаги задаётся в «Материалы → Бумаги» — эти поля используются как значение по умолчанию.</p>
+      <p class="cs-note">Отступы и размер листа по умолчанию. Список бумаг, их цены, размер печатного листа и флаг HQ теперь задаются в разделе «Настройки → Калькулятор → Цены калькулятора». Эти поля — значения по умолчанию, если у бумаги размер не указан.</p>
       <div class="cs-grid2">
         ${f("Ширина листа по умолч., мм", "width")}
         ${f("Высота листа по умолч., мм", "height")}

@@ -102,6 +102,7 @@ async function attemptLogin(event) {
             toggleAuthModal(false);
             applyPermissions();
             if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
+            if (typeof refreshCalcMaterials === "function") refreshCalcMaterials();
         } else if (errorDiv) {
             errorDiv.innerText = data?.error || "Неверный email или пароль";
         }
