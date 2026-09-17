@@ -4009,8 +4009,10 @@ async function renderSalaryReport() {
     const methodLabel = SALARY_METHOD_LABELS[d.method] || d.method;
     const years = []; for (let y = d.curYear; y >= d.curYear - 4; y--) years.push(y);
     const yearOpts = years.map(y => `<option value="${y}"${y === d.year ? " selected" : ""}>${y}</option>`).join("");
+    const mgrList = (d.managers || []).slice();
+    if (d.managerName && !mgrList.includes(d.managerName)) mgrList.unshift(d.managerName);
     const mgrSel = d.isAdmin ? `<label class="salary-ctl">Менеджер
-        <select onchange="salaryChangeManager(this.value)">${(d.managers || []).map(n => `<option value="${escapeHtml(n)}"${n === d.managerName ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>` : "";
+        <select onchange="salaryChangeManager(this.value)">${mgrList.map(n => `<option value="${escapeHtml(n)}"${n === d.managerName ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>` : "";
     const cur = d.current || null;
     const curMonthName = SALARY_MONTHS[(d.curMonth || 1) - 1];
     const adjCell = v => v ? `<span class="${v >= 0 ? "salary-pos" : "salary-neg"}">${v >= 0 ? "+" : "−"}${money2(Math.abs(v))}</span>` : "—";
