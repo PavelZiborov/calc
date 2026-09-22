@@ -364,6 +364,9 @@
     .cc-cp-row input { flex: 1 1 auto; min-width: 0; margin: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; box-sizing: border-box; }
     .cc-cp-row .cc-cp-name { flex: 1 1 30%; }
     .cc-cp-row .dbo-btn { width: auto; margin: 0; flex: 0 0 auto; }
+    .cc-cp-readonly-head { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 12px 0 6px; }
+    .cc-cp-ro { font-size: 13px; color: var(--text-muted); padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .cc-cp-ro:last-child { border-bottom: 0; }
     .cc-edit-addperson { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
     .cc-edit-addperson input { flex: 1 1 auto; min-width: 0; margin: 0; padding: 7px 9px; border: 1px dashed var(--border); border-radius: 7px; font-size: 13px; box-sizing: border-box; }
     .cc-edit-addperson .dbo-btn { width: auto; margin: 0; flex: 0 0 auto; }

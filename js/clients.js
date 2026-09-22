@@ -493,7 +493,8 @@ function ccOpenEditClient() {
                     <span id="ccEdMsg" class="dbo-ya-note"></span>
                 </div>
                 <div class="cc-edit-persons">
-                    <div class="cc-edit-persons-head">Контактные лица (PrintOffice)</div>
+                    <div class="cc-edit-persons-head">Дополнительные контакты</div>
+                    <p class="cc-hint" style="margin:0 0 8px;">Показываются в карточке и в дропдауне уведомлений о готовности. Хранятся в нашей базе (API PrintOffice не позволяет записывать доп. контактные лица).</p>
                     <div id="ccEditContacts"></div>
                     <div class="cc-edit-addperson">
                         <input type="text" id="ccNewCpName" placeholder="Имя">
@@ -513,19 +514,33 @@ function closeCcEdit() { const ov = document.getElementById("ccEditOverlay"); if
 function ccRenderEditContacts() {
     const host = document.getElementById("ccEditContacts");
     if (!host) return;
-    // Только реальные контактные лица PrintOffice (source='crm' с crmRef). Главный контакт — в полях выше.
-    const persons = (ccCardState.contacts || []).filter(c => c.source === "crm" && c.crmRef);
-    if (!persons.length) { host.innerHTML = `<p class="dbo-ya-note">Дополнительных контактных лиц нет.</p>`; return; }
-    host.innerHTML = persons.map(p => {
-        const ref = escapeHtml(String(p.crmRef));
-        return `<div class="cc-cp-row" data-ref="${ref}">
+    const all = ccCardState.contacts || [];
+    // Редактируемые доп. контакты — наша книга (source='manual'). Главный контакт — в полях выше.
+    const editable = all.filter(c => c.source === "manual" && c.contactId != null);
+    // Контактные лица из PrintOffice — только для чтения (их API не даёт менять).
+    const crmPersons = all.filter(c => c.source === "crm");
+    let html = "";
+    if (editable.length) {
+        html += editable.map(p => {
+            const cid = Number(p.contactId);
+            return `<div class="cc-cp-row" data-cid="${cid}">
             <input type="text" class="cc-cp-name" value="${escapeHtml(p.name || "")}" placeholder="Имя">
             <input type="text" class="cc-cp-phone" value="${escapeHtml(p.phone || "")}" placeholder="Телефон">
             <input type="text" class="cc-cp-email" value="${escapeHtml(p.email || "")}" placeholder="Email">
-            <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccUpdateContactPerson('${ref}', this)">Сохранить</button>
-            <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="ccDeleteContactPerson('${ref}', this)">×</button>
+            <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccUpdateContactPerson(${cid}, this)">Сохранить</button>
+            <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="ccDeleteContactPerson(${cid}, this)">×</button>
         </div>`;
-    }).join("");
+        }).join("");
+    } else {
+        html += `<p class="dbo-ya-note">Дополнительных контактов нет.</p>`;
+    }
+    if (crmPersons.length) {
+        html += `<div class="cc-cp-readonly-head">Из PrintOffice (только просмотр)</div>` + crmPersons.map(p => {
+            const reach = [p.phone, p.email].filter(Boolean).map(escapeHtml).join(" · ");
+            return `<div class="cc-cp-ro"><b>${escapeHtml(p.name || "—")}</b>${p.position ? " · " + escapeHtml(p.position) : ""}${reach ? " — " + reach : ""}</div>`;
+        }).join("");
+    }
+    host.innerHTML = html;
 }
 async function ccSaveClientEdit() {
     const val = id => document.getElementById(id)?.value.trim() || "";
@@ -560,12 +575,12 @@ async function ccAddContactPerson(btn) {
         const data = await clientsApi("addClientContact", { crmId: ccCardState.crmId, contact: { name, phone, email } });
         if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
         ["ccNewCpName", "ccNewCpPhone", "ccNewCpEmail"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-        if (msg) { msg.textContent = data?.crmError ? ("CRM: " + data.crmError) : "Контактное лицо добавлено."; msg.className = "dbo-ya-note " + (data?.crmError ? "payment-alert" : "payment-ok"); }
+        if (msg) { msg.textContent = "Контакт добавлен."; msg.className = "dbo-ya-note payment-ok"; }
         ccRenderEditContacts(); ccRefreshCardAfterEdit();
     } catch (e) { console.error("addClientContact", e); if (msg) { msg.textContent = (e && e.message) || "Не удалось добавить."; msg.className = "dbo-ya-note payment-alert"; } }
     finally { if (btn) btn.disabled = false; }
 }
-async function ccUpdateContactPerson(ref, btn) {
+async function ccUpdateContactPerson(contactId, btn) {
     const row = btn.closest(".cc-cp-row"); if (!row) return;
     const name = row.querySelector(".cc-cp-name")?.value.trim() || "";
     const phone = row.querySelector(".cc-cp-phone")?.value.trim() || "";
@@ -574,18 +589,18 @@ async function ccUpdateContactPerson(ref, btn) {
     if (btn) btn.disabled = true;
     const msg = document.getElementById("ccCpMsg");
     try {
-        const data = await clientsApi("updateClientContact", { crmId: ccCardState.crmId, contact: { crmRef: ref, name, phone, email } });
+        const data = await clientsApi("updateClientContact", { crmId: ccCardState.crmId, contact: { contactId, name, phone, email } });
         if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
-        if (msg) { msg.textContent = data?.crmError ? ("CRM: " + data.crmError) : "Сохранено."; msg.className = "dbo-ya-note " + (data?.crmError ? "payment-alert" : "payment-ok"); }
-        ccRefreshCardAfterEdit();
-    } catch (e) { console.error("updateClientContact", e); if (msg) { msg.textContent = "Не удалось сохранить контакт."; msg.className = "dbo-ya-note payment-alert"; } }
+        if (msg) { msg.textContent = "Сохранено."; msg.className = "dbo-ya-note payment-ok"; }
+        ccRenderEditContacts(); ccRefreshCardAfterEdit();
+    } catch (e) { console.error("updateClientContact", e); if (msg) { msg.textContent = (e && e.message) || "Не удалось сохранить контакт."; msg.className = "dbo-ya-note payment-alert"; } }
     finally { if (btn) btn.disabled = false; }
 }
-async function ccDeleteContactPerson(ref, btn) {
-    if (!confirm("Удалить контактное лицо?")) return;
+async function ccDeleteContactPerson(contactId, btn) {
+    if (!confirm("Удалить контакт?")) return;
     if (btn) btn.disabled = true;
     try {
-        const data = await clientsApi("deleteClientContact", { crmId: ccCardState.crmId, crmRef: ref });
+        const data = await clientsApi("deleteClientContact", { crmId: ccCardState.crmId, contactId });
         if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
         ccRenderEditContacts(); ccRefreshCardAfterEdit();
     } catch (e) { console.error("deleteClientContact", e); alert("Не удалось удалить контакт."); if (btn) btn.disabled = false; }
