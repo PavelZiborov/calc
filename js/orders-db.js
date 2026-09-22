@@ -1061,10 +1061,18 @@ async function pollContactsBackfill() {
             contactsBackfillTimer = setTimeout(pollContactsBackfill, 2000);
         } else if (job.finishedAt) {
             if (msg) {
-                msg.textContent = job.error
-                    ? `Ошибка: ${job.error}`
-                    : `Готово. Обработано ${job.total}, заполнено контактов: ${job.filled}${job.failed ? `, ошибок: ${job.failed}` : ""}.`;
-                msg.className = "dbo-ya-note " + (job.error ? "payment-alert" : "payment-ok");
+                if (job.error) {
+                    msg.textContent = `Ошибка: ${job.error}`;
+                    msg.className = "dbo-ya-note payment-alert";
+                } else {
+                    const parts = [`Готово. Обработано ${job.total}, заполнено контактов: ${job.filled}`];
+                    if (job.notFound) parts.push(`удалено в CRM: ${job.notFound}`);
+                    if (job.failed) parts.push(`ошибок: ${job.failed}`);
+                    let t = parts.join(", ") + ".";
+                    if (job.failed && Array.isArray(job.errorsSample) && job.errorsSample.length) t += ` Пример: ${job.errorsSample[0]}`;
+                    msg.textContent = t;
+                    msg.className = "dbo-ya-note " + (job.failed ? "payment-alert" : "payment-ok");
+                }
             }
         }
     } catch (_) { /* тихо */ }
