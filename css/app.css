@@ -341,6 +341,37 @@
     .cc-stat-value { font-size: 18px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
     .cc-stat-value.is-negative { color: var(--danger); }
     .cc-stat-value.is-positive { color: var(--success, #15803D); }
+    /* Вкладка «Контакты» карточки клиента */
+    .cc-contacts-list { display: flex; flex-direction: column; gap: 8px; }
+    .cc-contact { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .cc-contact-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cc-contact-name { font-weight: 600; color: var(--text); font-size: 14px; }
+    .cc-contact-pos { font-size: 12px; color: var(--text-muted); }
+    .cc-contact-badge { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--surface-3); color: var(--text-muted); }
+    .cc-contact-reach { margin-top: 3px; font-size: 13px; color: var(--text-2, var(--text-muted)); }
+    .cc-contacts-empty { text-align: center; color: var(--text-muted); padding: 18px 8px; }
+    .cc-edit-client-btn { margin: 0; width: auto; padding: 7px 14px; }
+    /* Модалка редактирования клиента */
+    .cc-edit-modal { width: min(640px, 100%); }
+    .cc-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+    .cc-edit-grid label, .cc-edit-modal .dbo-edit-wide { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted); }
+    .cc-edit-grid input, .cc-edit-modal .dbo-edit-wide input, .cc-edit-modal .dbo-edit-wide textarea { margin: 0; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--surface); color: var(--text); box-sizing: border-box; }
+    .cc-edit-save-row { display: flex; align-items: center; gap: 10px; margin: 12px 0 4px; }
+    .cc-edit-save-row .dbo-btn { width: auto; margin: 0; }
+    .cc-edit-persons { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+    .cc-edit-persons-head { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px; }
+    .cc-cp-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .cc-cp-row input { flex: 1 1 auto; min-width: 0; margin: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; box-sizing: border-box; }
+    .cc-cp-row .cc-cp-name { flex: 1 1 30%; }
+    .cc-cp-row .dbo-btn { width: auto; margin: 0; flex: 0 0 auto; }
+    .cc-edit-addperson { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+    .cc-edit-addperson input { flex: 1 1 auto; min-width: 0; margin: 0; padding: 7px 9px; border: 1px dashed var(--border); border-radius: 7px; font-size: 13px; box-sizing: border-box; }
+    .cc-edit-addperson .dbo-btn { width: auto; margin: 0; flex: 0 0 auto; }
+    @media (max-width: 640px) {
+        .cc-edit-grid { grid-template-columns: 1fr; }
+        .cc-cp-row, .cc-edit-addperson { flex-wrap: wrap; }
+        .cc-cp-row input, .cc-edit-addperson input { flex: 1 1 45%; }
+    }
 
     .client-card-warn {
         margin-bottom: 14px; padding: 8px 12px; font-size: 13px;

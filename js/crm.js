@@ -3173,12 +3173,11 @@ function contactEmailAddr(contact) {
 function buildContactLabel(contact) {
     const email = contactEmailAddr(contact);
     const tgNick = contactTelegramNick(contact);
-    // Имя — главное; показываем И email, И @ник (видно сразу, без редактирования).
-    // Телефон — только если ни email, ни ника нет.
+    // Имя — главное; показываем телефон, email и @ник (видно сразу, без редактирования).
     const bits = [];
+    if (contact.phone) bits.push(String(contact.phone).trim());
     if (email) bits.push(email);
     if (tgNick) bits.push("@" + tgNick);
-    if (!bits.length && contact.phone) bits.push(contact.phone);
     const reach = bits.join(" · ");
     const rawName = contact.name != null ? String(contact.name).trim() : "";
     const invalid = !rawName || rawName === "NaN" || rawName === "null" || rawName === "undefined"

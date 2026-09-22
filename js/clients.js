@@ -394,6 +394,10 @@ function renderClientCard(data, crmId) {
             </div>`;
     }
 
+    // Контактные лица клиента (главный контакт + контактные лица PrintOffice + книга).
+    ccCardState = { crmId, client: c, contacts: Array.isArray(data?.contacts) ? data.contacts : [] };
+    const contactsBlock = ccContactsBlockHtml(ccCardState.contacts);
+
     overlay.innerHTML = `
         <div class="client-card" role="dialog" aria-modal="true">
             <div class="client-card-header">
@@ -402,6 +406,7 @@ function renderClientCard(data, crmId) {
                     ${sub ? `<div class="client-card-sub">${sub}</div>` : ""}
                 </div>
                 <div class="client-card-header-actions">
+                    <button class="clients-btn clients-btn-add cc-edit-client-btn" onclick="ccOpenEditClient()">Редактировать</button>
                     ${crmLink}
                     <button class="client-card-close" onclick="closeClientCard()" aria-label="Закрыть">&times;</button>
                 </div>
@@ -411,10 +416,12 @@ function renderClientCard(data, crmId) {
                 ${data?.crmError ? `<div class="client-card-warn">Свежие данные из CRM недоступны — показаны сохранённые.</div>` : ""}
                 <div class="hp-tabs">
                     <button type="button" class="hp-tab is-active" data-cctab="deals" onclick="ccSwitchTab('deals')">Заказы</button>
+                    <button type="button" class="hp-tab" data-cctab="contacts" onclick="ccSwitchTab('contacts')">Контакты</button>
                     <button type="button" class="hp-tab" data-cctab="req" onclick="ccSwitchTab('req')">Реквизиты</button>
                     <button type="button" class="hp-tab" data-cctab="docs" onclick="ccSwitchTab('docs')">Шаблоны документов</button>
                 </div>
                 <div class="hp-tabpanel" id="ccPanel-deals">${dealsBlock}</div>
+                <div class="hp-tabpanel" id="ccPanel-contacts" hidden>${contactsBlock}</div>
                 <div class="hp-tabpanel" id="ccPanel-req" hidden>${clientCardRequisitesBlock()}</div>
                 <div class="hp-tabpanel" id="ccPanel-docs" hidden>${ccDocsBlock()}</div>
             </div>
@@ -422,13 +429,177 @@ function renderClientCard(data, crmId) {
     ccLoadRequisites(crmId);
     ccLoadDocs(crmId);
 }
-// Переключение вкладок карточки клиента: Заказы / Реквизиты / Шаблоны документов.
+// Переключение вкладок карточки клиента: Заказы / Контакты / Реквизиты / Шаблоны.
 function ccSwitchTab(tab) {
     document.querySelectorAll("#clientCardOverlay .hp-tab").forEach(b => b.classList.toggle("is-active", b.dataset.cctab === tab));
-    ["deals", "req", "docs"].forEach(t => {
+    ["deals", "contacts", "req", "docs"].forEach(t => {
         const p = document.getElementById("ccPanel-" + t);
         if (p) p.hidden = (t !== tab);
     });
+}
+
+// Состояние текущей карточки клиента (для вкладки «Контакты» и редактирования).
+let ccCardState = { crmId: null, client: null, contacts: [] };
+function ccContactsBlockHtml(contacts) {
+    contacts = Array.isArray(contacts) ? contacts : [];
+    if (!contacts.length) {
+        return `<div class="cc-contacts-empty"><p class="dbo-asset-empty">Контактных лиц нет.</p><p class="cc-hint">Добавьте их через «Редактировать».</p></div>`;
+    }
+    const rows = contacts.map(c => {
+        const reach = [
+            c.phone ? escapeHtml(c.phone) : "",
+            c.email ? escapeHtml(c.email) : "",
+            c.telegram ? "@" + escapeHtml(c.telegram) : ""
+        ].filter(Boolean).join(" · ");
+        const badge = c.source === "client" ? `<span class="cc-contact-badge">основной</span>` : "";
+        return `<div class="cc-contact">
+            <div class="cc-contact-main"><span class="cc-contact-name">${escapeHtml(c.name || "—")}</span>${c.position ? `<span class="cc-contact-pos">${escapeHtml(c.position)}</span>` : ""}${badge}</div>
+            <div class="cc-contact-reach">${reach || "—"}</div>
+        </div>`;
+    }).join("");
+    return `<div class="cc-contacts-list">${rows}</div>`;
+}
+
+// ---- Редактирование клиента + контактных лиц (моментальный синк с PrintOffice) ----
+function ccOpenEditClient() {
+    if (!ccCardState.crmId) return;
+    const c = ccCardState.client || {};
+    const v = s => escapeHtml(s == null ? "" : String(s));
+    let ov = document.getElementById("ccEditOverlay");
+    if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "ccEditOverlay";
+        ov.className = "client-card-overlay dbo-edit-overlay";
+        ov.setAttribute("onmousedown", "overlayDown(event)");
+        ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeCcEdit()");
+        document.body.appendChild(ov);
+    }
+    ov.style.display = "flex";
+    ov.innerHTML = `
+        <div class="dbo-edit cc-edit-modal" role="dialog" aria-modal="true">
+            <div class="dbo-edit-head"><h3>Редактирование клиента</h3>
+                <button class="dbo-close" onclick="closeCcEdit()" aria-label="Закрыть">×</button></div>
+            <div class="dbo-edit-body">
+                <label class="dbo-edit-wide">Компания / имя<input type="text" id="ccEdCompany" value="${v(c.company)}"></label>
+                <div class="cc-edit-grid">
+                    <label>Контактное лицо<input type="text" id="ccEdContact" value="${v(c.contactName)}"></label>
+                    <label>Мобильный<input type="text" id="ccEdMobile" value="${v(c.mobile)}"></label>
+                    <label>Городской<input type="text" id="ccEdLandline" value="${v(c.landline)}"></label>
+                    <label>Email<input type="text" id="ccEdEmail" value="${v(c.email)}"></label>
+                </div>
+                <label class="dbo-edit-wide">Заметки<textarea id="ccEdNotes" rows="2">${v(c.notes)}</textarea></label>
+                <div class="cc-edit-save-row">
+                    <button class="dbo-btn dbo-btn-primary" id="ccEdSaveBtn" onclick="ccSaveClientEdit()">Сохранить данные</button>
+                    <span id="ccEdMsg" class="dbo-ya-note"></span>
+                </div>
+                <div class="cc-edit-persons">
+                    <div class="cc-edit-persons-head">Контактные лица (PrintOffice)</div>
+                    <div id="ccEditContacts"></div>
+                    <div class="cc-edit-addperson">
+                        <input type="text" id="ccNewCpName" placeholder="Имя">
+                        <input type="text" id="ccNewCpPhone" placeholder="Телефон">
+                        <input type="text" id="ccNewCpEmail" placeholder="Email">
+                        <button type="button" class="dbo-btn" onclick="ccAddContactPerson(this)">+ Добавить</button>
+                    </div>
+                    <div id="ccCpMsg" class="dbo-ya-note"></div>
+                </div>
+            </div>
+        </div>`;
+    ccRenderEditContacts();
+    document.addEventListener("keydown", ccEditEsc);
+}
+function ccEditEsc(e) { if (e.key === "Escape") closeCcEdit(); }
+function closeCcEdit() { const ov = document.getElementById("ccEditOverlay"); if (ov) ov.remove(); document.removeEventListener("keydown", ccEditEsc); }
+function ccRenderEditContacts() {
+    const host = document.getElementById("ccEditContacts");
+    if (!host) return;
+    // Только реальные контактные лица PrintOffice (source='crm' с crmRef). Главный контакт — в полях выше.
+    const persons = (ccCardState.contacts || []).filter(c => c.source === "crm" && c.crmRef);
+    if (!persons.length) { host.innerHTML = `<p class="dbo-ya-note">Дополнительных контактных лиц нет.</p>`; return; }
+    host.innerHTML = persons.map(p => {
+        const ref = escapeHtml(String(p.crmRef));
+        return `<div class="cc-cp-row" data-ref="${ref}">
+            <input type="text" class="cc-cp-name" value="${escapeHtml(p.name || "")}" placeholder="Имя">
+            <input type="text" class="cc-cp-phone" value="${escapeHtml(p.phone || "")}" placeholder="Телефон">
+            <input type="text" class="cc-cp-email" value="${escapeHtml(p.email || "")}" placeholder="Email">
+            <button type="button" class="dbo-btn dbo-btn-sm" onclick="ccUpdateContactPerson('${ref}', this)">Сохранить</button>
+            <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="ccDeleteContactPerson('${ref}', this)">×</button>
+        </div>`;
+    }).join("");
+}
+async function ccSaveClientEdit() {
+    const val = id => document.getElementById(id)?.value.trim() || "";
+    const company = val("ccEdCompany");
+    if (!company) { alert("Укажите название компании / имя."); return; }
+    const msg = document.getElementById("ccEdMsg");
+    const btn = document.getElementById("ccEdSaveBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Сохранение…"; }
+    try {
+        const data = await clientsApi("editClient", { crmId: ccCardState.crmId, client: {
+            company_name: company, contact_name: val("ccEdContact"), mobile_phone: val("ccEdMobile"),
+            landline_phone: val("ccEdLandline"), email: val("ccEdEmail"),
+            notes: document.getElementById("ccEdNotes")?.value.trim() || ""
+        }});
+        if (data?.client) ccCardState.client = normalizeClient(data.client);
+        if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
+        if (msg) { msg.textContent = data?.crmError ? ("Сохранено в базе, но CRM: " + data.crmError) : "Сохранено и синхронизировано с PrintOffice."; msg.className = "dbo-ya-note " + (data?.crmError ? "payment-alert" : "payment-ok"); }
+        ccRefreshCardAfterEdit();
+    } catch (e) {
+        console.error("editClient", e);
+        if (msg) { msg.textContent = (e && e.message) || "Не удалось сохранить."; msg.className = "dbo-ya-note payment-alert"; }
+    } finally { if (btn) { btn.disabled = false; btn.textContent = "Сохранить данные"; } }
+}
+async function ccAddContactPerson(btn) {
+    const name = document.getElementById("ccNewCpName")?.value.trim() || "";
+    const phone = document.getElementById("ccNewCpPhone")?.value.trim() || "";
+    const email = document.getElementById("ccNewCpEmail")?.value.trim() || "";
+    const msg = document.getElementById("ccCpMsg");
+    if (!name) { alert("Укажите имя контактного лица."); return; }
+    if (btn) btn.disabled = true;
+    try {
+        const data = await clientsApi("addClientContact", { crmId: ccCardState.crmId, contact: { name, phone, email } });
+        if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
+        ["ccNewCpName", "ccNewCpPhone", "ccNewCpEmail"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+        if (msg) { msg.textContent = data?.crmError ? ("CRM: " + data.crmError) : "Контактное лицо добавлено."; msg.className = "dbo-ya-note " + (data?.crmError ? "payment-alert" : "payment-ok"); }
+        ccRenderEditContacts(); ccRefreshCardAfterEdit();
+    } catch (e) { console.error("addClientContact", e); if (msg) { msg.textContent = (e && e.message) || "Не удалось добавить."; msg.className = "dbo-ya-note payment-alert"; } }
+    finally { if (btn) btn.disabled = false; }
+}
+async function ccUpdateContactPerson(ref, btn) {
+    const row = btn.closest(".cc-cp-row"); if (!row) return;
+    const name = row.querySelector(".cc-cp-name")?.value.trim() || "";
+    const phone = row.querySelector(".cc-cp-phone")?.value.trim() || "";
+    const email = row.querySelector(".cc-cp-email")?.value.trim() || "";
+    if (!name) { alert("Имя не может быть пустым."); return; }
+    if (btn) btn.disabled = true;
+    const msg = document.getElementById("ccCpMsg");
+    try {
+        const data = await clientsApi("updateClientContact", { crmId: ccCardState.crmId, contact: { crmRef: ref, name, phone, email } });
+        if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
+        if (msg) { msg.textContent = data?.crmError ? ("CRM: " + data.crmError) : "Сохранено."; msg.className = "dbo-ya-note " + (data?.crmError ? "payment-alert" : "payment-ok"); }
+        ccRefreshCardAfterEdit();
+    } catch (e) { console.error("updateClientContact", e); if (msg) { msg.textContent = "Не удалось сохранить контакт."; msg.className = "dbo-ya-note payment-alert"; } }
+    finally { if (btn) btn.disabled = false; }
+}
+async function ccDeleteContactPerson(ref, btn) {
+    if (!confirm("Удалить контактное лицо?")) return;
+    if (btn) btn.disabled = true;
+    try {
+        const data = await clientsApi("deleteClientContact", { crmId: ccCardState.crmId, crmRef: ref });
+        if (Array.isArray(data?.contacts)) ccCardState.contacts = data.contacts;
+        ccRenderEditContacts(); ccRefreshCardAfterEdit();
+    } catch (e) { console.error("deleteClientContact", e); alert("Не удалось удалить контакт."); if (btn) btn.disabled = false; }
+}
+// Обновить видимую карточку клиента после изменений (вкладка Контакты + шапка).
+function ccRefreshCardAfterEdit() {
+    const panel = document.getElementById("ccPanel-contacts");
+    if (panel) panel.innerHTML = ccContactsBlockHtml(ccCardState.contacts);
+    const c = ccCardState.client || {};
+    const h = document.querySelector("#clientCardOverlay .client-card-title h3");
+    if (h) h.textContent = c.company || "Клиент";
+    const sub = document.querySelector("#clientCardOverlay .client-card-sub");
+    const bits = [c.contactName, c.mobile || c.landline, c.email].filter(Boolean).map(escapeHtml).join(" · ");
+    if (sub) sub.innerHTML = bits;
 }
 
 // Создать новый пустой заказ прямо из карточки клиента (для этого клиента).
