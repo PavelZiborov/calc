@@ -1030,6 +1030,45 @@ async function syncDbElements(btn) {
         if (btn) btn.disabled = false;
     }
 }
+// Бэкфилл телефонов/почт клиентов из PrintOffice (фоновая задача + прогресс в настройках).
+let contactsBackfillTimer = null;
+async function backfillClientContacts(btn) {
+    if (!ensureActiveSession()) return;
+    const msg = document.getElementById("contactsBackfillStatus");
+    if (btn) btn.disabled = true;
+    try {
+        await clientsApi("backfillClientContacts", {});
+        if (msg) { msg.textContent = "Синхронизация запущена…"; msg.className = "dbo-ya-note"; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Синхронизация контактов клиентов запущена…");
+        pollContactsBackfill();
+    } catch (e) {
+        console.error("backfillClientContacts", e);
+        if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось запустить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+async function pollContactsBackfill() {
+    const msg = document.getElementById("contactsBackfillStatus");
+    try {
+        const data = await clientsApi("contactsBackfillStatus", {});
+        const job = data?.job;
+        if (!job) return;
+        if (job.running) {
+            const pct = job.total ? Math.round(job.done / job.total * 100) : 0;
+            if (msg) { msg.textContent = `Обработка клиентов: ${job.done}/${job.total} (${pct}%), заполнено: ${job.filled}…`; msg.className = "dbo-ya-note"; }
+            clearTimeout(contactsBackfillTimer);
+            contactsBackfillTimer = setTimeout(pollContactsBackfill, 2000);
+        } else if (job.finishedAt) {
+            if (msg) {
+                msg.textContent = job.error
+                    ? `Ошибка: ${job.error}`
+                    : `Готово. Обработано ${job.total}, заполнено контактов: ${job.filled}${job.failed ? `, ошибок: ${job.failed}` : ""}.`;
+                msg.className = "dbo-ya-note " + (job.error ? "payment-alert" : "payment-ok");
+            }
+        }
+    } catch (_) { /* тихо */ }
+}
 // Опрос статуса задачи + отрисовка баннера. Вызывается при открытии раздела и по таймеру.
 async function refreshDbSyncStatus() {
     try {
