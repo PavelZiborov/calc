@@ -2147,14 +2147,10 @@ function renderDbDealCard(data, crmId) {
                 </div>
                 <div class="dbo-head-right">
                     ${dealStatusControl}
-                    <details class="deal-notify-section dbo-notify-drop" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
-                        <summary class="dbo-notify-drop-summary">
-                            <span class="dbo-notify-drop-head">${icon("mail")}<span class="dbo-notify-drop-title">Уведомление</span></span>
-                            <span class="dbo-notify-drop-status" id="dbNotifyStatus"></span>
-                            <span class="dbo-notify-drop-caret">▾</span>
-                        </summary>
+                    <div class="deal-notify-section dbo-notify-inline" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
+                        <div class="dbo-notify-inline-head">${icon("mail")}<span>Уведомление о готовности</span></div>
                         <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
-                    </details>
+                    </div>
                 </div>
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
@@ -2348,11 +2344,6 @@ async function dbDocDelete(id) {
 // contactTelegramNick, contactEmailAddr, formatNotifySentAt, maskRuPhone, icon.
 const dbNotifyCache = new Map();
 function dbNotifySection() { return document.getElementById("dbNotifySection"); }
-// Дропдаун уведомлений — плавающий поповер в шапке: закрываем по клику вне блока.
-document.addEventListener("mousedown", (e) => {
-    const sec = document.getElementById("dbNotifySection");
-    if (sec && sec.open && !sec.contains(e.target)) sec.open = false;
-});
 async function dbNotifyLoad(dealId, clientId) {
     const section = dbNotifySection();
     if (!section) return;
@@ -2378,8 +2369,9 @@ function dbNotifyRender(dealId) {
     const isDecided = hasSelection || notifyDisabled;
     const clientId = section.dataset.clientId;
     const sentAt = formatNotifySentAt(data.lastSentAt);
+    const sentBy = data.lastSentSource === "auto" ? "автоматически (n8n)" : (data.lastSentSource === "manual" ? "вручную" : "");
     const sentBadge = sentAt
-        ? `<div class="deal-notify-sent">${icon("check")} Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}</div>`
+        ? `<div class="deal-notify-sent">${icon("check")} Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}${sentBy ? ` · ${escapeHtml(sentBy)}` : ""}</div>`
         : "";
     const sendLabel = sentAt ? (icon("mail") + " Отправить ещё раз") : (icon("mail") + " Отправить уведомление о готовности");
     const selectedContact = hasSelection ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId)) : null;
@@ -2395,20 +2387,6 @@ function dbNotifyRender(dealId) {
     const currentLabel = notifyDisabled ? (icon("bellOff") + " Не уведомлять")
         : (hasSelection ? escapeHtml(buildContactLabel(selectedContact)) : "— выберите контакт —");
     section.classList.toggle("is-unset", !isDecided);
-    // Компактный статус в шапке дропдауна + авто-раскрытие, если контакт не выбран.
-    const statusEl = section.querySelector(".dbo-notify-drop-status");
-    if (statusEl) {
-        if (notifyDisabled) {
-            statusEl.className = "dbo-notify-drop-status is-off";
-            statusEl.textContent = "Не уведомлять";
-        } else if (hasSelection) {
-            statusEl.className = "dbo-notify-drop-status" + (sentAt ? " is-sent" : "");
-            statusEl.textContent = sentAt ? "Отправлено ✓" : buildContactLabel(selectedContact);
-        } else {
-            statusEl.className = "dbo-notify-drop-status is-unset";
-            statusEl.textContent = "Не выбран";
-        }
-    }
     body.innerHTML = `
         ${!isDecided ? `<div class="deal-notify-alert">${icon("alert")} Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
         <div class="deal-notify-row">
@@ -2605,13 +2583,19 @@ async function dbNotifyDeleteContact(dealId, contactId) {
 async function dbNotifySend(dealId) {
     const channels = dbNotifyCheckedChannels();
     if (!channels.length) { alert("Отметьте хотя бы один канал (Email/Telegram)"); return; }
+    // Дедуп: если уже отправлено (вручную или автоматизацией) — шлём повторно только осознанно
+    // («Отправить ещё раз» = force). Первичная отправка идёт без force и уважает общий send_log.
+    const already = !!formatNotifySentAt(dbNotifyCache.get(String(dealId))?.lastSentAt);
+    if (already && !confirm("Уведомление по этому заказу уже отправлялось. Отправить ещё раз?")) return;
     const btn = document.getElementById("dbNotifySendBtn");
     if (btn) { btn.disabled = true; btn.textContent = "Отправка…"; }
     try {
-        const data = await clientsApi("sendReadinessNotification", { dealId: Number(dealId), channels, force: true });
+        const data = await clientsApi("sendReadinessNotification", { dealId: Number(dealId), channels, force: already });
         const okCh = (data?.results || []).filter(r => r.ok && !r.skipped).map(r => r.channel);
+        const skipCh = (data?.results || []).filter(r => r.ok && r.skipped).map(r => r.channel);
         const errCh = (data?.results || []).filter(r => !r.ok);
-        let msg = okCh.length ? `Отправлено: ${okCh.map(c => c === "email" ? "Email" : "Telegram").join(", ")}` : "Ничего не отправлено";
+        let msg = okCh.length ? `Отправлено: ${okCh.map(c => c === "email" ? "Email" : "Telegram").join(", ")}`
+            : (skipCh.length ? "Уже было отправлено ранее — повтор не выполнен" : "Ничего не отправлено");
         if (errCh.length) msg += "\n" + errCh.map(r => `${r.channel}: ${r.error}`).join("\n");
         if (typeof showReadinessToast === "function" && okCh.length) showReadinessToast(msg);
         else alert(msg);

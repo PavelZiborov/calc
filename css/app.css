@@ -2151,7 +2151,13 @@
     }
     .deal-notify-dd-toggle:hover, .deal-notify-dd-toggle:focus { background: #fff; }
     .deal-notify-dd.is-open .deal-notify-dd-toggle { background: #fff; border-color: var(--accent); }
-    .deal-notify-dd-toggle.is-unset { border-color: #e7b3b3; }
+    .deal-notify-dd-toggle.is-unset { border-color: #d9534f; background: #fdf4f4; color: #b03434; box-shadow: 0 0 0 3px rgba(217,83,79,0.10); }
+    .deal-notify-dd-toggle.is-unset .deal-notify-dd-current { color: #b03434; font-weight: 600; }
+    .deal-notify-dd-toggle.is-unset .deal-notify-dd-caret { color: #cf6b68; }
+    /* Инлайн-блок уведомления в шапке карточки (без внешнего details-дропдауна) */
+    .dbo-notify-inline { width: 300px; max-width: 100%; text-align: left; }
+    .dbo-notify-inline-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .dbo-notify-inline-head .icn { width: 14px; height: 14px; color: var(--accent); }
     .deal-notify-dd-current { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1c1b19; }
     .deal-notify-dd-caret { flex: 0 0 auto; color: #9a988f; font-size: 11px; transition: transform .15s ease; }
     .deal-notify-dd.is-open .deal-notify-dd-caret { transform: rotate(180deg); }
