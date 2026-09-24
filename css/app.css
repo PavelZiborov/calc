@@ -932,9 +932,24 @@
     .dbo-lock-banner { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #6b4e00; background: #fff8e1; border: 1px solid #ffe0a3; border-radius: 8px; padding: 9px 12px; margin: 0 0 12px; }
     .dbo-card--locked .dbo-el-title--edit { cursor: default; }
     .dbo-card--locked .dbo-el-del, .dbo-card--locked .dbo-el-statusbtn { display: none; }
-    .dbo-mgr-edit { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; padding: 0 4px; line-height: 1; }
-    .dbo-mgr-edit:hover { color: var(--accent-strong, var(--accent)); }
-    .dbo-mgr-select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; max-width: 220px; }
+    /* Смена ответственного менеджера — кликабельное имя + аккуратный дропдаун */
+    .dbo-mgr-dd { position: relative; display: inline-block; }
+    .dbo-mgr-pill { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 2px 7px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+    .dbo-mgr-pill b { font-weight: 700; }
+    .dbo-mgr-pill:hover { background: var(--accent-tint); border-color: #cfe0fb; }
+    .dbo-mgr-dd.is-open .dbo-mgr-pill { background: var(--accent-tint); border-color: var(--accent); }
+    .dbo-mgr-caret { font-size: 10px; color: #9a988f; transition: transform .15s ease; }
+    .dbo-mgr-dd.is-open .dbo-mgr-caret { transform: rotate(180deg); }
+    .dbo-mgr-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; min-width: 200px; max-width: 320px; max-height: 300px; overflow-y: auto; padding: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 14px 36px rgba(28,27,25,0.22); }
+    .dbo-mgr-menu[hidden] { display: none; }
+    .dbo-mgr-menu-note { padding: 8px 10px; font-size: 12.5px; color: var(--text-muted); }
+    .dbo-mgr-opt { display: block; width: 100%; text-align: left; margin: 0; padding: 8px 10px; border: none; border-radius: 7px; background: transparent; font-size: 13.5px; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dbo-mgr-opt:hover { background: #eef4ff; }
+    .dbo-mgr-opt.is-sel { background: #e8f0fe; font-weight: 600; }
+    /* Премия — бейджи операции (начисление/сторно) в разбивке по месяцу */
+    .salary-op { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .salary-op--acc { color: #1f7a44; background: #e9f7ef; }
+    .salary-op--rev { color: #b03434; background: #fbe3e3; }
     .settings-actions .dbo-btn { width: auto; margin: 0; padding: 9px 18px; cursor: pointer; }
     /* Шаблоны КП в настройках */
     .kp-co-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }

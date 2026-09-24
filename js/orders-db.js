@@ -1220,37 +1220,53 @@ function dbElBaseName(e) {
     }
     return n;
 }
-// Завершённый заказ редактирует только админ. Хелпер + предупреждение.
+// Завершённый заказ заморожен для редактирования позиций — у ВСЕХ (в т.ч. админа).
+// Разморозить = сменить статус (открыть заново); это может только админ (setDealStatus).
 function dbCardLocked() {
-    const done = dbCardData?.deal?.status_name === "Завершено";
+    return dbCardData?.deal?.status_name === "Завершено";
+}
+function dbLockNotice() {
     const admin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
-    return done && !admin;
+    alert(admin
+        ? "Заказ завершён. Чтобы редактировать позиции, сначала смените статус заказа (откройте заново)."
+        : "Заказ завершён. Менять позиции можно только после того, как администратор снова откроет заказ.");
 }
-function dbLockNotice() { alert("Заказ завершён. Менять позиции и цены можно только после того, как администратор снова откроет заказ."); }
-function dbRerenderCard() { if (dbCardData) renderDbDealCard(dbCardData, dbCardDealId); }
-// Смена ответственного менеджера заказа (только админ). Показываем select со списком менеджеров.
-async function dbChangeResponsible(crmId) {
-    const host = document.getElementById("dbMgrWrap");
-    if (!host) return;
-    let managers = [];
-    try { managers = (await clientsApi("listManagers", {})).managers || []; }
-    catch (e) { console.error("listManagers", e); alert("Не удалось загрузить список менеджеров."); return; }
-    if (!managers.length) { alert("Список менеджеров пуст (синхронизируйте пользователей из CRM)."); return; }
+// Смена ответственного менеджера (только админ) — кастомный дропдаун (как уведомления/статусы).
+let dbMgrCache = null;   // [{crmUserId,name}] — список менеджеров на сессию
+function dbMgrCloseMenu() {
+    const dd = document.getElementById("dbMgrDd");
+    const menu = dd?.querySelector(".dbo-mgr-menu");
+    if (menu) menu.hidden = true;
+    if (dd) dd.classList.remove("is-open");
+    document.removeEventListener("click", dbMgrOutside);
+}
+function dbMgrOutside(ev) { if (!ev.target.closest("#dbMgrDd")) dbMgrCloseMenu(); }
+async function dbMgrToggle(ev, crmId) {
+    if (ev) ev.stopPropagation();
+    const dd = document.getElementById("dbMgrDd");
+    const menu = dd?.querySelector(".dbo-mgr-menu");
+    if (!menu) return;
+    if (!menu.hidden) { dbMgrCloseMenu(); return; }
+    menu.innerHTML = `<div class="dbo-mgr-menu-note">Загрузка…</div>`;
+    menu.hidden = false; dd.classList.add("is-open");
+    setTimeout(() => document.addEventListener("click", dbMgrOutside), 0);
+    if (!dbMgrCache) {
+        try { dbMgrCache = (await clientsApi("listManagers", {})).managers || []; }
+        catch (e) { console.error("listManagers", e); menu.innerHTML = `<div class="dbo-mgr-menu-note">Не удалось загрузить</div>`; return; }
+    }
     const cur = dbCardData?.deal?.employee_name || "";
-    host.innerHTML = `Менеджер: <select class="dbo-mgr-select" onchange="dbApplyResponsible(${Number(crmId)}, this)">
-        <option value="">— выбрать —</option>
-        ${managers.map(m => `<option value="${m.crmUserId}"${m.name === cur ? " selected" : ""}>${escapeHtml(m.name)}</option>`).join("")}
-      </select> <button type="button" class="dbo-mgr-edit" onclick="dbRerenderCard()" title="Отмена">×</button>`;
+    menu.innerHTML = dbMgrCache.length
+        ? dbMgrCache.map(m => `<button type="button" class="dbo-mgr-opt${m.name === cur ? " is-sel" : ""}" onclick="dbMgrPick(${Number(crmId)}, ${m.crmUserId})">${m.name === cur ? "✓ " : ""}${escapeHtml(m.name)}</button>`).join("")
+        : `<div class="dbo-mgr-menu-note">Список пуст — синхронизируйте пользователей из CRM</div>`;
 }
-async function dbApplyResponsible(crmId, sel) {
-    const id = Number(sel?.value);
-    if (!Number.isFinite(id)) { dbRerenderCard(); return; }
+async function dbMgrPick(crmId, responsibleId) {
+    dbMgrCloseMenu();
     try {
-        const r = await clientsApi("setDealResponsible", { crmId: Number(crmId), responsibleId: id });
+        const r = await clientsApi("setDealResponsible", { crmId: Number(crmId), responsibleId: Number(responsibleId) });
         if (dbCardData?.deal) dbCardData.deal.employee_name = r.employeeName || dbCardData.deal.employee_name;
         renderDbDealCard(dbCardData, dbCardDealId);
-        if (typeof showReadinessToast === "function") showReadinessToast("Ответственный изменён: " + (r.employeeName || ""));
-    } catch (e) { console.error("setDealResponsible", e); alert("Не удалось сменить ответственного: " + (e.message || "")); dbRerenderCard(); }
+        if (typeof showReadinessToast === "function") showReadinessToast("Ответственный: " + (r.employeeName || ""));
+    } catch (e) { console.error("setDealResponsible", e); alert("Не удалось сменить ответственного: " + (e.message || "")); }
 }
 function dbOpenElEdit(elId) {
     if (dbCardLocked()) { dbLockNotice(); return; }
@@ -2170,11 +2186,12 @@ function renderDbDealCard(data, crmId) {
                 onblur="dbSaveCostInfo(${crmId}, this.value)">${escapeHtml(costInfo)}</textarea>
         </div>`;
 
-    // Права: завершённый заказ редактирует только админ (позиции/цены/статусы); он же — открывает заново.
+    // Права: завершённый заказ заморожен для редактирования позиций у ВСЕХ. Открыть заново
+    // (сменить статус) может только админ — после этого позиции снова редактируются.
     const dbIsAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
-    const dbLocked = (d.status_name === "Завершено") && !dbIsAdmin;
+    const dbLocked = (d.status_name === "Завершено");
     const dbLockBanner = dbLocked
-        ? `<div class="dbo-lock-banner">🔒 Заказ завершён — наименования, цены и статусы менять нельзя. Снова открыть заказ может только администратор.</div>`
+        ? `<div class="dbo-lock-banner">🔒 Заказ завершён — наименования, цены и статусы позиций заморожены. ${dbIsAdmin ? "Чтобы редактировать — смените статус заказа (откройте заново)." : "Снова открыть заказ может только администратор."}</div>`
         : "";
     ov.innerHTML = `
         <div class="dbo-card${dbLocked ? " dbo-card--locked" : ""}" role="dialog" aria-modal="true">
@@ -2216,7 +2233,12 @@ function renderDbDealCard(data, crmId) {
                 <div class="dbo-mid">
                     <div class="dbo-meta">
                         ${d.created_at_crm ? `<div>Дата заказа: <b>${escapeHtml(d.created_at_crm)}</b></div>` : ""}
-                        ${(d.employee_name || dbIsAdmin) ? `<div id="dbMgrWrap">Менеджер: <b id="dbMgrName">${escapeHtml(d.employee_name || "—")}</b>${dbIsAdmin ? ` <button type="button" class="dbo-mgr-edit" onclick="dbChangeResponsible(${crmId})" title="Сменить ответственного менеджера">✎</button>` : ""}</div>` : ""}
+                        ${(d.employee_name || dbIsAdmin) ? `<div class="dbo-mgr-line">Менеджер: ${dbIsAdmin
+                            ? `<span class="dbo-mgr-dd" id="dbMgrDd">
+                                   <button type="button" class="dbo-mgr-pill" onclick="dbMgrToggle(event, ${crmId})" title="Сменить ответственного менеджера"><b id="dbMgrName">${escapeHtml(d.employee_name || "— выбрать —")}</b><span class="dbo-mgr-caret">▾</span></button>
+                                   <div class="dbo-mgr-menu" hidden></div>
+                               </span>`
+                            : `<b>${escapeHtml(d.employee_name || "—")}</b>`}</div>` : ""}
                     </div>
                     <div class="dbo-summary-group">
                         <button type="button" class="dbo-profit-toggle" onclick="dbToggleProfit(this)" aria-expanded="false" title="Показать прибыль по заказу">${icon("eye")}<span>Прибыль</span></button>
@@ -4306,14 +4328,18 @@ async function dbOpenSalaryMonth(month) {
     const baseLabel = { net: "Чистая", gross: "Грязная", turnover: "Оборот" }[d.method] || "База";
     const list = Array.isArray(d.deals) ? d.deals : [];
     const totalPrem = list.reduce((s, x) => s + x.premium, 0);
-    const rows = list.length ? list.map(x => `
+    const rows = list.length ? list.map(x => {
+        const isRev = x.kind === "reversal" || x.premium < 0;
+        return `
         <tr class="salary-deal-row" onclick="dbSalaryOpenDeal(${x.crmDealId})" title="Открыть заказ">
             <td>№ ${escapeHtml(x.num)}</td>
             <td class="salary-deal-client">${escapeHtml(x.clientName || "—")}</td>
+            <td><span class="salary-op ${isRev ? "salary-op--rev" : "salary-op--acc"}">${isRev ? "Списано (переоткрыт)" : "Начислено (закрыт)"}</span></td>
             <td class="num">${money2(x.turnover)}</td>
             <td class="num">${money2(x.base)}</td>
-            <td class="num"><b>${money2(x.premium)}</b></td>
-        </tr>`).join("") : `<tr><td colspan="5" class="dbo-asset-empty">Завершённых заказов за месяц нет.</td></tr>`;
+            <td class="num"><b class="${x.premium < 0 ? "payment-alert" : "payment-ok"}">${money2(x.premium)}</b></td>
+        </tr>`;
+    }).join("") : `<tr><td colspan="6" class="dbo-asset-empty">Операций за месяц нет.</td></tr>`;
     let ov = document.getElementById("salaryDealsOverlay");
     if (!ov) {
         ov = document.createElement("div");
@@ -4329,12 +4355,12 @@ async function dbOpenSalaryMonth(month) {
             <div class="dbo-edit-head"><h3>Премия · ${SALARY_MONTHS[month - 1]} ${d.year}${d.managerName ? " — " + escapeHtml(d.managerName) : ""}</h3>
                 <button class="dbo-close" onclick="closeSalaryDeals()" aria-label="Закрыть">×</button></div>
             <div class="dbo-edit-body">
-                <p class="dbo-ya-hint">Премия по заказу = <b>${baseLabel}</b> × <b>${d.percent}%</b>. Клик по строке — открыть заказ.</p>
+                <p class="dbo-ya-hint">Премия по заказу = <b>${baseLabel}</b> × <b>${d.percent}%</b>. Начисление — при закрытии заказа; списание (сторно) — при переоткрытии. Клик по строке — открыть заказ.</p>
                 <div class="clients-table-wrap">
                 <table class="clients-table salary-deals-table">
-                    <thead><tr><th>Заказ</th><th>Клиент</th><th class="num">Оборот</th><th class="num">${baseLabel}</th><th class="num">Премия</th></tr></thead>
+                    <thead><tr><th>Заказ</th><th>Клиент</th><th>Операция</th><th class="num">Оборот</th><th class="num">${baseLabel}</th><th class="num">Премия</th></tr></thead>
                     <tbody>${rows}</tbody>
-                    ${list.length ? `<tfoot><tr><td colspan="4">Итого премия · ${list.length} зак.</td><td class="num"><b>${money2(totalPrem)}</b></td></tr></tfoot>` : ""}
+                    ${list.length ? `<tfoot><tr><td colspan="5">Итого за месяц · ${list.length} оп.</td><td class="num"><b>${money2(totalPrem)}</b></td></tr></tfoot>` : ""}
                 </table>
                 </div>
             </div>
