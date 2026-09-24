@@ -3492,7 +3492,31 @@ async function renderNotifySettingsInline() {
         </ul>
         <div class="settings-actions">
             <button class="dbo-btn dbo-btn-primary" onclick="dboSaveTelegramSettings()">Сохранить</button>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
+        <div class="dbo-ya-status">Авто-отправка уведомлений о готовности: <b class="payment-ok">включена</b> (сервер, каждые 15 мин, раб. часы МСК пн–пт 8–20)</div>
+        <p class="dbo-ya-hint">Заказ в статусе «Заказ готов» с выбранным контактом уведомляется автоматически (один раз, дедуп общий с ручной кнопкой). При первом запуске текущие «готовые» заказы помечаются как обработанные (без рассылки).</p>
+        <div class="settings-actions">
+            <button class="dbo-btn" id="dboRunAutoNotifyBtn" onclick="dboRunAutoNotify()">Проверить готовые сейчас</button>
+            <span id="dboAutoNotifyMsg" class="dbo-ya-note"></span>
         </div>`;
+}
+async function dboRunAutoNotify() {
+    const btn = document.getElementById("dboRunAutoNotifyBtn");
+    const msg = document.getElementById("dboAutoNotifyMsg");
+    if (btn) { btn.disabled = true; btn.textContent = "Проверяю…"; }
+    try {
+        const r = await clientsApi("runReadinessAutoNotify", {});
+        if (msg) {
+            msg.className = "dbo-ya-note payment-ok";
+            msg.textContent = r.seeded
+                ? `Первая активация: помечено обработанными ${r.seeded} заказ(ов), рассылки не было.`
+                : `Проверено: ${r.checked ?? 0}, отправлено: ${r.sent ?? 0}.`;
+        }
+    } catch (e) {
+        console.error("runReadinessAutoNotify", e);
+        if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = (e && e.message) || "Не удалось запустить проверку."; }
+    } finally { if (btn) { btn.disabled = false; btn.textContent = "Проверить готовые сейчас"; } }
 }
 async function dboSaveTelegramSettings() {
     const token = document.getElementById("dboTgToken")?.value || "";
