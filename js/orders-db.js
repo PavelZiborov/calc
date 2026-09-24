@@ -2151,7 +2151,6 @@ function renderDbDealCard(data, crmId) {
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
             </div>
             <div class="deal-notify-section dbo-notify-inline" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
-                <div class="dbo-notify-inline-head">${icon("mail")}<span>Уведомление о готовности</span></div>
                 <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
             </div>
             <div class="dbo-body">
@@ -2369,10 +2368,8 @@ function dbNotifyRender(dealId) {
     const isDecided = hasSelection || notifyDisabled;
     const clientId = section.dataset.clientId;
     const sentAt = formatNotifySentAt(data.lastSentAt);
-    const sentBy = data.lastSentSource === "auto" ? "автоматически (n8n)" : (data.lastSentSource === "manual" ? "вручную" : "");
-    const sentBadge = sentAt
-        ? `<div class="deal-notify-sent">${icon("check")} Уведомление отправлено: <b>${escapeHtml(sentAt)}</b>${data.lastSentTo ? ` · ${escapeHtml(data.lastSentTo)}` : ""}${sentBy ? ` · ${escapeHtml(sentBy)}` : ""}</div>`
-        : "";
+    const sentBy = data.lastSentSource === "auto" ? "автоматически" : (data.lastSentSource === "manual" ? "вручную" : "");
+    const chLabel = data.lastSentChannel === "telegram" ? "Telegram" : (data.lastSentChannel === "email" ? "Email" : "");
     const sendLabel = sentAt ? (icon("mail") + " Отправить ещё раз") : (icon("mail") + " Отправить уведомление о готовности");
     const selectedContact = hasSelection ? data.contacts.find(c => c.contactId != null && Number(c.contactId) === Number(selectedId)) : null;
     const ddOptionsHtml = data.contacts.map(contact => {
@@ -2384,17 +2381,25 @@ function dbNotifyRender(dealId) {
             ${canDel ? `<button type="button" class="deal-notify-dd-del" onclick="event.stopPropagation(); dbNotifyDeleteContact(${dealId}, ${contact.contactId})" title="Удалить контакт">${icon("trash")}</button>` : ""}
         </div>`;
     }).join("");
-    const currentLabel = notifyDisabled ? (icon("bellOff") + " Не уведомлять")
-        : (hasSelection ? escapeHtml(buildContactLabel(selectedContact)) : "— выберите контакт —");
+    // Компактный статус рядом с пилюлей: когда/куда/кем отправлено, либо состояние выбора.
+    let statusHtml;
+    if (sentAt) {
+        statusHtml = `<span class="dbo-notify-status is-sent">${icon("check")} Отправлено ${escapeHtml(sentAt)}${chLabel ? " · " + chLabel : ""}${sentBy ? " · " + escapeHtml(sentBy) : ""}</span>`;
+    } else if (notifyDisabled) {
+        statusHtml = `<span class="dbo-notify-status is-off">${icon("bellOff")} Не уведомлять</span>`;
+    } else if (hasSelection) {
+        statusHtml = `<span class="dbo-notify-status">${escapeHtml(buildContactLabel(selectedContact))} · ещё не отправлялось</span>`;
+    } else {
+        statusHtml = `<span class="dbo-notify-status is-unset">${icon("alert")} Контакт не выбран</span>`;
+    }
     section.classList.toggle("is-unset", !isDecided);
     body.innerHTML = `
-        ${!isDecided ? `<div class="deal-notify-alert">${icon("alert")} Контакт для уведомлений не указан — выберите, кому сообщить о готовности</div>` : ""}
-        <div class="deal-notify-row">
-            <div class="deal-notify-dd">
-                <button type="button" class="deal-notify-dd-toggle${!isDecided ? " is-unset" : ""}" onclick="dbNotifyToggleDropdown(event)">
-                    <span class="deal-notify-dd-current">${currentLabel}</span><span class="deal-notify-dd-caret">▾</span>
-                </button>
-                <div class="deal-notify-dd-menu" hidden>
+        <div class="deal-notify-dd dbo-notify-dd-single">
+            <button type="button" class="deal-notify-dd-toggle dbo-notify-pill${!isDecided ? " is-unset" : ""}" onclick="dbNotifyToggleDropdown(event)">
+                ${icon("mail")}<span class="dbo-notify-pill-label">Уведомление о готовности</span><span class="deal-notify-dd-caret">▾</span>
+            </button>
+            <div class="deal-notify-dd-menu dbo-notify-menu-full" hidden>
+                <div class="dbo-notify-menu-sec">
                     <button type="button" class="deal-notify-dd-opt${notifyDisabled ? " is-sel" : ""}" onclick="dbNotifyPick(${dealId}, '__none__')">${notifyDisabled ? "✓ " : ""}${icon("bellOff")} Не уведомлять</button>
                     ${ddOptionsHtml}
                     <div class="deal-notify-dd-foot">
@@ -2402,12 +2407,14 @@ function dbNotifyRender(dealId) {
                         ${clientId ? `<a class="deal-notify-dd-crm" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" onclick="dbNotifyCloseDropdown()">Добавить в CRM ↗</a>` : ""}
                     </div>
                 </div>
+                ${hasSelection ? `<div class="dbo-notify-menu-sec">
+                    ${dbNotifyChannelsHtml(selectedContact, dealId)}
+                    ${dbNotifyTgStatusHtml(selectedContact, dealId)}
+                    <button type="button" class="deal-notify-send-btn" id="dbNotifySendBtn" onclick="dbNotifySend(${dealId})">${sendLabel}</button>
+                </div>` : ""}
             </div>
         </div>
-        ${sentBadge}
-        ${hasSelection ? dbNotifyChannelsHtml(selectedContact, dealId) : ""}
-        ${hasSelection ? dbNotifyTgStatusHtml(selectedContact, dealId) : ""}
-        ${hasSelection ? `<button type="button" class="deal-notify-send-btn" id="dbNotifySendBtn" onclick="dbNotifySend(${dealId})">${sendLabel}</button>` : ""}
+        ${statusHtml}
         <div class="deal-notify-modal" hidden onmousedown="overlayDown(event)" onclick="if(overlayClickedSelf(event))dbNotifyCloseForm()">
             <div class="deal-notify-modal-card">
                 <div class="deal-notify-modal-title">Новый контакт</div>
