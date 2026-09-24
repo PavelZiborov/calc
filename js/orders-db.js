@@ -3504,7 +3504,7 @@ async function renderNotifySettingsInline() {
         </div>
         <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
         <div class="dbo-ya-status">Авто-отправка уведомлений о готовности: <b class="payment-ok">включена</b> (сервер, каждые 15 мин, раб. часы МСК пн–пт 8–20)</div>
-        <p class="dbo-ya-hint">Заказ в статусе «Заказ готов» с выбранным контактом уведомляется автоматически (один раз, дедуп общий с ручной кнопкой). При первом запуске текущие «готовые» заказы помечаются как обработанные (без рассылки).</p>
+        <p class="dbo-ya-hint">Заказ в статусе «Заказ готов» с выбранным контактом уведомляется автоматически. Повторное уведомление уходит только если <b>состав заказа изменился</b> после прошлого (добавили/убрали позицию) — простой флип-флоп статуса «готов→печать→готов» повтора не даёт. Дедуп общий с ручной кнопкой. При первом запуске текущие «готовые» заказы помечаются как обработанные (без рассылки).</p>
         <div class="settings-actions">
             <button class="dbo-btn" id="dboRunAutoNotifyBtn" onclick="dboRunAutoNotify()">Проверить готовые сейчас</button>
             <span id="dboAutoNotifyMsg" class="dbo-ya-note"></span>
@@ -3568,7 +3568,7 @@ async function dboRunAutoNotify() {
             msg.className = "dbo-ya-note payment-ok";
             msg.textContent = r.seeded
                 ? `Первая активация: помечено обработанными ${r.seeded} заказ(ов), рассылки не было.`
-                : `Проверено: ${r.checked ?? 0}, отправлено: ${r.sent ?? 0}.`;
+                : `Проверено: ${r.checked ?? 0}, отправлено: ${r.sent ?? 0}${r.resent ? ` (из них повторно: ${r.resent})` : ""}.`;
         }
     } catch (e) {
         console.error("runReadinessAutoNotify", e);
