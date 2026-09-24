@@ -3485,6 +3485,7 @@ async function renderNotifySettingsInline() {
     const wh = s.webhookUrl || "";
     const tpl = s.templates || {};
     dboTplDefaults = s.templateDefaults || null;
+    const an = s.autoNotify || { enabled: true, delayMin: 5, intervalMin: 60, workhours: true };
     host.innerHTML = `
         <p class="dbo-ya-note">Бот один на всю компанию — рассылает уведомления о готовности в Telegram. Почта настраивается отдельно у каждого менеджера (Настройки → Пользователи → SMTP).</p>
         <div class="dbo-ya-status">Токен бота: <b class="${s.telegramTokenSet ? "payment-ok" : "payment-alert"}">${s.telegramTokenSet ? "задан" : "не задан"}</b></div>
@@ -3503,9 +3504,16 @@ async function renderNotifySettingsInline() {
             <button class="dbo-btn dbo-btn-primary" onclick="dboSaveTelegramSettings()">Сохранить</button>
         </div>
         <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
-        <div class="dbo-ya-status">Авто-отправка уведомлений о готовности: <b class="payment-ok">включена</b> (сервер, каждые 15 мин, раб. часы МСК пн–пт 8–20)</div>
-        <p class="dbo-ya-hint">Заказ в статусе «Заказ готов» с выбранным контактом уведомляется автоматически. Повторное уведомление уходит только если <b>состав заказа изменился</b> после прошлого (добавили/убрали позицию) — простой флип-флоп статуса «готов→печать→готов» повтора не даёт. Дедуп общий с ручной кнопкой. При первом запуске текущие «готовые» заказы помечаются как обработанные (без рассылки).</p>
+        <div class="cc-edit-persons-head">Авто-отправка уведомлений о готовности</div>
+        <p class="dbo-ya-hint">Как только заказ становится «Заказ готов» (с выбранным контактом) — уведомление уходит через заданную задержку. Если за это время статус увели обратно — отправка отменяется (защита от случайных нажатий). Повтор — только если <b>изменился состав заказа</b>. Страховочная проверка подстрахует, если событие из CRM не пришло. Дедуп общий с ручной кнопкой.</p>
+        <label class="dbo-an-check"><input type="checkbox" id="dboAnEnabled" ${an.enabled ? "checked" : ""}> Включить авто-отправку</label>
+        <div class="dbo-an-grid">
+            <label>Задержка после «готов», мин<input type="number" id="dboAnDelay" min="0" max="120" value="${Number(an.delayMin ?? 5)}"></label>
+            <label>Страховочная проверка, мин<input type="number" id="dboAnInterval" min="5" max="1440" value="${Number(an.intervalMin ?? 60)}"></label>
+        </div>
+        <label class="dbo-an-check"><input type="checkbox" id="dboAnWorkhours" ${an.workhours ? "checked" : ""}> Только в рабочие часы (пн–пт 8:00–20:00 МСК; вне их — до утра)</label>
         <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dboSaveAutoNotify()">Сохранить</button>
             <button class="dbo-btn" id="dboRunAutoNotifyBtn" onclick="dboRunAutoNotify()">Проверить готовые сейчас</button>
             <span id="dboAutoNotifyMsg" class="dbo-ya-note"></span>
         </div>
@@ -3557,6 +3565,24 @@ function dboResetReadinessTemplates() {
     set("dboTplTelegram", dboTplDefaults.telegramText);
     const msg = document.getElementById("dboTplMsg");
     if (msg) { msg.className = "dbo-ya-note"; msg.textContent = "Подставлены стандартные — нажмите «Сохранить тексты»."; }
+}
+async function dboSaveAutoNotify() {
+    const autoNotify = {
+        enabled: document.getElementById("dboAnEnabled")?.checked || false,
+        delayMin: document.getElementById("dboAnDelay")?.value || "5",
+        intervalMin: document.getElementById("dboAnInterval")?.value || "60",
+        workhours: document.getElementById("dboAnWorkhours")?.checked || false,
+    };
+    const msg = document.getElementById("dboAutoNotifyMsg");
+    try {
+        const r = await clientsApi("setAutoNotifySettings", { autoNotify });
+        const a = r.autoNotify || autoNotify;
+        if (msg) { msg.className = "dbo-ya-note payment-ok"; msg.textContent = a.enabled ? `Сохранено: задержка ${a.delayMin} мин, проверка ${a.intervalMin} мин.` : "Сохранено: авто-отправка выключена."; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Настройки авто-отправки сохранены");
+    } catch (e) {
+        console.error("setAutoNotifySettings", e);
+        if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = (e && e.message) || "Не удалось сохранить."; }
+    }
 }
 async function dboRunAutoNotify() {
     const btn = document.getElementById("dboRunAutoNotifyBtn");
