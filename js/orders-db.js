@@ -1220,7 +1220,40 @@ function dbElBaseName(e) {
     }
     return n;
 }
+// Завершённый заказ редактирует только админ. Хелпер + предупреждение.
+function dbCardLocked() {
+    const done = dbCardData?.deal?.status_name === "Завершено";
+    const admin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
+    return done && !admin;
+}
+function dbLockNotice() { alert("Заказ завершён. Менять позиции и цены можно только после того, как администратор снова откроет заказ."); }
+function dbRerenderCard() { if (dbCardData) renderDbDealCard(dbCardData, dbCardDealId); }
+// Смена ответственного менеджера заказа (только админ). Показываем select со списком менеджеров.
+async function dbChangeResponsible(crmId) {
+    const host = document.getElementById("dbMgrWrap");
+    if (!host) return;
+    let managers = [];
+    try { managers = (await clientsApi("listManagers", {})).managers || []; }
+    catch (e) { console.error("listManagers", e); alert("Не удалось загрузить список менеджеров."); return; }
+    if (!managers.length) { alert("Список менеджеров пуст (синхронизируйте пользователей из CRM)."); return; }
+    const cur = dbCardData?.deal?.employee_name || "";
+    host.innerHTML = `Менеджер: <select class="dbo-mgr-select" onchange="dbApplyResponsible(${Number(crmId)}, this)">
+        <option value="">— выбрать —</option>
+        ${managers.map(m => `<option value="${m.crmUserId}"${m.name === cur ? " selected" : ""}>${escapeHtml(m.name)}</option>`).join("")}
+      </select> <button type="button" class="dbo-mgr-edit" onclick="dbRerenderCard()" title="Отмена">×</button>`;
+}
+async function dbApplyResponsible(crmId, sel) {
+    const id = Number(sel?.value);
+    if (!Number.isFinite(id)) { dbRerenderCard(); return; }
+    try {
+        const r = await clientsApi("setDealResponsible", { crmId: Number(crmId), responsibleId: id });
+        if (dbCardData?.deal) dbCardData.deal.employee_name = r.employeeName || dbCardData.deal.employee_name;
+        renderDbDealCard(dbCardData, dbCardDealId);
+        if (typeof showReadinessToast === "function") showReadinessToast("Ответственный изменён: " + (r.employeeName || ""));
+    } catch (e) { console.error("setDealResponsible", e); alert("Не удалось сменить ответственного: " + (e.message || "")); dbRerenderCard(); }
+}
 function dbOpenElEdit(elId) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     if (!e) return;
     closeDbElEdit();
@@ -1520,6 +1553,7 @@ function dbAddElFromCalc() { dbCloseAddElMenu(); dbOpenCalcModal(); }
 
 // Форма новой позиции (как редактирование, но без макетов — их добавляют после сохранения).
 function dbOpenElAdd(prefill = {}) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     closeDbElEdit();
     const name = String(prefill.name ?? "").trim();
     const catId = prefill.categoryId != null ? Number(prefill.categoryId)
@@ -1722,6 +1756,7 @@ function dbElStatusBtn(e) {
 let dbElStatusMenuElId = null;
 function dbOpenElStatusMenu(ev, elId) {
     if (ev) ev.stopPropagation();
+    if (dbCardLocked()) { dbLockNotice(); return; }
     dbCloseStatusMenu();
     dbCloseElStatusMenu();
     dbElStatusMenuElId = elId;
@@ -1893,6 +1928,7 @@ async function dbFetchKpFile(dealId, companyId, format) {
 }
 // Удаление позиции: подтверждение → бэкенд удаляет её в CRM (PrintOffice) + БД.
 async function dbDeleteElement(elementId, btn) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const list = dbCardData?.elements || [];
     const idx = list.findIndex(x => Number(x.crm_element_id) === Number(elementId));
     if (idx < 0) return;
@@ -2134,8 +2170,14 @@ function renderDbDealCard(data, crmId) {
                 onblur="dbSaveCostInfo(${crmId}, this.value)">${escapeHtml(costInfo)}</textarea>
         </div>`;
 
+    // Права: завершённый заказ редактирует только админ (позиции/цены/статусы); он же — открывает заново.
+    const dbIsAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
+    const dbLocked = (d.status_name === "Завершено") && !dbIsAdmin;
+    const dbLockBanner = dbLocked
+        ? `<div class="dbo-lock-banner">🔒 Заказ завершён — наименования, цены и статусы менять нельзя. Снова открыть заказ может только администратор.</div>`
+        : "";
     ov.innerHTML = `
-        <div class="dbo-card" role="dialog" aria-modal="true">
+        <div class="dbo-card${dbLocked ? " dbo-card--locked" : ""}" role="dialog" aria-modal="true">
             <div class="dbo-head">
                 <div class="dbo-head-left">
                     <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button>${dbClientClickable ? `<button type="button" class="dbo-num-copy" onclick="dbNewDealForClient(${Number(d.client_crm_id)}, this)" title="Создать новый пустой заказ для этого клиента" aria-label="Новый заказ для клиента">${DBO_NEWDEAL_ICON}</button>` : ""}<a class="dbo-num-copy dbo-num-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в PrintOffice" aria-label="Открыть в PrintOffice">↗</a></div>
@@ -2159,11 +2201,12 @@ function renderDbDealCard(data, crmId) {
                     ${d.client_crm_id ? `<button type="button" class="hp-tab" id="dbTabDocs" data-dbtab="docs" onclick="dbSwitchCardTab('docs')">Приложения</button>` : ""}
                 </div>
                 <div class="dbo-tabpanel" id="dbPanel-order">
+                ${dbLockBanner}
                 <div class="dbo-elements">
                     ${elHead}
                     ${elBody}
                 </div>
-                <div class="dbo-addel-wrap">
+                <div class="dbo-addel-wrap"${dbLocked ? ' style="display:none;"' : ""}>
                     <button type="button" class="dbo-addel-btn" onclick="dbToggleAddElMenu(event)">+ Добавить наименование</button>
                     <div class="dbo-addel-menu" id="dbAddElMenu" hidden>
                         <button type="button" onclick="dbAddElManual()">Добавить вручную</button>
@@ -2173,7 +2216,7 @@ function renderDbDealCard(data, crmId) {
                 <div class="dbo-mid">
                     <div class="dbo-meta">
                         ${d.created_at_crm ? `<div>Дата заказа: <b>${escapeHtml(d.created_at_crm)}</b></div>` : ""}
-                        ${d.employee_name ? `<div>Менеджер: <b>${escapeHtml(d.employee_name)}</b></div>` : ""}
+                        ${(d.employee_name || dbIsAdmin) ? `<div id="dbMgrWrap">Менеджер: <b id="dbMgrName">${escapeHtml(d.employee_name || "—")}</b>${dbIsAdmin ? ` <button type="button" class="dbo-mgr-edit" onclick="dbChangeResponsible(${crmId})" title="Сменить ответственного менеджера">✎</button>` : ""}</div>` : ""}
                     </div>
                     <div class="dbo-summary-group">
                         <button type="button" class="dbo-profit-toggle" onclick="dbToggleProfit(this)" aria-expanded="false" title="Показать прибыль по заказу">${icon("eye")}<span>Прибыль</span></button>
@@ -3524,10 +3567,13 @@ async function renderNotifySettingsInline() {
             <label class="dbo-edit-wide">Тема письма (Email)
                 <input type="text" id="dboTplEmailSubject" value="${escapeHtml(tpl.emailSubject || "")}">
             </label>
-            <label class="dbo-edit-wide">Текст письма (Email)
-                <textarea id="dboTplEmailMessage" rows="5" style="font-family:inherit;">${escapeHtml(tpl.emailMessage || "")}</textarea>
+            <label class="dbo-edit-wide">HTML письма (Email)
+                <textarea id="dboTplEmailHtml" rows="12" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-space:pre;">${escapeHtml(tpl.emailHtml || "")}</textarea>
             </label>
-            <p class="dbo-ya-hint" style="margin:2px 0 10px;">Логотип, таблица позиций (<code>{positions}</code>), адрес с картой и подпись добавляются автоматически в фирменное оформление письма.</p>
+            <p class="dbo-ya-hint" style="margin:2px 0 10px;">Полный HTML письма. <code>{positions}</code> заменяется на строки таблицы позиций. Кнопка «Предпросмотр» покажет письмо с примером данных. «Сбросить» вернёт фирменный шаблон.</p>
+            <div class="settings-actions" style="margin:0 0 8px;">
+                <button class="dbo-btn" onclick="dboPreviewEmail()">Предпросмотр письма</button>
+            </div>
             <label class="dbo-edit-wide">Текст в Telegram (поддерживает HTML: &lt;b&gt;, &lt;i&gt;, &lt;a&gt;)
                 <textarea id="dboTplTelegram" rows="7" style="font-family:inherit;">${escapeHtml(tpl.telegramText || "")}</textarea>
             </label>
@@ -3543,7 +3589,7 @@ let dboTplDefaults = null;
 async function dboSaveReadinessTemplates() {
     const templates = {
         emailSubject: document.getElementById("dboTplEmailSubject")?.value || "",
-        emailMessage: document.getElementById("dboTplEmailMessage")?.value || "",
+        emailHtml: document.getElementById("dboTplEmailHtml")?.value || "",
         telegramText: document.getElementById("dboTplTelegram")?.value || "",
     };
     const msg = document.getElementById("dboTplMsg");
@@ -3556,12 +3602,29 @@ async function dboSaveReadinessTemplates() {
         if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = (e && e.message) || "Не удалось сохранить."; }
     }
 }
+// Предпросмотр письма: рендерим текущий (несохранённый) HTML на бэкенде с примером данных и открываем.
+async function dboPreviewEmail() {
+    const emailHtml = document.getElementById("dboTplEmailHtml")?.value || "";
+    const emailSubject = document.getElementById("dboTplEmailSubject")?.value || "";
+    const msg = document.getElementById("dboTplMsg");
+    try {
+        const r = await clientsApi("previewReadinessEmail", { emailHtml, emailSubject });
+        const w = window.open("", "_blank");
+        if (!w) { if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = "Разрешите всплывающие окна для предпросмотра."; } return; }
+        w.document.open();
+        w.document.write(`<title>Тема: ${escapeHtml(r.subject || "")}</title>` + (r.html || ""));
+        w.document.close();
+    } catch (e) {
+        console.error("previewReadinessEmail", e);
+        if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = (e && e.message) || "Не удалось построить предпросмотр."; }
+    }
+}
 function dboResetReadinessTemplates() {
     if (!dboTplDefaults) return;
-    if (!confirm("Вернуть стандартные тексты для письма и Telegram?")) return;
+    if (!confirm("Вернуть стандартный шаблон письма и текст Telegram?")) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
     set("dboTplEmailSubject", dboTplDefaults.emailSubject);
-    set("dboTplEmailMessage", dboTplDefaults.emailMessage);
+    set("dboTplEmailHtml", dboTplDefaults.emailHtml);
     set("dboTplTelegram", dboTplDefaults.telegramText);
     const msg = document.getElementById("dboTplMsg");
     if (msg) { msg.className = "dbo-ya-note"; msg.textContent = "Подставлены стандартные — нажмите «Сохранить тексты»."; }
