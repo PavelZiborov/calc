@@ -2154,10 +2154,26 @@
     .deal-notify-dd-toggle.is-unset { border-color: #d9534f; background: #fdf4f4; color: #b03434; box-shadow: 0 0 0 3px rgba(217,83,79,0.10); }
     .deal-notify-dd-toggle.is-unset .deal-notify-dd-current { color: #b03434; font-weight: 600; }
     .deal-notify-dd-toggle.is-unset .deal-notify-dd-caret { color: #cf6b68; }
-    /* Инлайн-блок уведомления в шапке карточки (без внешнего details-дропдауна) */
-    .dbo-notify-inline { width: 300px; max-width: 100%; text-align: left; }
-    .dbo-notify-inline-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    .dbo-notify-inline-head .icn { width: 14px; height: 14px; color: var(--accent); }
+    /* Инлайн-панель уведомления — ГОРИЗОНТАЛЬНАЯ полоса под шапкой карточки (не тянется вниз). */
+    .dbo-notify-inline {
+        width: auto; max-width: 100%;
+        display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+        text-align: left; padding: 10px 12px; margin: 10px 0 0;
+    }
+    .dbo-notify-inline > .deal-notify-body { display: contents; }   /* дети тела участвуют в общей flex-строке */
+    .dbo-notify-inline-head { order: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text); flex: 0 0 auto; }
+    .dbo-notify-inline-head .icn { width: 15px; height: 15px; color: var(--accent); }
+    /* Порядок: интерактив в одну строку, справочные строки — под ней на всю ширину. */
+    .dbo-notify-inline .deal-notify-row { order: 1; flex: 1 1 260px; min-width: 200px; max-width: 400px; }
+    .dbo-notify-inline .deal-notify-channels { order: 2; flex: 0 1 auto; }
+    .dbo-notify-inline .deal-notify-send-btn { order: 3; margin: 0; align-self: center; flex: 0 0 auto; }
+    .dbo-notify-inline .deal-notify-alert { order: 4; flex: 1 1 100%; margin: 0; }
+    .dbo-notify-inline .deal-notify-sent { order: 5; flex: 1 1 100%; margin: 0; }
+    .dbo-notify-inline .deal-notify-tgstatus { order: 6; flex: 1 1 100%; margin: 0; }
+    @media (max-width: 720px) {
+        .dbo-notify-inline .deal-notify-row { flex: 1 1 100%; max-width: none; }
+        .dbo-notify-inline .deal-notify-send-btn { flex: 1 1 100%; }
+    }
     .deal-notify-dd-current { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1c1b19; }
     .deal-notify-dd-caret { flex: 0 0 auto; color: #9a988f; font-size: 11px; transition: transform .15s ease; }
     .deal-notify-dd.is-open .deal-notify-dd-caret { transform: rotate(180deg); }

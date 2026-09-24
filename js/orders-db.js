@@ -2147,12 +2147,12 @@ function renderDbDealCard(data, crmId) {
                 </div>
                 <div class="dbo-head-right">
                     ${dealStatusControl}
-                    <div class="deal-notify-section dbo-notify-inline" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
-                        <div class="dbo-notify-inline-head">${icon("mail")}<span>Уведомление о готовности</span></div>
-                        <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
-                    </div>
                 </div>
                 <button class="dbo-close" onclick="closeDbDealCard()" aria-label="Закрыть">×</button>
+            </div>
+            <div class="deal-notify-section dbo-notify-inline" id="dbNotifySection" data-deal-id="${crmId}"${d.client_crm_id ? ` data-client-id="${Number(d.client_crm_id)}"` : ""}>
+                <div class="dbo-notify-inline-head">${icon("mail")}<span>Уведомление о готовности</span></div>
+                <div class="deal-notify-body"><div class="deal-notify-loading">Загрузка контактов…</div></div>
             </div>
             <div class="dbo-body">
                 <div class="hp-tabs" id="dbCardTabs" hidden>
@@ -3476,6 +3476,8 @@ async function renderNotifySettingsInline() {
     let s = {};
     try { s = await clientsApi("getNotifySettings", {}); } catch (_) {}
     const wh = s.webhookUrl || "";
+    const tpl = s.templates || {};
+    dboTplDefaults = s.templateDefaults || null;
     host.innerHTML = `
         <p class="dbo-ya-note">Бот один на всю компанию — рассылает уведомления о готовности в Telegram. Почта настраивается отдельно у каждого менеджера (Настройки → Пользователи → SMTP).</p>
         <div class="dbo-ya-status">Токен бота: <b class="${s.telegramTokenSet ? "payment-ok" : "payment-alert"}">${s.telegramTokenSet ? "задан" : "не задан"}</b></div>
@@ -3499,7 +3501,55 @@ async function renderNotifySettingsInline() {
         <div class="settings-actions">
             <button class="dbo-btn" id="dboRunAutoNotifyBtn" onclick="dboRunAutoNotify()">Проверить готовые сейчас</button>
             <span id="dboAutoNotifyMsg" class="dbo-ya-note"></span>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
+        <div class="dbo-notify-tpl">
+            <div class="cc-edit-persons-head">Тексты уведомлений</div>
+            <p class="dbo-ya-hint">Переменные подставляются автоматически: <code>{orderNum}</code> — № заказа, <code>{contactName}</code> — имя контакта, <code>{managerName}</code> — менеджер, <code>{positions}</code> — список позиций, <code>{address}</code> — адрес, <code>{mapLink}</code> — ссылка на карту${""}. Для Telegram ещё <code>{managerChat}</code> — ссылка «Написать менеджеру».</p>
+            <label class="dbo-edit-wide">Тема письма (Email)
+                <input type="text" id="dboTplEmailSubject" value="${escapeHtml(tpl.emailSubject || "")}">
+            </label>
+            <label class="dbo-edit-wide">Текст письма (Email)
+                <textarea id="dboTplEmailMessage" rows="5" style="font-family:inherit;">${escapeHtml(tpl.emailMessage || "")}</textarea>
+            </label>
+            <p class="dbo-ya-hint" style="margin:2px 0 10px;">Логотип, таблица позиций (<code>{positions}</code>), адрес с картой и подпись добавляются автоматически в фирменное оформление письма.</p>
+            <label class="dbo-edit-wide">Текст в Telegram (поддерживает HTML: &lt;b&gt;, &lt;i&gt;, &lt;a&gt;)
+                <textarea id="dboTplTelegram" rows="7" style="font-family:inherit;">${escapeHtml(tpl.telegramText || "")}</textarea>
+            </label>
+            <div class="settings-actions">
+                <button class="dbo-btn dbo-btn-primary" onclick="dboSaveReadinessTemplates()">Сохранить тексты</button>
+                <button class="dbo-btn" onclick="dboResetReadinessTemplates()">Сбросить к стандартным</button>
+                <span id="dboTplMsg" class="dbo-ya-note"></span>
+            </div>
         </div>`;
+}
+// Дефолты шаблонов (для «Сбросить») — приходят из getNotifySettings.
+let dboTplDefaults = null;
+async function dboSaveReadinessTemplates() {
+    const templates = {
+        emailSubject: document.getElementById("dboTplEmailSubject")?.value || "",
+        emailMessage: document.getElementById("dboTplEmailMessage")?.value || "",
+        telegramText: document.getElementById("dboTplTelegram")?.value || "",
+    };
+    const msg = document.getElementById("dboTplMsg");
+    try {
+        await clientsApi("setReadinessTemplates", { templates });
+        if (msg) { msg.className = "dbo-ya-note payment-ok"; msg.textContent = "Тексты сохранены."; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Тексты уведомлений сохранены");
+    } catch (e) {
+        console.error("setReadinessTemplates", e);
+        if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = (e && e.message) || "Не удалось сохранить."; }
+    }
+}
+function dboResetReadinessTemplates() {
+    if (!dboTplDefaults) return;
+    if (!confirm("Вернуть стандартные тексты для письма и Telegram?")) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
+    set("dboTplEmailSubject", dboTplDefaults.emailSubject);
+    set("dboTplEmailMessage", dboTplDefaults.emailMessage);
+    set("dboTplTelegram", dboTplDefaults.telegramText);
+    const msg = document.getElementById("dboTplMsg");
+    if (msg) { msg.className = "dbo-ya-note"; msg.textContent = "Подставлены стандартные — нажмите «Сохранить тексты»."; }
 }
 async function dboRunAutoNotify() {
     const btn = document.getElementById("dboRunAutoNotifyBtn");
