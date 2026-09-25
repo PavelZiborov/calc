@@ -3564,12 +3564,70 @@ function openSettingsPage() {
     renderSalarySettingsInline();
     renderNotifySettingsInline();
     renderKpSettingsInline();
+    renderStatusSettingsInline();
     settingsSwitchTab("calc");
+}
+// ——— Настройки: автоматизация статусов заказа (по статусам позиций) ———
+async function renderStatusSettingsInline() {
+    const host = document.getElementById("settingsStatusHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let s;
+    try { s = await clientsApi("getStatusSettings", {}); }
+    catch (e) { host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить статусы.</p>`; return; }
+    if (!s.isAdmin && s.isAdmin !== undefined) { /* getStatusSettings доступен staff; настройку сохраняет админ */ }
+    const a = s.automation || {};
+    const statuses = Array.isArray(s.statuses) ? s.statuses : [];
+    const opt = (sel) => `<option value="">— не выбран —</option>` + statuses.map(st =>
+        `<option value="${st.id}"${Number(sel) === Number(st.id) ? " selected" : ""}>${escapeHtml(st.name)} (id ${st.id})</option>`).join("");
+    const swatches = statuses.map(st => {
+        const bg = st.bk_color || "#eef1f5", fg = st.text_color || "#1c1b19";
+        return `<span class="status-swatch" style="background:${escapeHtml(bg)};color:${escapeHtml(fg)}" title="id ${st.id}">${escapeHtml(st.name)}</span>`;
+    }).join(" ");
+    host.innerHTML = `
+        <p class="dbo-ya-hint">Когда меняется статус позиции, заказ пересчитывается автоматически:
+        все позиции завершены → <b>«готов»</b>; все завершены, кроме «доставки» → <b>«Доставка»</b>. Дальше — уведомление о готовности (см. вкладку «Уведомления»).</p>
+        <label class="dbo-an-check"><input type="checkbox" id="dbStAutoEnabled" ${a.enabled ? "checked" : ""}> Включить авто-перевод статуса по позициям</label>
+        <div class="dbo-an-grid" style="flex-direction:column;gap:10px;max-width:520px;">
+            <label style="width:100%;">Статус «Заказ готов» (все позиции завершены)
+                <select id="dbStReady" style="width:100%;">${opt(a.readyId)}</select>
+            </label>
+            <label style="width:100%;">Статус «Доставка» (готово всё, кроме доставки)
+                <select id="dbStDelivery" style="width:100%;">${opt(a.deliveryId)}</select>
+            </label>
+            <label style="width:100%;">Слово-признак «доставки» в названии позиции
+                <input type="text" id="dbStKeyword" value="${escapeHtml(a.deliveryKeyword || "доставка")}" style="width:100%;">
+            </label>
+        </div>
+        <div class="settings-actions">
+            <button class="dbo-btn dbo-btn-primary" onclick="dbSaveStatusAutomation()">Сохранить</button>
+            <span id="dbStMsg" class="dbo-ya-note"></span>
+        </div>
+        <div class="cc-edit-persons-head" style="margin-top:16px;">Статусы сделок (из PrintOffice)</div>
+        <p class="dbo-ya-hint">Имена и цвета статусов сейчас берутся из PrintOffice24 (меняются там). Отдельный редактор статусов у нас (переименование/цвет/порядок с хранением у себя) — сделаю следующим шагом.</p>
+        <div class="status-swatches">${swatches || "<span class=\"dbo-ya-note\">Статусы не загружены</span>"}</div>`;
+}
+async function dbSaveStatusAutomation() {
+    const automation = {
+        enabled: document.getElementById("dbStAutoEnabled")?.checked || false,
+        readyId: document.getElementById("dbStReady")?.value || "",
+        deliveryId: document.getElementById("dbStDelivery")?.value || "",
+        deliveryKeyword: document.getElementById("dbStKeyword")?.value || "доставка",
+    };
+    const msg = document.getElementById("dbStMsg");
+    try {
+        await clientsApi("setStatusSettings", { automation });
+        if (msg) { msg.className = "dbo-ya-note payment-ok"; msg.textContent = "Сохранено."; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Автоматизация статусов сохранена");
+    } catch (e) {
+        console.error("setStatusSettings", e);
+        if (msg) { msg.className = "dbo-ya-note payment-alert"; msg.textContent = (e && e.message) || "Не удалось сохранить."; }
+    }
 }
 // Вкладки раздела «Настройки»: Калькулятор / Финансы / Интеграции / Уведомления / Система.
 function settingsSwitchTab(tab) {
     document.querySelectorAll("#settingsTabs .hp-tab").forEach(b => b.classList.toggle("is-active", b.dataset.settab === tab));
-    ["calc", "finance", "integrations", "notify", "system"].forEach(t => {
+    ["calc", "finance", "integrations", "notify", "status", "system"].forEach(t => {
         const p = document.getElementById("setPanel-" + t);
         if (p) p.hidden = (t !== tab);
     });

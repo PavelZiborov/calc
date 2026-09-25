@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=153">
+<link rel="stylesheet" href="css/app.css?v=154">
 </head>
 <body>
 
@@ -395,6 +395,7 @@
             <button type="button" class="hp-tab" data-settab="finance" onclick="settingsSwitchTab('finance')">Финансы</button>
             <button type="button" class="hp-tab" data-settab="integrations" onclick="settingsSwitchTab('integrations')">Интеграции</button>
             <button type="button" class="hp-tab" data-settab="notify" onclick="settingsSwitchTab('notify')">Уведомления</button>
+            <button type="button" class="hp-tab" data-settab="status" onclick="settingsSwitchTab('status')">Статусы</button>
             <button type="button" class="hp-tab" data-settab="system" onclick="settingsSwitchTab('system')">Система</button>
         </div>
 
@@ -460,6 +461,16 @@
             </div>
         </div>
 
+        <div class="hp-tabpanel" id="setPanel-status" hidden>
+            <div class="settings-sections">
+                <section class="settings-card">
+                    <h3>Автоматизация статусов заказа</h3>
+                    <p class="settings-card-note">Автоматический перевод статуса заказа по статусам позиций. Всё настраивается здесь, без жёсткой привязки к PrintOffice.</p>
+                    <div id="settingsStatusHost"></div>
+                </section>
+            </div>
+        </div>
+
         <div class="hp-tabpanel" id="setPanel-system" hidden>
             <div class="settings-sections">
                 <section class="settings-card" id="settingsUsersCard">
@@ -492,19 +503,19 @@
     </div>
 </div>
 
-<script src="js/config.js?v=153"></script>
-<script src="js/calculator-data.js?v=153"></script>
-<script src="js/calc-settings.js?v=153"></script>
-<script src="js/calc-settings-ui.js?v=153"></script>
-<script src="js/utils.js?v=153"></script>
-<script src="js/auth.js?v=153"></script>
-<script src="js/calculator.js?v=153"></script>
-<script src="js/crm.js?v=153"></script>
-<script src="js/element-editor.js?v=153"></script>
-<script src="js/kp-docx.js?v=153"></script>
-<script src="js/calc-sheet.js?v=153"></script>
-<script src="js/clients.js?v=153"></script>
-<script src="js/orders-db.js?v=153"></script>
-<script src="js/main.js?v=153"></script>
+<script src="js/config.js?v=154"></script>
+<script src="js/calculator-data.js?v=154"></script>
+<script src="js/calc-settings.js?v=154"></script>
+<script src="js/calc-settings-ui.js?v=154"></script>
+<script src="js/utils.js?v=154"></script>
+<script src="js/auth.js?v=154"></script>
+<script src="js/calculator.js?v=154"></script>
+<script src="js/crm.js?v=154"></script>
+<script src="js/element-editor.js?v=154"></script>
+<script src="js/kp-docx.js?v=154"></script>
+<script src="js/calc-sheet.js?v=154"></script>
+<script src="js/clients.js?v=154"></script>
+<script src="js/orders-db.js?v=154"></script>
+<script src="js/main.js?v=154"></script>
 </body>
 </html>
