@@ -3617,6 +3617,19 @@ async function renderNotifySettingsInline() {
             <button class="dbo-btn" id="dboRunAutoNotifyBtn" onclick="dboRunAutoNotify()">Проверить готовые сейчас</button>
             <span id="dboAutoNotifyMsg" class="dbo-ya-note"></span>
         </div>
+        ${(() => {
+            const w = s.webhook || {};
+            const got = Number(w.count) || 0;
+            const last = w.lastAt ? new Date(w.lastAt).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) : null;
+            return `<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
+            <div class="cc-edit-persons-head">Приём вебхуков PrintOffice</div>
+            <div class="dbo-ya-status">Вебхуков получено: <b class="${got ? "payment-ok" : "payment-alert"}">${got}</b>${got && last ? ` · последний: <b>${escapeHtml(last)}</b>${w.lastEvent ? ` (${escapeHtml(w.lastEvent)})` : ""}` : ""}</div>
+            <p class="dbo-ya-hint">${got
+                ? "CRM шлёт события напрямую нам — мгновенная 5-минутная доставка уведомлений работает."
+                : "Событий от PrintOffice ещё не приходило. Если CRM шлёт вебхуки только в n8n — 5-минутная доставка не сработает (её подстрахует часовой бэкстоп). Проверить: смените статус любого заказа прямо в PrintOffice и обновите этот блок."}
+                URL для вебхука: <code style="word-break:break-all;">${escapeHtml(w.url || "")}?token=…</code></p>
+        </div>`;
+        })()}
         <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
         <div class="dbo-notify-tpl">
             <div class="cc-edit-persons-head">Тексты уведомлений</div>
