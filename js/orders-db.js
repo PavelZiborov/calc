@@ -1269,10 +1269,10 @@ async function dbMgrPick(crmId, responsibleId) {
     } catch (e) { console.error("setDealResponsible", e); alert("Не удалось сменить ответственного: " + (e.message || "")); }
 }
 function dbOpenElEdit(elId) {
-    if (dbCardLocked()) { dbLockNotice(); return; }
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     if (!e) return;
     closeDbElEdit();
+    const locked = dbCardLocked();   // завершённый заказ — открываем на ПРОСМОТР (без редактирования)
     const name = dbElBaseName(e);
     const catId = e.category_id != null ? Number(e.category_id) : null;
     const catOpts = (dbCardCategories || []).map(c =>
@@ -1291,10 +1291,11 @@ function dbOpenElEdit(elId) {
     ov.innerHTML = `
         <div class="dbo-edit" role="dialog" aria-modal="true">
             <div class="dbo-edit-head">
-                <h3>Редактирование позиции</h3>
+                <h3>${locked ? "Позиция — просмотр" : "Редактирование позиции"}</h3>
                 <button class="dbo-close" onclick="closeDbElEdit()" aria-label="Закрыть">×</button>
             </div>
             <div class="dbo-edit-body">
+                <fieldset class="dbo-edit-fieldset"${locked ? " disabled" : ""}>
                 <label class="dbo-edit-wide">Наименование
                     <textarea id="dbEditName" class="dbo-edit-name" rows="1" oninput="dbAutoGrow(this)">${escapeHtml(name)}</textarea>
                 </label>
@@ -1328,12 +1329,16 @@ function dbOpenElEdit(elId) {
                 </label>
                 <div class="dbo-assets-title dbo-assets-heading">Превью и макеты</div>
                 ${dboAssetsEditHtml(elId)}
+                </fieldset>
             </div>
-            <div class="dbo-edit-note">Имя и категорию в PrintOffice нельзя менять напрямую — при их изменении позиция пересоздаётся (удаляется и создаётся заново).</div>
-            <div class="dbo-edit-actions">
-                <button class="dbo-btn dbo-btn-primary" id="dbEditSaveBtn" onclick="dbSaveElEdit(${elId})">Сохранить</button>
-                <button class="dbo-btn" onclick="closeDbElEdit()">Отмена</button>
-            </div>
+            ${locked
+                ? `<div class="dbo-edit-note dbo-edit-note--lock">🔒 Заказ завершён — просмотр без редактирования. Открыть заказ заново (и разрешить правки) может только администратор, сменив статус.</div>
+                   <div class="dbo-edit-actions"><button class="dbo-btn" onclick="closeDbElEdit()">Закрыть</button></div>`
+                : `<div class="dbo-edit-note">Имя и категорию в PrintOffice нельзя менять напрямую — при их изменении позиция пересоздаётся (удаляется и создаётся заново).</div>
+                   <div class="dbo-edit-actions">
+                       <button class="dbo-btn dbo-btn-primary" id="dbEditSaveBtn" onclick="dbSaveElEdit(${elId})">Сохранить</button>
+                       <button class="dbo-btn" onclick="closeDbElEdit()">Отмена</button>
+                   </div>`}
         </div>`;
     document.body.appendChild(ov);
     document.addEventListener("keydown", dbElEditEsc);
@@ -1495,6 +1500,7 @@ function dbCostBlur(el) {
     if (!String(el.value).trim()) el.value = "0";
 }
 async function dbSaveElEdit(elId) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     if (!e) return;
     const val = id => document.getElementById(id)?.value;
@@ -3325,8 +3331,9 @@ function dboPreviewBoxClick(elementId) {
     if (dboUploadBusy === elementId) return;
     const cached = dboAssets.get(dboAssetKey(elementId));
     const url = cached?.preview?.url || cached?.preview?.thumbUrl;
-    if (dboIsImageUrl(url)) dboOpenLightbox(url);
-    else document.getElementById(`dboPreviewInput_${elementId}`)?.click();
+    if (dboIsImageUrl(url)) { dboOpenLightbox(url); return; }   // просмотр разрешён всегда
+    if (dbCardLocked()) return;   // нет превью + заказ завершён → загрузка недоступна
+    document.getElementById(`dboPreviewInput_${elementId}`)?.click();
 }
 // Разметка прогресс-бара со шкалой в процентах (индетерминантная, пока нет ratio).
 function dboProgressHtml(label) {
@@ -3378,6 +3385,7 @@ function dboClearBusy(elementId) { dboUploadBusy = null; dboUploadLabel = ""; db
 
 // Загрузка превью из <input> (клик) — делегирует на файловый core.
 function dboUploadPreview(elementId, input) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const file = input?.files?.[0];
     if (input) input.value = "";
     if (file) dboUploadPreviewFile(elementId, file);
@@ -3410,6 +3418,7 @@ async function dboUploadPreviewFile(elementId, file) {
 
 // Загрузка макетов из <input> (клик) — делегирует на файловый core.
 function dboUploadLayout(elementId, input) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const files = [...(input?.files || [])];
     if (input) input.value = "";
     if (files.length) dboUploadLayoutFiles(elementId, files);
@@ -3458,6 +3467,7 @@ async function dboUploadLayoutFiles(elementId, files) {
 }
 
 async function dboAddLayoutLink(elementId) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const inp = document.getElementById(`dboLinkInput_${elementId}`);
     const url = String(inp?.value || "").trim();
     if (!url) return;
@@ -3475,6 +3485,7 @@ async function dboAddLayoutLink(elementId) {
 }
 
 async function dboDeletePreview(elementId) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     if (!confirm("Удалить превью позиции?")) return;
     dboSetBusy(elementId, "Удаление превью…", "preview");
     try {
@@ -3489,6 +3500,7 @@ async function dboDeletePreview(elementId) {
 }
 
 async function dboDeleteLayout(elementId, layoutId) {
+    if (dbCardLocked()) { dbLockNotice(); return; }
     if (!confirm("Удалить макет?")) return;
     dboSetBusy(elementId, "Удаление макета…", "layout");
     try {

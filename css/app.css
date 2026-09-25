@@ -930,8 +930,18 @@
     .dbo-an-grid input { width: 120px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; box-sizing: border-box; }
     /* Завершённый заказ: блокировка редактирования позиций (кроме админа) */
     .dbo-lock-banner { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #6b4e00; background: #fff8e1; border: 1px solid #ffe0a3; border-radius: 8px; padding: 9px 12px; margin: 0 0 12px; }
-    .dbo-card--locked .dbo-el-title--edit { cursor: default; }
     .dbo-card--locked .dbo-el-del, .dbo-card--locked .dbo-el-statusbtn { display: none; }
+    /* Просмотр позиции завершённого заказа: поля видны и читаемы, но не редактируются */
+    .dbo-edit-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+    .dbo-edit-fieldset:disabled { opacity: 1; }
+    .dbo-edit-fieldset:disabled input, .dbo-edit-fieldset:disabled textarea, .dbo-edit-fieldset:disabled select {
+        background: #f6f5f2; color: var(--text); -webkit-text-fill-color: var(--text); opacity: 1; cursor: default;
+    }
+    .dbo-edit-fieldset:disabled .dbo-units-btn, .dbo-edit-fieldset:disabled .dbo-resp-btn { background: #f6f5f2; color: var(--text); cursor: default; }
+    .dbo-edit-fieldset:disabled .dbo-asset-del, .dbo-edit-fieldset:disabled .dbo-preview-upload,
+    .dbo-edit-fieldset:disabled .dbo-layout-add, .dbo-edit-fieldset:disabled .dbo-layout-drophint,
+    .dbo-edit-fieldset:disabled .dbo-btn { display: none; }
+    .dbo-edit-note--lock { color: #6b4e00; background: #fff8e1; border: 1px solid #ffe0a3; border-radius: 8px; padding: 9px 12px; font-weight: 600; margin: 0 16px; }
     /* Смена ответственного менеджера — кликабельное имя + аккуратный дропдаун */
     .dbo-mgr-dd { position: relative; display: inline-block; }
     .dbo-mgr-pill { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 2px 7px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
