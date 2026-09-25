@@ -905,11 +905,12 @@
     .salary-adj-del { flex: 0 0 auto; }
     .salary-deals-link { margin: 0; width: auto; padding: 2px 8px; background: transparent; border: none; box-shadow: none; color: var(--accent); font-weight: 700; font-size: inherit; cursor: pointer; text-decoration: underline; }
     .salary-deals-link:hover, .salary-deals-link:focus { background: transparent; color: var(--accent-strong); box-shadow: none; }
-    .salary-deals-modal { width: min(700px, 100%); }
+    .salary-deals-modal { width: min(920px, 96vw); }
+    .salary-deals-table .salary-op { display: inline-block; white-space: nowrap; }
     .salary-deals-table td.num, .salary-deals-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
     .salary-deals-table .salary-deal-row { cursor: pointer; }
     .salary-deals-table .salary-deal-row:hover { background: var(--surface-2); }
-    .salary-deals-table .salary-deal-client { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .salary-deals-table .salary-deal-client { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
     .salary-deals-table tfoot td { border-top: 2px solid var(--border); font-weight: 600; }
     /* Страница «Настройки» */
     .settings-page { max-width: 760px; }

@@ -241,6 +241,13 @@ function updateDbFiltersBtn() {
     if (btn) btn.classList.toggle("has-active", dbFiltersActive());
 }
 
+// Стартовый вид для staff: раздел «Заказы» по умолчанию + открытие заказа по якорю #deal-<№>.
+function bootDbOrdersView() {
+    if (typeof currentUser === "undefined" || currentUser.role !== "staff") return;   // только сотрудники
+    const m = String(location.hash || "").match(/^#deal-([^/?#]+)$/);
+    openDbOrders();
+    if (m) { try { openDealByNum(decodeURIComponent(m[1])); } catch (_) {} }
+}
 function openDbOrders(trigger) {
     if (!ensureActiveSession()) return;
     switchTab("db-orders-tab", trigger || document.querySelector('.tab-btn[data-tab-target="db-orders-tab"]'));
@@ -1153,6 +1160,18 @@ function closeDbDealCard() {
     if (typeof closeDbElEdit === "function") closeDbElEdit();
     if (typeof closeDbPayModal === "function") closeDbPayModal();
     if (typeof dbCloseInvoice === "function") dbCloseInvoice();
+    // Убираем якорь заказа из URL (ссылка снова указывает на раздел, а не на конкретный заказ).
+    if (String(location.hash || "").startsWith("#deal-")) {
+        try { history.replaceState(null, "", location.pathname + location.search); } catch (_) {}
+    }
+}
+// Открыть заказ по номеру (№) — для прямых ссылок вида #deal-9701.
+async function openDealByNum(num) {
+    try {
+        const r = await clientsApi("dealCrmIdByNum", { num: String(num) });
+        if (r && r.crmId) openDbDealCard(Number(r.crmId));
+        else if (typeof showReadinessToast === "function") showReadinessToast("Заказ № " + num + " не найден");
+    } catch (e) { console.error("openDealByNum", e); }
 }
 
 async function openDbDealCard(crmId) {
@@ -2151,6 +2170,10 @@ function renderDbDealCard(data, crmId) {
     if (Number(dbCardDealId) !== Number(crmId)) dbCostHidden = false;
     dbCardDealId = crmId;
     dbCardData = data;
+    // Якорь заказа в URL (для прямой ссылки на этот заказ). Используем № (d.num) — удобно делиться.
+    if (d.num != null && String(d.num) !== "") {
+        try { history.replaceState(null, "", "#deal-" + encodeURIComponent(String(d.num))); } catch (_) {}
+    }
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
     dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
     if (Array.isArray(data?.payMethods) && data.payMethods.length) dbCardPayMethods = data.payMethods;
