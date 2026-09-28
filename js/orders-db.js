@@ -1308,7 +1308,8 @@ function dbOpenElEdit(elId) {
     ov.setAttribute("onclick", "if (overlayClickedSelf(event)) closeDbElEdit()");
     ov.style.display = "flex";
     ov.innerHTML = `
-        <div class="dbo-edit" role="dialog" aria-modal="true">
+        <div class="dbo-edit"${locked ? "" : ` ondragenter="dboEditDragOver(event)" ondragover="dboEditDragOver(event)" ondragleave="dboEditDragLeave(event)" ondrop="dboEditDrop(event, ${elId})"`} role="dialog" aria-modal="true">
+            ${locked ? "" : `<div class="dbo-drop-overlay" aria-hidden="true"><div class="dbo-drop-overlay-card">${icon("upload") || "📎"}<div class="dbo-drop-overlay-t">Отпустите файлы</div><div class="dbo-drop-overlay-s">добавлю как макеты · на квадрат превью — как превью</div></div></div>`}
             <div class="dbo-edit-head">
                 <h3>${locked ? "Позиция — просмотр" : "Редактирование позиции"}</h3>
                 <button class="dbo-close" onclick="closeDbElEdit()" aria-label="Закрыть">×</button>
@@ -3369,16 +3370,45 @@ function dboProgressHtml(label) {
     </div>`;
 }
 // Перетаскивание файлов в области превью/макетов.
-function dboDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("dbo-drop-active"); }
+// В событии drag есть файл? (а не выделенный текст/элемент)
+function dboDragHasFiles(e) {
+    const t = e.dataTransfer?.types;
+    return !!(t && (t.includes ? t.includes("Files") : Array.from(t).includes("Files")));
+}
+function dboDragOver(e) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add("dbo-drop-active"); }
 function dboDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove("dbo-drop-active"); }
 function dboDropPreview(e, elementId) {
-    e.preventDefault(); e.currentTarget.classList.remove("dbo-drop-active");
+    e.preventDefault(); e.stopPropagation();   // превью-квадрат обрабатывает сам, не пускаем в общий обработчик модалки
+    e.currentTarget.classList.remove("dbo-drop-active");
+    const dm = document.querySelector("#dbElEditOverlay .dbo-edit"); if (dm) dm.classList.remove("dbo-edit--dragging");
     const f = [...(e.dataTransfer?.files || [])].filter(x => x && /^image\//.test(x.type))[0];
     if (f) dboUploadPreviewFile(elementId, f);
     else alert("Для превью нужен файл-изображение (JPG, PNG, WebP, GIF).");
 }
 function dboDropLayout(e, elementId) {
     e.preventDefault(); e.currentTarget.classList.remove("dbo-drop-active");
+    const files = [...(e.dataTransfer?.files || [])].filter(x => x && x.size > 0);
+    if (files.length) dboUploadLayoutFiles(elementId, files);
+}
+// Перетаскивание файла на ВСЮ модалку редактирования позиции → загрузка как макеты
+// (кроме квадрата превью — он останавливает событие и грузит как превью).
+function dboEditDragOver(e) {
+    if (!dboDragHasFiles(e)) return;
+    e.preventDefault();
+    const dm = document.querySelector("#dbElEditOverlay .dbo-edit");
+    if (dm) dm.classList.add("dbo-edit--dragging");
+}
+function dboEditDragLeave(e) {
+    const dm = e.currentTarget;
+    // Уводим подсветку только если курсор реально вышел за пределы модалки.
+    if (!dm.contains(e.relatedTarget)) dm.classList.remove("dbo-edit--dragging");
+}
+function dboEditDrop(e, elementId) {
+    e.preventDefault();
+    const dm = e.currentTarget;
+    dm.classList.remove("dbo-edit--dragging");
+    dm.querySelectorAll(".dbo-drop-active").forEach(el => el.classList.remove("dbo-drop-active"));
+    if (dbCardLocked()) { dbLockNotice(); return; }
     const files = [...(e.dataTransfer?.files || [])].filter(x => x && x.size > 0);
     if (files.length) dboUploadLayoutFiles(elementId, files);
 }
