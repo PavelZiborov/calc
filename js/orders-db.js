@@ -822,6 +822,21 @@ function dbSetDealStatusLocal(dealId, statusId, statusName) {
         if (ov && ov.style.display !== "none") renderDbDealCard(dbCardData, dbCardDealId);
     }
 }
+// Обновить кэш списка/канбана свежими данными открытой карточки (getDeal синкает оплаты в
+// deals.debt/paid — иначе при возврате к списку сумма/«Оплачено» остаются старыми до ре-поиска).
+function dbSyncListDealFromCard(fresh) {
+    if (!fresh || fresh.crm_deal_id == null) return;
+    const id = Number(fresh.crm_deal_id);
+    const flds = ["amount", "debt", "paid", "status_id", "status_name", "content", "employee_name"];
+    let touched = false;
+    [dbOrdersState.deals, dbOrdersState.kanbanDeals].forEach(arr => (arr || []).forEach(d => {
+        if (Number(d.crm_deal_id) !== id) return;
+        flds.forEach(k => { if (fresh[k] !== undefined) d[k] = fresh[k]; });
+        touched = true;
+    }));
+    // Перерисовать нижележащий список/канбан, если раздел «Заказы» открыт (карточка — оверлей поверх).
+    if (touched && document.getElementById("db-orders-tab")?.classList.contains("active")) renderDbOrders();
+}
 
 // ---- Смена статуса сделки (оптимистично + PUT в CRM через бэкенд) ----
 async function setDealStatus(dealId, statusId) {
@@ -2185,6 +2200,8 @@ function renderDbDealCard(data, crmId) {
         try { history.replaceState(null, "", "#deal-" + encodeURIComponent(String(d.num))); } catch (_) {}
     }
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
+    // Свежие суммы/статус/оплата из карточки → в кэш списка (чтобы список не показывал старое).
+    dbSyncListDealFromCard(d);
     dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
     if (Array.isArray(data?.payMethods) && data.payMethods.length) dbCardPayMethods = data.payMethods;
     dbCardTaxPercent = Number(data?.taxPercent) || 0;
