@@ -247,10 +247,19 @@ function updateDbFiltersBtn() {
     if (btn) btn.classList.toggle("has-active", dbFiltersActive());
 }
 
-// Стартовый вид для staff: раздел «Заказы» по умолчанию + открытие заказа по якорю #deal-<№>.
+// Стартовый вид для staff: раздел «Заказы» по умолчанию + открытие заказа по якорю #deal-<№>
+// или карточки клиента по якорю #client-<crmId> (ссылка из определителя номера на iPhone).
 function bootDbOrdersView() {
     if (typeof currentUser === "undefined" || currentUser.role !== "staff") return;   // только сотрудники
     const m = String(location.hash || "").match(/^#deal-([^/?#]+)$/);
+    const cm = String(location.hash || "").match(/^#client-(\d+)$/);
+    if (cm) {
+        try {
+            if (typeof openClientsView === "function") openClientsView();
+            if (typeof openClientCard === "function") openClientCard(Number(cm[1]));
+        } catch (_) {}
+        return;
+    }
     openDbOrders();
     if (m) { try { openDealByNum(decodeURIComponent(m[1])); } catch (_) {} }
 }
