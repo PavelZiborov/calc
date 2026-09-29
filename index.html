@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>Heaven Calc Pro</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css?v=159">
+<link rel="stylesheet" href="css/app.css?v=160">
 </head>
 <body>
 
@@ -50,6 +50,7 @@
             </div>
             <button type="button" id="calcSettingsBtn" class="auth-settings-btn" style="display:none;" onclick="openSettingsPage()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>Настройки</button>
             <button type="button" id="salaryBtn" class="auth-settings-btn" style="display:none;" onclick="openSalaryView()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"/><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4"/></svg>Премия</button>
+            <button type="button" id="carddavSelfBtn" class="auth-settings-btn" style="display:none;" onclick="openCarddavSelf()"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2"/><path d="M9 7l6 0"/><path d="M9 11l6 0"/><path d="M9 15l4 0"/></svg>Определитель номера</button>
             <button type="button" id="changePassBtn" class="auth-settings-btn" onclick="openChangePassword()">Сменить пароль</button>
             <button type="button" id="logoutBtn" class="auth-logout-btn" onclick="logout()">Выйти</button>
         </div>
@@ -450,6 +451,11 @@
                     <h3>Автозаполнение по ИНН (DaData)</h3>
                     <div id="settingsDadataHost"></div>
                 </section>
+                <section class="settings-card" id="settingsCarddavCard">
+                    <h3>Определитель номера на iPhone</h3>
+                    <p class="settings-card-note">Клиенты и контактные лица из нашей базы выгружаются в адресную книгу на iPhone менеджеров (CardDAV). При звонке клиента телефон показывает его название из CRM. Не зависит от PrintOffice.</p>
+                    <div id="settingsCarddavHost"></div>
+                </section>
             </div>
         </div>
 
@@ -504,19 +510,19 @@
     </div>
 </div>
 
-<script src="js/config.js?v=159"></script>
-<script src="js/calculator-data.js?v=159"></script>
-<script src="js/calc-settings.js?v=159"></script>
-<script src="js/calc-settings-ui.js?v=159"></script>
-<script src="js/utils.js?v=159"></script>
-<script src="js/auth.js?v=159"></script>
-<script src="js/calculator.js?v=159"></script>
-<script src="js/crm.js?v=159"></script>
-<script src="js/element-editor.js?v=159"></script>
-<script src="js/kp-docx.js?v=159"></script>
-<script src="js/calc-sheet.js?v=159"></script>
-<script src="js/clients.js?v=159"></script>
-<script src="js/orders-db.js?v=159"></script>
-<script src="js/main.js?v=159"></script>
+<script src="js/config.js?v=160"></script>
+<script src="js/calculator-data.js?v=160"></script>
+<script src="js/calc-settings.js?v=160"></script>
+<script src="js/calc-settings-ui.js?v=160"></script>
+<script src="js/utils.js?v=160"></script>
+<script src="js/auth.js?v=160"></script>
+<script src="js/calculator.js?v=160"></script>
+<script src="js/crm.js?v=160"></script>
+<script src="js/element-editor.js?v=160"></script>
+<script src="js/kp-docx.js?v=160"></script>
+<script src="js/calc-sheet.js?v=160"></script>
+<script src="js/clients.js?v=160"></script>
+<script src="js/orders-db.js?v=160"></script>
+<script src="js/main.js?v=160"></script>
 </body>
 </html>

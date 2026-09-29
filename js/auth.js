@@ -17,6 +17,7 @@ function updateAuthModalUi() {
     const isAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
     const settingsBtn = document.getElementById("calcSettingsBtn");
     const salaryBtn = document.getElementById("salaryBtn");
+    const carddavSelfBtn = document.getElementById("carddavSelfBtn");
 
     if (loggedIn) {
         if (badge) {
@@ -33,9 +34,11 @@ function updateAuthModalUi() {
         // Настройки — только админам; «Премия» — всем сотрудникам (свою видят все).
         if (settingsBtn) settingsBtn.style.display = isAdmin ? "" : "none";
         if (salaryBtn) salaryBtn.style.display = currentUser.role === "staff" ? "" : "none";
+        if (carddavSelfBtn) carddavSelfBtn.style.display = currentUser.role === "staff" ? "" : "none";
     } else {
         if (settingsBtn) settingsBtn.style.display = "none";
         if (salaryBtn) salaryBtn.style.display = "none";
+        if (carddavSelfBtn) carddavSelfBtn.style.display = "none";
         if (badge) {
             badge.innerText = "ГОСТЬ";
             badge.className = "auth-role-badge auth-role-badge--guest";

@@ -3621,7 +3621,153 @@ function openSettingsPage() {
     renderNotifySettingsInline();
     renderKpSettingsInline();
     renderStatusSettingsInline();
+    renderCarddavSettingsInline();
     settingsSwitchTab("calc");
+}
+
+// ——— Настройки: определитель номера на iPhone (CardDAV) ———
+async function renderCarddavSettingsInline() {
+    const host = document.getElementById("settingsCarddavHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let s;
+    try { s = await clientsApi("getCarddavSettings", {}); }
+    catch (e) { host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить настройки (нужны права администратора).</p>`; return; }
+    if (!s.configured) {
+        host.innerHTML = `<p class="dbo-ya-note payment-alert">CardDAV-сервер не настроен. Задайте <b>CONTACTS_DOMAIN</b> в <code>.env</code> на сервере, добавьте DNS A-запись этого поддомена на сервер и поднимите контейнер <code>radicale</code> (см. README). После этого обновите страницу.</p>`;
+        return;
+    }
+    const r = s.lastReconcile;
+    const recNote = r
+        ? `Последняя сверка: ${dbFmtDateTime(r.at)} (${escapeHtml(r.trigger || "")}) — карточек ${r.cards}, создано ${r.created}, обновлено ${r.updated}, удалено ${r.deleted}, ошибок ${r.errors}${r.conflicts ? `, конфликтов номеров ${r.conflicts}` : ""}.`
+        : "Сверок ещё не было.";
+    const mgrRows = (s.managers || []).map(m => {
+        const on = m.enabled;
+        const st = on
+            ? `<span class="dbo-user-crm" title="логин Radicale">${escapeHtml(m.login || "")}</span> <span style="color:var(--success,#2e7d32)">включён</span>`
+            : `<span style="color:var(--muted,#888)">выключен</span>`;
+        const btns = on
+            ? `<button type="button" class="dbo-btn dbo-btn-sm" onclick="dbCarddavProfile(${m.id})">Профиль iPhone</button>
+               <button type="button" class="dbo-btn dbo-btn-sm" onclick="dbCarddavReset(${m.id})">Сменить пароль</button>
+               <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbCarddavToggle(${m.id},false)">Отключить</button>`
+            : `<button type="button" class="dbo-btn dbo-btn-sm" onclick="dbCarddavToggle(${m.id},true)">Включить</button>`;
+        return `<div class="dbo-user-row"><div class="dbo-user-main">
+            <div class="dbo-user-name">${escapeHtml(m.name)} — ${st}</div>
+            <div class="dbo-user-email">${escapeHtml(m.email)}</div>
+        </div><div class="dbo-user-actions">${btns}</div></div>`;
+    }).join("") || `<p class="dbo-ya-note">Нет активных сотрудников.</p>`;
+    host.innerHTML = `
+        <p class="dbo-ya-hint">Поддомен: <b>${escapeHtml(s.domain)}</b>. Карточек в книге: <b>${s.cards}</b>${s.queue ? `, в очереди: ${s.queue}` : ""}.</p>
+        <div class="dbo-an-grid" style="flex-direction:column;gap:10px;max-width:560px;">
+            <label>Шаблон имени на экране звонка
+                <input type="text" id="cdName" class="dbo-input" value="${escapeHtml(s.nameTemplate || "")}" placeholder="{company} — {contact}">
+            </label>
+            <label style="font:inherit;color:var(--muted,#777)">Плейсхолдеры: <code>{company}</code> — компания, <code>{contact}</code> — контактное лицо. Если контакта нет — только компания.</label>
+            <label>Название организации в профиле (необязательно)
+                <input type="text" id="cdOrg" class="dbo-input" value="${escapeHtml(s.orgName || "")}" placeholder="Heaven Print">
+            </label>
+            <label class="dbo-an-check"><input type="checkbox" id="cdIncludeContacts" ${s.includeContacts ? "checked" : ""}> Выгружать контактные лица клиентов (не только сам клиент)</label>
+        </div>
+        <div class="settings-actions" style="margin-top:12px;">
+            <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbCarddavSave(this)">Сохранить</button>
+            <button type="button" class="dbk-btn dbk-btn-sync" onclick="dbCarddavSyncNow(this)" title="Полная сверка книги с базой">⟳ Синхронизировать сейчас</button>
+        </div>
+        <p class="dbo-ya-note" style="margin-top:8px;">${escapeHtml(recNote)}</p>
+        <h4 style="margin:16px 0 6px;">Сотрудники</h4>
+        <p class="dbo-ya-note">«Включить» создаёт учётку CardDAV и книгу. Профиль сотрудник ставит сам на своём iPhone (в нём пароль — не пересылайте его в мессенджерах).</p>
+        <div class="dbo-user-list">${mgrRows}</div>`;
+}
+function dbFmtDateTime(iso) {
+    try { const d = new Date(iso); return d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+    catch (_) { return String(iso || ""); }
+}
+async function dbCarddavSave(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Сохранение…"; }
+    try {
+        await clientsApi("setCarddavSettings", {
+            nameTemplate: document.getElementById("cdName")?.value || "",
+            orgName: document.getElementById("cdOrg")?.value || "",
+            includeContacts: !!document.getElementById("cdIncludeContacts")?.checked,
+        });
+        if (typeof showReadinessToast === "function") showReadinessToast("Настройки сохранены");
+    } catch (e) { alert("Не удалось сохранить: " + (e.message || "")); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = "Сохранить"; } }
+}
+async function dbCarddavSyncNow(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Синхронизация…"; }
+    try {
+        const r = await clientsApi("carddavSyncNow", {});
+        if (typeof showReadinessToast === "function") showReadinessToast(`Готово: карточек ${r.result?.cards ?? "?"}`);
+        await renderCarddavSettingsInline();
+    } catch (e) { alert("Ошибка синхронизации: " + (e.message || "")); if (btn) { btn.disabled = false; btn.textContent = "⟳ Синхронизировать сейчас"; } }
+}
+async function dbCarddavToggle(id, enable) {
+    if (!enable && !confirm("Отключить определитель у сотрудника? Его учётка CardDAV и книга удалятся; на телефоне контакты исчезнут после снятия профиля.")) return;
+    try {
+        await clientsApi(enable ? "carddavEnableManager" : "carddavDisableManager", { id: Number(id) });
+        await renderCarddavSettingsInline();
+    } catch (e) { alert("Ошибка: " + (e.message || "")); }
+}
+async function dbCarddavReset(id) {
+    if (!confirm("Сменить пароль CardDAV сотруднику? Старый профиль на телефоне перестанет работать — нужно поставить новый.")) return;
+    try {
+        await clientsApi("carddavResetManagerPassword", { id: Number(id) });
+        if (typeof showReadinessToast === "function") showReadinessToast("Пароль обновлён — сотруднику нужно переустановить профиль");
+    } catch (e) { alert("Ошибка: " + (e.message || "")); }
+}
+async function dbCarddavProfile(id) {
+    try {
+        const r = await clientsApi("carddavProfileLink", { id: Number(id) });
+        dbCarddavShowLink(r.url);
+    } catch (e) { alert("Ошибка: " + (e.message || "")); }
+}
+// Определитель для себя (кнопка в личном кабинете) — открыть/установить профиль на своём iPhone.
+async function openCarddavSelf() {
+    if (typeof toggleAuthModal === "function") toggleAuthModal(false);
+    let me;
+    try { me = await clientsApi("getMe", {}); } catch (_) { me = null; }
+    const id = me?.user?.id;
+    if (!id) { alert("Не удалось определить пользователя."); return; }
+    try {
+        const r = await clientsApi("carddavProfileLink", { id: Number(id) });
+        dbCarddavShowLink(r.url, true);
+    } catch (e) {
+        const msg = String(e.message || "");
+        if (/не настроен/i.test(msg)) alert("Определитель номера ещё не настроен на сервере. Обратитесь к администратору.");
+        else if (/не включ/i.test(msg)) alert("Определитель номера для вас не включён. Попросите администратора включить его в разделе Настройки → Интеграции.");
+        else alert("Ошибка: " + msg);
+    }
+}
+// Модалка со ссылкой на профиль .mobileconfig.
+function dbCarddavShowLink(url, self) {
+    let ov = document.getElementById("cdLinkOverlay");
+    if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "cdLinkOverlay";
+        ov.className = "client-card-overlay";
+        ov.setAttribute("onclick", "if (event.target===this) this.style.display='none'");
+        document.body.appendChild(ov);
+    }
+    const steps = self
+        ? `<ol class="cd-steps">
+             <li>Откройте эту страницу <b>в Safari на своём iPhone</b> и нажмите кнопку ниже.</li>
+             <li>iPhone скачает профиль → «Разрешить».</li>
+             <li>Настройки → «Профиль загружен» → «Установить», введите код-пароль.</li>
+             <li>Через несколько минут в «Контактах» появится список «Клиенты CRM». Готово — звонки клиентов определяются.</li>
+           </ol>`
+        : `<p class="dbo-ya-note">Эта ссылка одноразовая и живёт 10 минут. Сотрудник должен открыть её <b>сам на своём iPhone в Safari</b>. Не пересылайте её в мессенджерах — в профиле пароль.</p>`;
+    ov.innerHTML = `<div class="client-card" style="max-width:520px;">
+        <div class="client-card-header"><h3>Профиль iPhone «Клиенты CRM»</h3>
+            <button class="client-card-close" onclick="document.getElementById('cdLinkOverlay').style.display='none'" aria-label="Закрыть">&times;</button></div>
+        <div class="client-card-body">
+            ${steps}
+            <div class="cd-link-row"><input type="text" readonly value="${escapeHtml(url)}" onclick="this.select()" class="dbo-input"></div>
+            <div class="settings-actions" style="margin-top:10px;">
+                <a class="dbo-btn dbo-btn-primary" href="${escapeHtml(url)}">${self ? "Установить профиль на этот iPhone" : "Открыть профиль"}</a>
+                <button type="button" class="dbo-btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${url.replace(/'/g, "\\'")}');this.textContent='Скопировано'">Скопировать ссылку</button>
+            </div>
+        </div></div>`;
+    ov.style.display = "flex";
 }
 // ——— Настройки: автоматизация статусов заказа (по статусам позиций) ———
 async function renderStatusSettingsInline() {

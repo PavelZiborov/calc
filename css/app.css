@@ -540,6 +540,14 @@
     .dbo-btn-primary:hover { background: var(--accent-strong); }
     .dbo-btn:disabled { opacity: 0.6; cursor: default; }
 
+    /* Поле ввода в настройках/модалках + определитель номера (CardDAV) */
+    .dbo-input { width: 100%; box-sizing: border-box; padding: 8px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 14px; }
+    .dbo-input:focus { outline: none; border-color: var(--accent-container); }
+    .cd-steps { margin: 4px 0 12px; padding-left: 20px; line-height: 1.7; font-size: 14px; color: var(--text); }
+    .cd-steps li { margin-bottom: 4px; }
+    .cd-link-row { margin: 8px 0; }
+    .dbo-user-list { display: flex; flex-direction: column; gap: 8px; }
+
     .dbo-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
     .dbo-meta { font-size: 14px; color: var(--text-muted); line-height: 1.75; }
     .dbo-meta b { color: var(--text); }
