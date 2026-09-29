@@ -13,7 +13,7 @@ const dbOrdersState = {
     view: "list"      // list | kanban
 };
 try { const v = localStorage.getItem("dbOrdersView"); if (v === "list" || v === "kanban") dbOrdersState.view = v; } catch (_) {}
-dbOrdersState.filters = { statuses: new Set(), openOnly: false, debtOnly: false, employee: "", dateFrom: "", dateTo: "" };
+dbOrdersState.filters = { statuses: new Set(), openOnly: false, debtOnly: false, employees: new Set(), dateFrom: "", dateTo: "" };
 dbOrdersState.employees = [];
 dbOrdersState.page = 1;
 dbOrdersState.perPage = 100;
@@ -50,7 +50,7 @@ function getDbKanbanFiltered() {
     if (f.openOnly) list = list.filter(d => String(d.status_name || "") !== "Завершено");
     if (f.statuses && f.statuses.size) list = list.filter(d => f.statuses.has(Number(d.status_id)));
     if (f.debtOnly) list = list.filter(d => (Number(d.debt) || 0) > 0.009);
-    if (f.employee) list = list.filter(d => String(d.employee_name || "") === f.employee);
+    if (f.employees && f.employees.size) list = list.filter(d => f.employees.has(String(d.employee_name || "")));
     if (f.dateFrom || f.dateTo) {
         const from = f.dateFrom ? new Date(f.dateFrom) : null;
         const to = f.dateTo ? new Date(f.dateTo) : null;
@@ -66,7 +66,7 @@ function getDbKanbanFiltered() {
 }
 function dbFiltersActive() {
     const f = dbOrdersState.filters;
-    return (f.statuses && f.statuses.size > 0) || f.openOnly || f.debtOnly || !!f.employee || !!f.dateFrom || !!f.dateTo;
+    return (f.statuses && f.statuses.size > 0) || f.openOnly || f.debtOnly || (f.employees && f.employees.size > 0) || !!f.dateFrom || !!f.dateTo;
 }
 function updateDbSearchClearBtn() {
     const btn = document.getElementById("dbkSearchClearBtn");
@@ -149,13 +149,12 @@ function dbToggleOpenOnly(el) {
     dbApplyQueryOrFilters();
 }
 function renderDbFilterEmployees() {
-    const sel = document.getElementById("dbFilterEmployee");
-    if (!sel) return;
-    const cur = dbOrdersState.filters.employee || "";
-    const opts = ['<option value="">Все сотрудники</option>']
-        .concat((dbOrdersState.employees || []).map(n => `<option value="${escapeHtml(n)}"${n === cur ? " selected" : ""}>${escapeHtml(n)}</option>`));
-    sel.innerHTML = opts.join("");
-    sel.value = cur;
+    const host = document.getElementById("dbFilterEmployeeList");
+    if (!host) return;
+    const sel = dbOrdersState.filters.employees || new Set();
+    const items = (dbOrdersState.employees || []).map(n =>
+        `<label class="dbk-filter-status"><input type="checkbox" value="${escapeHtml(n)}"${sel.has(n) ? " checked" : ""} onchange="applyDbFilters()">${escapeHtml(n)}</label>`).join("");
+    host.innerHTML = items || `<div class="dbk-filter-empty">Нет сотрудников</div>`;
 }
 function dbUpdateFilterLabels() {
     const f = dbOrdersState.filters;
@@ -163,6 +162,12 @@ function dbUpdateFilterLabels() {
     if (sBtn) {
         sBtn.textContent = f.openOnly ? "Открытые" : (f.statuses && f.statuses.size ? `Статус · ${f.statuses.size}` : "Статус");
         sBtn.classList.toggle("is-active", f.openOnly || !!(f.statuses && f.statuses.size));
+    }
+    const eBtn = document.getElementById("dbEmployeeDdBtn");
+    if (eBtn) {
+        const n = f.employees ? f.employees.size : 0;
+        eBtn.textContent = n ? `Сотрудник · ${n}` : "Сотрудник";
+        eBtn.classList.toggle("is-active", n > 0);
     }
     const pBtn = document.getElementById("dbPeriodBtn");
     if (pBtn) {
@@ -182,10 +187,11 @@ function applyDbFilters() {
         if (openBox) openBox.checked = false;
     }
     const debt = document.getElementById("dbFilterDebtOnly");
-    const emp = document.getElementById("dbFilterEmployee");
+    const emps = new Set();
+    document.querySelectorAll("#dbFilterEmployeeList input[type=checkbox][value]:checked").forEach(c => emps.add(String(c.value)));
     dbOrdersState.filters.statuses = sel;
     dbOrdersState.filters.debtOnly = !!(debt && debt.checked);
-    dbOrdersState.filters.employee = emp ? String(emp.value || "") : "";
+    dbOrdersState.filters.employees = emps;
     dbUpdateFilterLabels();
     updateDbFiltersBtn();
     dbApplyQueryOrFilters();
@@ -222,7 +228,7 @@ function dbClearPeriod() {
     dbApplyPeriod();
 }
 function resetDbFilters() {
-    dbOrdersState.filters = { statuses: new Set(), openOnly: false, debtOnly: false, employee: "", dateFrom: "", dateTo: "" };
+    dbOrdersState.filters = { statuses: new Set(), openOnly: false, debtOnly: false, employees: new Set(), dateFrom: "", dateTo: "" };
     const debt = document.getElementById("dbFilterDebtOnly");
     if (debt) debt.checked = false;
     const df = document.getElementById("dbFilterDateFrom");
@@ -314,7 +320,7 @@ async function loadDbList() {
             statusIds: f.statuses ? [...f.statuses] : [],
             openOnly: !!f.openOnly,
             debtOnly: !!f.debtOnly,
-            employee: f.employee || "",
+            employees: f.employees ? [...f.employees] : [],
             dateFrom: f.dateFrom || "",
             dateTo: f.dateTo || ""
         });
@@ -344,9 +350,8 @@ async function loadDbKanban() {
         const data = await clientsApi("listKanbanDeals", {});
         dbOrdersState.kanbanDeals = Array.isArray(data?.deals) ? data.deals : [];
         if (Array.isArray(data?.statuses)) dbOrdersState.statuses = data.statuses;
-        // Список сотрудников для фильтра — из загруженных сделок канбана.
-        const emp = [...new Set(dbOrdersState.kanbanDeals.map(d => String(d.employee_name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru"));
-        if (emp.length) dbOrdersState.employees = emp;
+        // Список сотрудников для фильтра — только активные менеджеры из настроек (с сервера).
+        if (Array.isArray(data?.employees)) dbOrdersState.employees = data.employees;
         dbOrdersState.loaded = true;
         renderDbFilters();
     } catch (e) {
@@ -1345,7 +1350,7 @@ function dbOpenElEdit(elId) {
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Дополнительная информация
-                    <textarea id="dbEditElInfo" class="dbo-edit-name" rows="2" oninput="dbAutoGrow(this)" placeholder="Заметки к позиции…">${escapeHtml(e.description || "")}</textarea>
+                    <textarea id="dbEditElInfo" class="dbo-edit-name dbo-edit-info" rows="3" data-minh="80" oninput="dbAutoGrow(this)" placeholder="Заметки к позиции…">${escapeHtml(e.description || "")}</textarea>
                 </label>
                 <div class="dbo-assets-title dbo-assets-heading">Превью и макеты</div>
                 ${dboAssetsEditHtml(elId)}
@@ -1362,7 +1367,10 @@ function dbOpenElEdit(elId) {
         </div>`;
     document.body.appendChild(ov);
     document.addEventListener("keydown", dbElEditEsc);
-    setTimeout(() => { const t = document.getElementById("dbEditName"); if (t) { dbAutoGrow(t); t.focus(); } }, 0);
+    setTimeout(() => {
+        const t = document.getElementById("dbEditName"); if (t) { dbAutoGrow(t); if (!locked) t.focus(); }
+        const info = document.getElementById("dbEditElInfo"); if (info) dbAutoGrow(info);
+    }, 0);
     // Освежаем превью/макеты позиции (если карточка ещё не догрузила).
     const cached = dboAssets.get(dboAssetKey(elId));
     if (!cached || cached.status !== "ready") dboLoadElementAssets(elId).catch(() => {});
@@ -1454,8 +1462,9 @@ function dbRespOutside(e) {
 // Авто-высота textarea наименования (растёт вниз по мере ввода).
 function dbAutoGrow(el) {
     if (!el) return;
+    const min = Number(el.dataset.minh) || 40;   // минимальная высота (для многострочных полей)
     el.style.height = "auto";
-    el.style.height = Math.max(el.scrollHeight, 40) + "px";
+    el.style.height = Math.max(el.scrollHeight, min) + "px";
 }
 // Дропдаун единиц измерения (как в разделе «Заказы» по API): пресеты + своё значение.
 function dbToggleUnits(e) {
@@ -3877,6 +3886,7 @@ async function renderUsersSettingsInline() {
                 ${u.role === "superadmin" ? "" : (inactive
                     ? `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-primary" onclick="dbUserSetActive(${u.id}, true)">Активировать</button>`
                     : `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbUserSetActive(${u.id}, false)">Деактивировать</button>`)}
+                ${u.role === "superadmin" ? "" : `<button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="dbUserDelete(${u.id})" title="Удалить сотрудника из системы (сделки и их история сохранятся)">Удалить</button>`}
             </div>
         </div>`;
     }).join("");
@@ -4009,6 +4019,19 @@ async function dbUserSetActive(id, active) {
     } catch (e) {
         console.error("setUserActive", e);
         alert("Не удалось изменить статус пользователя.");
+    }
+}
+async function dbUserDelete(id) {
+    const u = dbUsersCache.find(x => Number(x.id) === Number(id));
+    const nm = u ? (u.name || u.email) : "пользователя";
+    if (!confirm(`Удалить «${nm}» из системы?\n\nЕго заказы и история сохранятся (имя менеджера в сделках останется). Это действие необратимо.`)) return;
+    try {
+        await clientsApi("deleteUser", { id: Number(id) });
+        await renderUsersSettingsInline();
+        if (typeof showReadinessToast === "function") showReadinessToast("Сотрудник удалён");
+    } catch (e) {
+        console.error("deleteUser", e);
+        alert("Не удалось удалить сотрудника: " + (e.message || ""));
     }
 }
 
