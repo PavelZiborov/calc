@@ -733,8 +733,8 @@
     .dbo-drop-overlay-s { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
     @keyframes dboDropPulse { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } }
     @media (prefers-reduced-motion: reduce) { .dbo-drop-overlay-card { animation: none; } .dbo-drop-overlay { transition: opacity .12s ease; transform: none; } }
-    /* Превью-квадрат — над оверлеем, чтобы его собственный drop/подсветка работали */
-    .dbo-edit--dragging .dbo-preview-box { position: relative; z-index: 31; box-shadow: 0 0 0 3px var(--accent); }
+    /* Превью-квадрат — над оверлеем (не залит тинтом), подсветка появляется при наведении на него */
+    .dbo-edit--dragging .dbo-preview-box { position: relative; z-index: 31; }
     .dbo-layout-drophint { margin-top: 6px; font-size: 11px; color: var(--text-muted); opacity: 0.7; }
     /* История оплат — без серой плашки */
     .dbo-pay-section { background: transparent; }

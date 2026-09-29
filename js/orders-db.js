@@ -3338,7 +3338,7 @@ function dboAssetsInnerHtml(elementId) {
                 ${previewInner}
             </div>
             <input type="file" id="dboPreviewInput_${elementId}" hidden accept="image/jpeg,image/png,image/webp,image/gif" onchange="dboUploadPreview(${elementId}, this)">
-            <div class="dbo-layouts-col dbo-drop" ondragover="dboDragOver(event)" ondragleave="dboDragLeave(event)" ondrop="dboDropLayout(event, ${elementId})">
+            <div class="dbo-layouts-col">
                 <div class="dbo-assets-title">Макеты</div>
                 <div class="dbo-layouts-list">${layouts}</div>
                 <div class="dbo-layout-add">
@@ -3375,7 +3375,7 @@ function dboDragHasFiles(e) {
     const t = e.dataTransfer?.types;
     return !!(t && (t.includes ? t.includes("Files") : Array.from(t).includes("Files")));
 }
-function dboDragOver(e) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add("dbo-drop-active"); }
+function dboDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("dbo-drop-active"); }
 function dboDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove("dbo-drop-active"); }
 function dboDropPreview(e, elementId) {
     e.preventDefault(); e.stopPropagation();   // превью-квадрат обрабатывает сам, не пускаем в общий обработчик модалки
