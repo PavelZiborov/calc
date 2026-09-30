@@ -407,6 +407,7 @@ function renderClientCard(data, crmId) {
                 </div>
                 <div class="client-card-header-actions">
                     <button class="clients-btn clients-btn-add cc-edit-client-btn" onclick="ccOpenEditClient()">Редактировать</button>
+                    ${((c.dealsCount || deals.length || 0) === 0) ? `<button class="clients-btn cc-delete-client-btn" onclick="ccDeleteClient(${crmId || 'null'}, ${c.id || 'null'})" title="Удалить клиента (доступно, только если нет сделок)">Удалить</button>` : ""}
                     ${crmLink}
                     <button class="client-card-close" onclick="closeClientCard()" aria-label="Закрыть">&times;</button>
                 </div>
@@ -458,6 +459,23 @@ function ccContactsBlockHtml(contacts) {
         </div>`;
     }).join("");
     return `<div class="cc-contacts-list">${rows}</div>`;
+}
+
+// Удаление клиента из карточки. Правило PrintOffice: только если у клиента 0 сделок.
+async function ccDeleteClient(crmId, clientId) {
+    const c = ccCardState.client || {};
+    const nm = c.company || "клиента";
+    if (!confirm(`Удалить «${nm}»?\n\nКлиент будет удалён и в PrintOffice, и у нас (вместе с контактными лицами). Это действие необратимо.\nУдаление возможно только если у клиента нет сделок.`)) return;
+    try {
+        await clientsApi("deleteClient", { crmId: crmId ?? undefined, clientId: clientId ?? undefined });
+        if (typeof showReadinessToast === "function") showReadinessToast("Клиент удалён");
+        else alert("Клиент удалён");
+        closeClientCard();
+        if (typeof loadClients === "function") loadClients();
+    } catch (e) {
+        console.error("deleteClient", e);
+        alert(e && e.message ? e.message : "Не удалось удалить клиента.");
+    }
 }
 
 // ---- Редактирование клиента + контактных лиц (моментальный синк с PrintOffice) ----
