@@ -1101,8 +1101,10 @@ async function pollContactsBackfill() {
                     msg.textContent = `Ошибка: ${job.error}`;
                     msg.className = "dbo-ya-note payment-alert";
                 } else {
-                    const parts = [`Готово. Обработано ${job.total}, заполнено контактов: ${job.filled}`];
-                    if (job.notFound) parts.push(`удалено в CRM: ${job.notFound}`);
+                    const parts = [`Готово. Обработано ${job.total}, заполнено телефонов/почт: ${job.filled}`];
+                    if (job.notFound) parts.push(`удалены в PrintOffice: ${job.notFound}`);
+                    if (job.deleted) parts.push(`убрано из нашей базы (без сделок): ${job.deleted}`);
+                    if (job.keptWithDeals) parts.push(`оставлено со сделками: ${job.keptWithDeals}`);
                     if (job.failed) parts.push(`ошибок: ${job.failed}`);
                     let t = parts.join(", ") + ".";
                     if (job.failed && Array.isArray(job.errorsSample) && job.errorsSample.length) t += ` Пример: ${job.errorsSample[0]}`;
