@@ -1293,7 +1293,8 @@ let dbCardElementStatuses = [];
 let dbCardData = null;   // текущие данные карточки (для оптимистичного апдейта статусов)
 let dbCardCategories = []; // категории прайс-листа (для смены категории элемента)
 let dbCardPayMethods = []; // методы оплаты CRM (для ручного ввода оплат)
-let dbCardTaxPercent = 0;  // процент налога для расчёта чистой прибыли (из настроек)
+let dbCardTaxPercent = 0;  // эффективный % налога (по методам оплаты) — для подписи
+let dbCardTaxAmount = 0;   // сумма налога в рублях (по методам оплаты заказа)
 
 // ---- Редактирование элемента (поля; имя/категорию — через пересоздание в CRM) ----
 function dbElEditEsc(e) { if (e.key === "Escape") closeDbElEdit(); }
@@ -2148,17 +2149,18 @@ function dbApplyCostVisibility() {
 
 // Прибыль по заказу: грязная (доход−расход) и чистая (доход − налог − расход),
 // где налог = доход × процент (настраивается в Настройках).
-function dbProfitPanelHtml(amount, cost, taxPercent) {
+function dbProfitPanelHtml(amount, cost, taxAmount, taxPercent) {
     amount = Number(amount) || 0;
     cost = Number(cost) || 0;
-    const tax = Number(taxPercent) || 0;
+    taxAmount = Number(taxAmount) || 0;
+    const tax = Number(taxPercent) || 0;   // эффективный % (по методам оплаты заказа)
     const gross = amount - cost;
-    const taxAmount = amount * tax / 100;
     const net = amount - taxAmount - cost;
     const cls = v => v >= 0 ? "dbo-profit-pos" : "dbo-profit-neg";
-    const taxRow = tax
-        ? `<div class="dbo-profit-row"><span>Налог (${tax}%)</span><b>−${money2(taxAmount)}</b></div>`
-        : `<div class="dbo-profit-row" title="Налог не задан — укажите процент в разделе «Настройки»"><span>Налог</span><b>—</b></div>`;
+    const pctLabel = tax ? ` (${tax.toFixed(tax % 1 ? 1 : 0)}%)` : "";
+    const taxRow = taxAmount
+        ? `<div class="dbo-profit-row" title="Налог по методам оплаты заказа (настраивается в Настройки → Финансы)"><span>Налог${pctLabel}</span><b>−${money2(taxAmount)}</b></div>`
+        : `<div class="dbo-profit-row" title="Налог 0 — по методам оплаты заказа; ставки в Настройки → Финансы"><span>Налог</span><b>${money2(0)}</b></div>`;
     return `
         <div class="dbo-profit-row"><span>Грязная прибыль</span><b class="${cls(gross)}">${money2(gross)}</b></div>
         ${taxRow}
@@ -2258,6 +2260,7 @@ function renderDbDealCard(data, crmId) {
     dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
     if (Array.isArray(data?.payMethods) && data.payMethods.length) dbCardPayMethods = data.payMethods;
     dbCardTaxPercent = Number(data?.taxPercent) || 0;
+    dbCardTaxAmount = Number(data?.taxAmount) || 0;
     const amount = Number(d.amount) || 0;
     const debt = Number(d.debt) || 0;
     const paid = d.paid != null ? Number(d.paid) : Math.max(0, amount - debt);
@@ -2351,7 +2354,7 @@ function renderDbDealCard(data, crmId) {
                     </div>
                     <div class="dbo-summary-group">
                         <button type="button" class="dbo-profit-toggle" onclick="dbToggleProfit(this)" aria-expanded="false" title="Показать прибыль по заказу">${icon("eye")}<span>Прибыль</span></button>
-                        <div class="dbo-profit-panel" id="dbProfitPanel" hidden>${dbProfitPanelHtml(amount, totalCost, dbCardTaxPercent)}</div>
+                        <div class="dbo-profit-panel" id="dbProfitPanel" hidden>${dbProfitPanelHtml(amount, totalCost, dbCardTaxAmount, dbCardTaxPercent)}</div>
                         <div class="payment-summary dbo-totals">
                             <div class="payment-summary-row"><span class="payment-summary-label">Всего</span><span class="payment-summary-value">${money2(amount)}</span><span></span></div>
                             <div class="payment-summary-row paid-row"><span class="payment-summary-label">Оплачено</span><span class="payment-summary-value">${money2(paid)}</span><span class="payment-actions">${debt > 0.009 ? `<button type="button" class="payment-action-btn payment-partial-btn" title="Добавить частичную сумму к оплате" aria-label="Добавить частичную сумму к оплате" onclick="dbOpenPayModal('partial')"><span class="payment-action-icon">+</span></button><button type="button" class="payment-action-btn payment-full-btn" title="Добавить всю сумму" aria-label="Добавить всю сумму" onclick="dbOpenPayModal('full')"><span class="payment-action-icon">+</span></button>` : ""}</span></div>
@@ -4499,31 +4502,49 @@ async function renderProfitSettingsInline() {
     const host = document.getElementById("settingsProfitHost");
     if (!host) return;
     host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
-    let taxPercent = 0;
-    try { const s = await clientsApi("getProfitSettings", {}); taxPercent = Number(s?.taxPercent) || 0; } catch (_) {}
+    let taxPercent = 0, methods = [];
+    try { const s = await clientsApi("getProfitSettings", {}); taxPercent = Number(s?.taxPercent) || 0; methods = Array.isArray(s?.methods) ? s.methods : []; } catch (_) {}
+    dboTaxMethodNames = methods.map(m => m.name);
+    const rows = methods.map((m, i) => `
+        <div class="dbo-user-row dbo-tax-row">
+            <div class="dbo-user-main"><div class="dbo-user-name">${escapeHtml(m.name)}</div></div>
+            <div class="dbo-user-actions dbo-tax-pct">
+                <input type="text" inputmode="decimal" class="dbo-input dbo-tax-method-input" data-idx="${i}" value="${m.percent == null ? "" : m.percent}" placeholder="по умолч.">
+                <span>%</span>
+            </div>
+        </div>`).join("") || `<p class="dbo-ya-note">Методы оплаты появятся после синхронизации платежей (откройте любой оплаченный заказ или нажмите «⟳ Сделки»).</p>`;
     host.innerHTML = `
-        <p class="dbo-ya-note">Процент налога с дохода — используется в карточке заказа при расчёте чистой прибыли: <b>чистая = доход − доход×налог% − расход</b>. Грязная прибыль = доход − расход.</p>
-        <label class="dbo-edit-wide">Налог, %
-            <input type="text" inputmode="decimal" id="dboTaxPercent" value="${taxPercent}" placeholder="напр. 6">
+        <p class="dbo-ya-note">Чистая прибыль = доход − расход − налог. Налог считается <b>по методам оплаты заказа</b>: у каждого метода свой %. Пустое поле = метод берёт «налог по умолчанию». Грязная прибыль = доход − расход.</p>
+        <label class="dbo-edit-wide">Налог по умолчанию, %
+            <input type="text" inputmode="decimal" id="dboTaxPercent" value="${taxPercent}" placeholder="напр. 8">
         </label>
-        <div class="settings-actions">
+        <h4 style="margin:14px 0 4px;">Налог по методам оплаты</h4>
+        <p class="dbo-ya-note">Например: безнал — 8, наличные по кассе — 8, картой по кассе — укажите 8 + эквайринг суммарно (напр. 10.5), наличка / перевод на карту — 0.</p>
+        <div class="dbo-user-list" id="dboTaxMethods">${rows}</div>
+        <div class="settings-actions" style="margin-top:12px;">
             <button class="dbo-btn dbo-btn-primary" onclick="dboSaveProfitSettings()">Сохранить</button>
         </div>
         <div id="dboTaxMsg" class="dbo-ya-note"></div>`;
 }
+let dboTaxMethodNames = [];
 async function dboSaveProfitSettings() {
     const raw = String(document.getElementById("dboTaxPercent")?.value || "").replace(",", ".").trim();
     const val = Number(raw);
     const msg = document.getElementById("dboTaxMsg");
     if (!Number.isFinite(val) || val < 0 || val > 100) {
-        if (msg) { msg.textContent = "Введите число от 0 до 100."; msg.className = "dbo-ya-note payment-alert"; }
+        if (msg) { msg.textContent = "Налог по умолчанию: введите число от 0 до 100."; msg.className = "dbo-ya-note payment-alert"; }
         return;
     }
+    const methodTaxes = {};
+    document.querySelectorAll("#dboTaxMethods .dbo-tax-method-input").forEach(inp => {
+        const name = dboTaxMethodNames[Number(inp.dataset.idx)];
+        if (name != null) methodTaxes[name] = String(inp.value || "").trim();   // пусто → бэкенд оставит дефолт
+    });
     try {
-        const s = await clientsApi("setProfitSettings", { taxPercent: val });
+        const s = await clientsApi("setProfitSettings", { taxPercent: val, methodTaxes });
         dbCardTaxPercent = Number(s?.taxPercent) || 0;
-        if (msg) { msg.textContent = "Сохранено. Новый расчёт прибыли использует этот процент."; msg.className = "dbo-ya-note payment-ok"; }
-        if (typeof showReadinessToast === "function") showReadinessToast("Налог сохранён");
+        if (msg) { msg.textContent = "Сохранено. Новый расчёт прибыли использует эти ставки."; msg.className = "dbo-ya-note payment-ok"; }
+        if (typeof showReadinessToast === "function") showReadinessToast("Налоги сохранены");
     } catch (e) {
         console.error("dboSaveProfitSettings", e);
         if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
