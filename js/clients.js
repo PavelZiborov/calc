@@ -9,8 +9,50 @@ const clientsState = {
     loading: false,
     error: "",
     query: "",
-    loaded: false
+    loaded: false,
+    sortKey: "debt",   // по умолчанию — должники сверху
+    sortDir: "desc"
 };
+
+// Колонки для сортировки: num — числовая, get — как достать значение из клиента.
+const CLIENTS_SORT = {
+    company: { num: false, get: c => c.company || "" },
+    contact: { num: false, get: c => c.contactName || "" },
+    phone:   { num: false, get: c => c.mobile || c.landline || "" },
+    email:   { num: false, get: c => c.email || "" },
+    deals:   { num: true,  get: c => Number(c.dealsCount) || 0 },
+    income:  { num: true,  get: c => Number(c.income) || 0 },
+    debt:    { num: true,  get: c => Number(c.debt) || 0 },
+    notes:   { num: false, get: c => c.notes || "" }
+};
+function clientsSortedItems() {
+    const spec = CLIENTS_SORT[clientsState.sortKey];
+    if (!spec) return clientsState.items;
+    const dir = clientsState.sortDir === "asc" ? 1 : -1;
+    return clientsState.items.slice().sort((a, b) => {
+        const av = spec.get(a), bv = spec.get(b);
+        const cmp = spec.num ? (av - bv) : String(av).localeCompare(String(bv), "ru");
+        return cmp * dir;
+    });
+}
+function clientsSortBy(key) {
+    if (!CLIENTS_SORT[key]) return;
+    if (clientsState.sortKey === key) {
+        clientsState.sortDir = clientsState.sortDir === "asc" ? "desc" : "asc";
+    } else {
+        clientsState.sortKey = key;
+        clientsState.sortDir = CLIENTS_SORT[key].num ? "desc" : "asc";   // числа — сначала по убыванию
+    }
+    renderClientsTable();
+}
+function clientsThHtml(key, label, numCol) {
+    const active = clientsState.sortKey === key;
+    const arrow = active ? (clientsState.sortDir === "asc" ? " ▲" : " ▼") : "";
+    const cls = ["clients-th-sort"];
+    if (numCol) cls.push("clients-td-num");
+    if (active) cls.push("is-sorted");
+    return `<th class="${cls.join(" ")}" onclick="clientsSortBy('${key}')" title="Сортировать">${escapeHtml(label)}<span class="clients-sort-arrow">${arrow}</span></th>`;
+}
 
 let clientsSearchTimer = null;
 
@@ -154,17 +196,17 @@ function renderClientsTable() {
             <table class="clients-table">
                 <thead>
                     <tr>
-                        <th>Компания</th>
-                        <th>Контакт</th>
-                        <th>Телефон</th>
-                        <th>Email</th>
-                        <th class="clients-td-num">Сделок</th>
-                        <th class="clients-td-num">Доход</th>
-                        <th class="clients-td-num">Долг</th>
-                        <th>Заметки</th>
+                        ${clientsThHtml("company", "Компания")}
+                        ${clientsThHtml("contact", "Контакт")}
+                        ${clientsThHtml("phone", "Телефон")}
+                        ${clientsThHtml("email", "Email")}
+                        ${clientsThHtml("deals", "Сделок", true)}
+                        ${clientsThHtml("income", "Доход", true)}
+                        ${clientsThHtml("debt", "Долг", true)}
+                        ${clientsThHtml("notes", "Заметки")}
                     </tr>
                 </thead>
-                <tbody>${clientsState.items.map(clientRowHtml).join("")}</tbody>
+                <tbody>${clientsSortedItems().map(clientRowHtml).join("")}</tbody>
             </table>
         </div>
         <div class="clients-count">Всего клиентов: <b>${clientsState.items.length}</b></div>`;

@@ -284,6 +284,11 @@
     .clients-table tbody tr:hover { background: var(--surface-2); }
     .clients-td-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .clients-td-nowrap { white-space: nowrap; }
+    /* Сортируемые заголовки списка клиентов */
+    .clients-th-sort { cursor: pointer; user-select: none; -webkit-user-select: none; }
+    .clients-th-sort:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, var(--surface-2)); }
+    .clients-th-sort.is-sorted { color: var(--accent-container, var(--text)); }
+    .clients-sort-arrow { font-size: 10px; }
     .clients-td-notes { color: var(--text-muted); max-width: 260px; }
     .clients-company { font-weight: 600; color: var(--text); }
     .clients-crm-link { margin-left: 6px; color: var(--accent); text-decoration: none; font-weight: 700; }
