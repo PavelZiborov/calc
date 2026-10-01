@@ -14,6 +14,7 @@ const dbOrdersState = {
 };
 try { const v = localStorage.getItem("dbOrdersView"); if (v === "list" || v === "kanban") dbOrdersState.view = v; } catch (_) {}
 dbOrdersState.filters = { statuses: new Set(), openOnly: false, debtOnly: false, employees: new Set(), dateFrom: "", dateTo: "" };
+dbRestoreFilters();   // восстановить фильтры/поиск из localStorage (не сбрасываются при перезагрузке)
 dbOrdersState.employees = [];
 dbOrdersState.page = 1;
 dbOrdersState.perPage = 100;
@@ -86,8 +87,47 @@ function clearDbSearch(event) {
 }
 // Список: перезагрузка с сервера (пагинация/фильтры серверные). Канбан: клиентский рендер.
 function dbApplyQueryOrFilters() {
+    dbSaveFilters();   // запоминаем текущие фильтры/поиск — переживут перезагрузку страницы
     if (dbOrdersState.view === "kanban") { renderDbKanban(); }
     else { dbOrdersState.page = 1; loadDbList(); }
+}
+// Сохранение/восстановление фильтров и поиска раздела «Заказы» (localStorage).
+function dbSaveFilters() {
+    try {
+        const f = dbOrdersState.filters;
+        localStorage.setItem("dbOrdersFilters", JSON.stringify({
+            statuses: [...(f.statuses || [])],
+            employees: [...(f.employees || [])],
+            openOnly: !!f.openOnly,
+            debtOnly: !!f.debtOnly,
+            dateFrom: f.dateFrom || "",
+            dateTo: f.dateTo || "",
+            query: dbOrdersState.query || ""
+        }));
+    } catch (_) {}
+}
+function dbRestoreFilters() {
+    try {
+        const s = JSON.parse(localStorage.getItem("dbOrdersFilters") || "null");
+        if (!s || typeof s !== "object") return;
+        const f = dbOrdersState.filters;
+        f.statuses = new Set((s.statuses || []).map(Number).filter(Number.isFinite));
+        f.employees = new Set((s.employees || []).map(String));
+        f.openOnly = !!s.openOnly;
+        f.debtOnly = !!s.debtOnly;
+        f.dateFrom = typeof s.dateFrom === "string" ? s.dateFrom : "";
+        f.dateTo = typeof s.dateTo === "string" ? s.dateTo : "";
+        dbOrdersState.query = typeof s.query === "string" ? s.query : "";
+    } catch (_) {}
+}
+// Проставить значения в поля, которые не перерисовываются из состояния (поиск/долг/период).
+function dbSyncFilterInputs() {
+    const f = dbOrdersState.filters;
+    const debt = document.getElementById("dbFilterDebtOnly"); if (debt) debt.checked = !!f.debtOnly;
+    const df = document.getElementById("dbFilterDateFrom"); if (df) df.value = f.dateFrom || "";
+    const dt = document.getElementById("dbFilterDateTo"); if (dt) dt.value = f.dateTo || "";
+    const inp = document.getElementById("dbkSearchInput"); if (inp) inp.value = dbOrdersState.query || "";
+    if (typeof updateDbSearchClearBtn === "function") updateDbSearchClearBtn();
 }
 // Мобильная кнопка «Фильтры»: показать/спрятать всю панель фильтров.
 function toggleDbFilters(e) {
@@ -267,8 +307,10 @@ function openDbOrders(trigger) {
     if (!ensureActiveSession()) return;
     switchTab("db-orders-tab", trigger || document.querySelector('.tab-btn[data-tab-target="db-orders-tab"]'));
     updateDbViewToggle();
+    dbSyncFilterInputs();    // восстановить поиск/долг/период в поля формы
     updateDbSearchClearBtn();
     renderDbFilters();
+    updateDbFiltersBtn();    // подсветить кнопку «Фильтры», если что-то выбрано
     refreshDbSyncStatus();   // показать/возобновить статус фоновой синхронизации элементов
     if (!dbOrdersState.loaded) loadDbDeals();
     else renderDbOrders();
