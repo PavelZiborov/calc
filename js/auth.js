@@ -152,6 +152,8 @@ function applyPermissions() {
 
         if (currentUser.role === "staff") {
             document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = ""; });
+            const isAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
+            document.querySelectorAll(".admin-nav").forEach(el => { el.style.display = isAdmin ? "" : "none"; });
             fillStatusFilter();
             fillManagerFilter();
         } else {

@@ -556,6 +556,61 @@
     .dbo-tax-row { align-items: center; }
     .dbo-tax-pct { display: flex; align-items: center; gap: 6px; }
     .dbo-tax-method-input { width: 76px; text-align: right; }
+    /* Премия по менеджерам (индивидуально) */
+    .salary-mgr-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .salary-mgr-row .salary-oklad-name { flex: 1 1 150px; min-width: 110px; font-weight: 600; }
+    .salary-mgr-field { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+    .salary-mgr-field input { width: 86px; padding: 6px 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); }
+    .salary-mgr-field .salary-mgr-percent { width: 62px; text-align: right; }
+    .salary-mgr-field select { padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); }
+
+    /* ===================== Аналитика ===================== */
+    .analytics-page { max-width: 1100px; }
+    .analytics-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    .analytics-period { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .analytics-period select { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-weight: 600; }
+    .an-pos { color: var(--success, #16a34a); }
+    .an-neg { color: var(--danger, #dc2626); }
+    .an-muted { color: var(--text-muted); font-weight: 400; }
+    .an-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+    .an-cards-sm { grid-template-columns: repeat(3, 1fr); margin: 10px 0 0; }
+    .an-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md, 14px); padding: 16px 18px; }
+    .an-card-hi { background: color-mix(in srgb, var(--accent-container, #2563eb) 10%, var(--surface)); border-color: color-mix(in srgb, var(--accent-container, #2563eb) 30%, var(--border)); }
+    .an-card-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); }
+    .an-card-val { font-size: 26px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .an-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .an-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .an-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md, 14px); padding: 16px 18px; }
+    .an-block h3 { margin: 0 0 12px; font-size: 15px; }
+    .an-donut-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .an-donut-wrap { position: relative; width: 160px; height: 160px; flex: 0 0 auto; }
+    .an-donut { width: 160px; height: 160px; }
+    .an-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+    .an-donut-center span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+    .an-donut-center b { font-size: 15px; font-variant-numeric: tabular-nums; }
+    .an-legend { flex: 1 1 180px; display: flex; flex-direction: column; gap: 7px; }
+    .an-leg { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .an-leg b { margin-left: auto; font-variant-numeric: tabular-nums; }
+    .an-leg-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+    .an-pl { display: flex; flex-direction: column; gap: 9px; }
+    .an-pl-head { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; gap: 10px; }
+    .an-pl-head b { font-variant-numeric: tabular-nums; }
+    .an-pl-bar { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--text) 7%, transparent); overflow: hidden; margin-top: 4px; }
+    .an-pl-bar span { display: block; height: 100%; border-radius: 4px; transition: width .3s ease; }
+    .an-pl-total .an-pl-head { font-weight: 700; font-size: 14px; }
+    .an-pl-total { padding-top: 4px; }
+    .an-fx-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .an-fx-row .an-fx-name { flex: 1 1 200px; }
+    .an-fx-row .an-fx-amount { width: 120px; text-align: right; }
+    .an-fx-active { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+    .an-settings { margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md, 14px); padding: 4px 18px; }
+    .an-settings > summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+    .an-settings-body { padding-bottom: 14px; }
+    @media (max-width: 760px) {
+        .an-cards { grid-template-columns: repeat(2, 1fr); }
+        .an-cards-sm { grid-template-columns: 1fr; }
+        .an-grid2 { grid-template-columns: 1fr; }
+    }
     /* Кнопка удаления клиента в карточке */
     .cc-delete-client-btn { background: var(--danger, #d9534f); color: #fff; border-color: var(--danger, #d9534f); }
     .cc-delete-client-btn:hover { filter: brightness(0.94); }

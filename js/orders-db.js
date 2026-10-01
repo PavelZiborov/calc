@@ -4785,23 +4785,27 @@ async function renderSalarySettingsInline() {
     try { s = await clientsApi("getSalarySettings", {}); }
     catch (e) { host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить настройки зарплаты.</p>`; return; }
     if (!s.isAdmin) { host.innerHTML = `<p class="dbo-ya-note">Формулу зарплаты и оклады настраивает администратор. Свою зарплату смотрите в разделе «Зарплата».</p>`; return; }
-    const opt = (v, l) => `<option value="${v}"${s.method === v ? " selected" : ""}>${l}</option>`;
+    const opt = (v, l, sel) => `<option value="${v}"${sel === v ? " selected" : ""}>${l}</option>`;
+    // Выпадашка метода для менеджера: "" = по умолчанию (глобальный).
+    const mOpts = cur => `${opt("", "по умолчанию", cur)}${opt("net", "% от чистой", cur)}${opt("gross", "% от грязной", cur)}${opt("turnover", "% от оборота", cur)}`;
     const mgrRows = (s.managers || []).map(m => `
-        <div class="salary-oklad-row" data-cid="${m.crmUserId}">
+        <div class="salary-oklad-row salary-mgr-row" data-cid="${m.crmUserId}">
             <span class="salary-oklad-name">${escapeHtml(m.name)}</span>
-            <input type="text" inputmode="decimal" class="salary-oklad-input" value="${Number(m.baseSalary) || 0}" oninput="dbCleanNum(this)">
+            <label class="salary-mgr-field">Оклад ₽<input type="text" inputmode="decimal" class="salary-oklad-input" value="${Number(m.baseSalary) || 0}" oninput="dbCleanNum(this)"></label>
+            <label class="salary-mgr-field">Премия<select class="salary-mgr-method">${mOpts(m.method || "")}</select></label>
+            <label class="salary-mgr-field">%<input type="text" inputmode="decimal" class="salary-mgr-percent" value="${m.percent == null ? "" : m.percent}" placeholder="по умолч." oninput="dbCleanNum(this)"></label>
         </div>`).join("") || `<p class="dbo-ya-note">Менеджеров нет.</p>`;
     host.innerHTML = `
-        <p class="dbo-ya-note">Премия = процент от базы за календарный месяц (по завершённым заказам). Плюс фиксированный оклад у каждого менеджера.</p>
+        <p class="dbo-ya-note">Премия = процент от базы за календарный месяц (по завершённым заказам) + фиксированный оклад. База («чистая/грязная/оборот») и процент можно задать индивидуально каждому менеджеру; пустое — берётся значение «по умолчанию» ниже.</p>
         <div class="salary-set-row">
-            <label class="dbo-edit-wide">Считать премию как
-                <select id="salaryMethodSel">${opt("net", "% от чистой прибыли")}${opt("gross", "% от грязной прибыли")}${opt("turnover", "% от оборота")}</select>
+            <label class="dbo-edit-wide">По умолчанию считать премию как
+                <select id="salaryMethodSel">${opt("net", "% от чистой прибыли", s.method)}${opt("gross", "% от грязной прибыли", s.method)}${opt("turnover", "% от оборота", s.method)}</select>
             </label>
-            <label class="dbo-edit-wide">Процент премии, %
+            <label class="dbo-edit-wide">Процент премии по умолчанию, %
                 <input type="text" inputmode="decimal" id="salaryPercentInp" value="${s.percent}" oninput="dbCleanNum(this)">
             </label>
         </div>
-        <div class="salary-oklad-head">Оклад по менеджерам, ₽/мес</div>
+        <div class="salary-oklad-head">Настройки по менеджерам</div>
         <div id="salaryOkladList">${mgrRows}</div>
         <div class="settings-actions"><button class="dbo-btn dbo-btn-primary" onclick="dbSaveSalarySettings()">Сохранить</button></div>
         <div id="salarySetMsg" class="dbo-ya-note"></div>`;
@@ -4811,7 +4815,9 @@ async function dbSaveSalarySettings() {
     const percent = Number(String(document.getElementById("salaryPercentInp")?.value || "").replace(",", ".")) || 0;
     const baseSalaries = Array.from(document.querySelectorAll("#salaryOkladList .salary-oklad-row")).map(r => ({
         crmUserId: Number(r.dataset.cid),
-        baseSalary: Number(String(r.querySelector(".salary-oklad-input")?.value || "").replace(",", ".")) || 0
+        baseSalary: Number(String(r.querySelector(".salary-oklad-input")?.value || "").replace(",", ".")) || 0,
+        method: r.querySelector(".salary-mgr-method")?.value || "",
+        percent: String(r.querySelector(".salary-mgr-percent")?.value || "").trim()
     }));
     const msg = document.getElementById("salarySetMsg");
     try {
@@ -4822,6 +4828,183 @@ async function dbSaveSalarySettings() {
         console.error("setSalarySettings", e);
         if (msg) { msg.textContent = (e && e.message) ? e.message : "Не удалось сохранить (нужны права администратора)."; msg.className = "dbo-ya-note payment-alert"; }
     }
+}
+
+// ============================ Аналитика (только админ) ============================
+let analyticsState = { year: null, month: null, managers: [], ownerCrmUserId: null };
+function openAnalytics(btn) {
+    if (!ensureActiveSession()) return;
+    if (typeof switchTab === "function") switchTab("analytics-tab", btn || document.getElementById("analytics-nav-btn"));
+    if (analyticsState.year == null) { const n = new Date(); analyticsState.year = n.getFullYear(); analyticsState.month = n.getMonth() + 1; }
+    analyticsFillSelectors();
+    renderAnalytics();
+}
+function analyticsFillSelectors() {
+    const my = document.getElementById("analyticsMonth"), yr = document.getElementById("analyticsYear");
+    const months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    if (my) my.innerHTML = months.map((m, i) => `<option value="${i + 1}"${analyticsState.month === i + 1 ? " selected" : ""}>${m}</option>`).join("");
+    if (yr) { const cy = new Date().getFullYear(); let o = ""; for (let y = cy; y >= cy - 4; y--) o += `<option value="${y}"${analyticsState.year === y ? " selected" : ""}>${y}</option>`; yr.innerHTML = o; }
+}
+function analyticsShiftMonth(delta) {
+    let m = analyticsState.month + delta, y = analyticsState.year;
+    if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
+    analyticsState.month = m; analyticsState.year = y;
+    analyticsFillSelectors(); renderAnalytics();
+}
+function aMoney(n) { return (Math.round(Number(n) || 0)).toLocaleString("ru-RU") + " ₽"; }
+async function renderAnalytics() {
+    const host = document.getElementById("analyticsHost");
+    if (!host) return;
+    const my = document.getElementById("analyticsMonth"), yr = document.getElementById("analyticsYear");
+    if (my && my.value) analyticsState.month = Number(my.value);
+    if (yr && yr.value) analyticsState.year = Number(yr.value);
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let d;
+    try { d = await clientsApi("getAnalytics", { year: analyticsState.year, month: analyticsState.month }); }
+    catch (e) { host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить аналитику (нужны права администратора).</p>`; return; }
+    analyticsState.managers = d.managers || [];
+    analyticsState.ownerCrmUserId = d.salary?.ownerCrmUserId || null;
+    host.innerHTML = analyticsHtml(d);
+}
+// Пончик (SVG): распределение оборота завершённых заказов.
+function analyticsDonut(slices) {
+    const pos = slices.filter(s => s.value > 0.5);
+    const total = pos.reduce((s, x) => s + x.value, 0) || 1;
+    const R = 62, C = 2 * Math.PI * R, cx = 80, cy = 80, sw = 26;
+    let off = 0;
+    const arcs = pos.map(s => {
+        const len = s.value / total * C;
+        const el = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+        off += len; return el;
+    }).join("");
+    return `<svg viewBox="0 0 160 160" class="an-donut" role="img">${arcs || `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--border)" stroke-width="${sw}"></circle>`}</svg>`;
+}
+function analyticsHtml(d) {
+    const done = d.done || {}, placed = d.placed || {}, sal = d.salary || {};
+    const turn = Number(done.turnover) || 0;
+    const pctOf = v => turn > 0 ? Math.max(0, Math.min(100, Math.abs(v) / turn * 100)) : 0;
+    const col = { cost: "#8a8f98", tax: "#e0a106", salary: "#3b82f6", fixed: "#8b5cf6", profit: "#16a34a", loss: "#dc2626" };
+    const posCls = v => v >= 0 ? "an-pos" : "an-neg";
+    // Карточки
+    const monthName = ["", "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"][d.month] || "";
+    const cards = `
+      <div class="an-cards">
+        <div class="an-card"><div class="an-card-label">Заказов завершено</div><div class="an-card-val">${done.count || 0}</div><div class="an-card-sub">оформлено: ${placed.count || 0} · всего в базе: ${d.totalOrders || 0}</div></div>
+        <div class="an-card"><div class="an-card-label">Оборот (завершённые)</div><div class="an-card-val">${aMoney(turn)}</div><div class="an-card-sub">грязная прибыль: ${aMoney(done.gross)}</div></div>
+        <div class="an-card"><div class="an-card-label">Чистая прибыль</div><div class="an-card-val ${posCls(done.net)}">${aMoney(done.net)}</div><div class="an-card-sub">после налога по методам оплаты</div></div>
+        <div class="an-card an-card-hi"><div class="an-card-label">Итоговая прибыль</div><div class="an-card-val ${posCls(d.profitFinal)}">${aMoney(d.profitFinal)}</div><div class="an-card-sub">после зарплат и расходов</div></div>
+      </div>`;
+    // Пончик + легенда
+    const slices = [
+        { label: "Себестоимость", value: Number(done.cost) || 0, color: col.cost },
+        { label: "Налог", value: Number(done.tax) || 0, color: col.tax },
+        { label: "Зарплаты", value: Number(sal.total) || 0, color: col.salary },
+        { label: "Фикс. расходы", value: Number(d.fixedSum) || 0, color: col.fixed },
+        { label: "Итоговая прибыль", value: Math.max(0, Number(d.profitFinal) || 0), color: col.profit }
+    ];
+    const legend = slices.map(s => `<div class="an-leg"><span class="an-leg-dot" style="background:${s.color}"></span>${s.label}<b>${aMoney(s.value)}</b></div>`).join("");
+    const donut = `<div class="an-donut-wrap">${analyticsDonut(slices)}<div class="an-donut-center"><span>оборот</span><b>${aMoney(turn)}</b></div></div>`;
+    // P&L построчно с полосами
+    const row = (label, value, color, isTotal) => `
+      <div class="an-pl-row${isTotal ? " an-pl-total" : ""}">
+        <div class="an-pl-head"><span>${label}</span><b class="${isTotal ? posCls(value) : ""}">${(value < 0 ? "−" : "") + aMoney(Math.abs(value))}</b></div>
+        <div class="an-pl-bar"><span style="width:${pctOf(value)}%;background:${color}"></span></div>
+      </div>`;
+    const pl = `
+      <div class="an-pl">
+        ${row("Оборот", turn, col.profit, false)}
+        ${row("− Себестоимость", -(Number(done.cost) || 0), col.cost, false)}
+        ${row("= Грязная прибыль", Number(done.gross) || 0, "#64748b", true)}
+        ${row("− Налог (по методам оплаты)", -(Number(done.tax) || 0), col.tax, false)}
+        ${row("= Чистая прибыль", Number(done.net) || 0, "#0ea5e9", true)}
+        ${row("− Зарплаты сотрудников", -(Number(sal.total) || 0), col.salary, false)}
+        ${row("= Прибыль после зарплат", Number(d.profitAfterSalary) || 0, "#6366f1", true)}
+        ${row("− Фиксированные расходы", -(Number(d.fixedSum) || 0), col.fixed, false)}
+        ${row("= Итоговая прибыль", Number(d.profitFinal) || 0, (Number(d.profitFinal) || 0) >= 0 ? col.profit : col.loss, true)}
+      </div>`;
+    // Зарплаты деталь
+    const salInfo = `<p class="dbo-ya-note">Зарплаты за месяц: оклады ${aMoney(sal.oklad)} + премии ${aMoney(sal.premium)} = <b>${aMoney(sal.total)}</b>${sal.ownerName ? ` · собственник <b>${escapeHtml(sal.ownerName)}</b> не учитывается` : " · собственник не выбран"}.</p>`;
+    // По методам оплаты
+    const maxPaid = Math.max(1, ...(d.byMethod || []).map(m => Math.abs(m.paid)));
+    const methodRows = (d.byMethod || []).map(m => `
+      <div class="an-pl-row">
+        <div class="an-pl-head"><span>${escapeHtml(m.name)}</span><b>${aMoney(m.paid)} <span class="an-muted">· налог ${aMoney(m.tax)}</span></b></div>
+        <div class="an-pl-bar"><span style="width:${Math.abs(m.paid) / maxPaid * 100}%;background:#0ea5e9"></span></div>
+      </div>`).join("") || `<p class="dbo-ya-note">Нет оплат за месяц.</p>`;
+    // Объём (оформленные)
+    const volume = `
+      <div class="an-cards an-cards-sm">
+        <div class="an-card"><div class="an-card-label">Оформлено заказов</div><div class="an-card-val">${placed.count || 0}</div></div>
+        <div class="an-card"><div class="an-card-label">Оборот оформленных</div><div class="an-card-val">${aMoney(placed.turnover)}</div></div>
+        <div class="an-card"><div class="an-card-label">Грязная прибыль оформленных</div><div class="an-card-val">${aMoney(placed.gross)}</div></div>
+      </div>`;
+    // Настройки: собственник + фикс.расходы
+    const ownerOpts = `<option value="">— не выбран —</option>` + (d.managers || []).map(m =>
+        `<option value="${m.crmUserId}"${sal.ownerCrmUserId === m.crmUserId ? " selected" : ""}>${escapeHtml(m.name)}</option>`).join("");
+    const fxRows = (d.fixedExpenses || []).map(e => `
+      <div class="an-fx-row" data-id="${e.id}">
+        <input type="text" class="dbo-input an-fx-name" value="${escapeHtml(e.name)}" placeholder="Название (аренда, кредит…)">
+        <input type="text" inputmode="decimal" class="dbo-input an-fx-amount" value="${e.amount}" oninput="dbCleanNum(this)">
+        <label class="an-fx-active" title="Учитывать в аналитике"><input type="checkbox" ${e.active ? "checked" : ""}> вкл</label>
+        <button type="button" class="dbo-btn dbo-btn-sm" onclick="analyticsSaveFx(${e.id}, this)">Сохранить</button>
+        <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-danger" onclick="analyticsDeleteFx(${e.id})">×</button>
+      </div>`).join("");
+    const settings = `
+      <details class="an-settings">
+        <summary>Настройки аналитики (собственник и фиксированные расходы)</summary>
+        <div class="an-settings-body">
+          <label class="dbo-edit-wide">Собственник (не вычитается из прибыли как зарплата)
+            <select id="analyticsOwnerSel" onchange="analyticsSaveOwner(this.value)">${ownerOpts}</select>
+          </label>
+          <h4 style="margin:14px 0 6px;">Фиксированные ежемесячные расходы</h4>
+          <p class="dbo-ya-note">Аренда, кредиты, лизинги и т.п. Учитываются каждый месяц, пока включены.</p>
+          <div id="anFxList">${fxRows}</div>
+          <div class="an-fx-row an-fx-new">
+            <input type="text" class="dbo-input" id="anFxNewName" placeholder="Название">
+            <input type="text" inputmode="decimal" class="dbo-input" id="anFxNewAmount" placeholder="Сумма ₽" oninput="dbCleanNum(this)">
+            <button type="button" class="dbo-btn dbo-btn-sm dbo-btn-primary" onclick="analyticsAddFx(this)">Добавить</button>
+          </div>
+        </div>
+      </details>`;
+    return `
+      ${cards}
+      <div class="an-grid2">
+        <section class="an-block"><h3>Куда ушёл оборот (завершённые заказы)</h3>
+          <div class="an-donut-row">${donut}<div class="an-legend">${legend}</div></div>
+        </section>
+        <section class="an-block"><h3>Отчёт о прибыли за месяц</h3>${pl}${salInfo}</section>
+      </div>
+      <div class="an-grid2">
+        <section class="an-block"><h3>Оборот по методам оплаты</h3>${methodRows}</section>
+        <section class="an-block"><h3>Объём: оформленные заказы за месяц</h3>${volume}
+          <p class="dbo-ya-note">«Оформленные» — заказы, созданные в этом месяце (объём работы). Прибыль считается по «завершённым» (реально закрытым).</p>
+        </section>
+      </div>
+      ${settings}`;
+}
+async function analyticsSaveOwner(crmUserId) {
+    try { await clientsApi("setAnalyticsOwner", { crmUserId: crmUserId ? Number(crmUserId) : 0 }); renderAnalytics(); }
+    catch (e) { alert("Не удалось сохранить: " + (e.message || "")); }
+}
+async function analyticsAddFx(btn) {
+    const name = String(document.getElementById("anFxNewName")?.value || "").trim();
+    const amount = String(document.getElementById("anFxNewAmount")?.value || "").trim();
+    if (!name) { alert("Укажите название расхода"); return; }
+    try { await clientsApi("addFixedExpense", { name, amount }); renderAnalytics(); }
+    catch (e) { alert("Ошибка: " + (e.message || "")); }
+}
+async function analyticsSaveFx(id, btn) {
+    const row = btn.closest(".an-fx-row"); if (!row) return;
+    const name = String(row.querySelector(".an-fx-name")?.value || "").trim();
+    const amount = String(row.querySelector(".an-fx-amount")?.value || "").trim();
+    const active = !!row.querySelector(".an-fx-active input")?.checked;
+    try { await clientsApi("updateFixedExpense", { id, name, amount, active }); renderAnalytics(); }
+    catch (e) { alert("Ошибка: " + (e.message || "")); }
+}
+async function analyticsDeleteFx(id) {
+    if (!confirm("Удалить этот фиксированный расход?")) return;
+    try { await clientsApi("deleteFixedExpense", { id }); renderAnalytics(); }
+    catch (e) { alert("Ошибка: " + (e.message || "")); }
 }
 
 // ——— Настройки: шаблоны коммерческих предложений ———

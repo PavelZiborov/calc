@@ -217,6 +217,7 @@ function resetAuthToGuest() {
     if (typeof updateAuthModalUi === "function") updateAuthModalUi();
     if (crmContainer) crmContainer.style.display = 'none';
     document.querySelectorAll('.gated-nav').forEach(el => { el.style.display = 'none'; });
+    document.querySelectorAll('.admin-nav').forEach(el => { el.style.display = 'none'; });
 }
 
 function ensureActiveSession(options = {}) {
