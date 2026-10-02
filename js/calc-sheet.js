@@ -347,14 +347,17 @@ async function cshCreateDeal(clientId) {
         cshDealBusy = false;
         if (!r?.newDealId) { if (msg) { msg.textContent = "CRM не вернула заказ."; msg.className = "dbo-ya-note payment-alert"; } return; }
         cshCloseDealModal();
-        // Лист оформлен — очищаем.
-        calcSheetItems = [];
-        if (typeof renderCalcSheet === "function") renderCalcSheet();
-        if (typeof updateCalcSheetTabCount === "function") updateCalcSheetTabCount();
-        if (typeof showReadinessToast === "function") showReadinessToast(`Заказ создан (${r.added} поз.)` + (r.errors && r.errors.length ? `, ошибок: ${r.errors.length}` : ""));
+        const fullOk = Number(r.added) >= items.length && !(r.errors && r.errors.length);
+        // Лист очищаем только если ВСЕ позиции добавились — иначе не теряем расчёт.
+        if (fullOk) {
+            calcSheetItems = [];
+            if (typeof renderCalcSheet === "function") renderCalcSheet();
+            if (typeof updateCalcSheetTabCount === "function") updateCalcSheetTabCount();
+        }
+        if (typeof showReadinessToast === "function") showReadinessToast(`Заказ создан (${r.added} из ${items.length} поз.)`);
         if (typeof openDbOrders === "function") openDbOrders();
         if (typeof openDbDealCard === "function") openDbDealCard(Number(r.newDealId));
-        if (r.errors && r.errors.length) setTimeout(() => alert("Часть позиций не добавилась:\n\n" + r.errors.join("\n")), 400);
+        if (r.errors && r.errors.length) setTimeout(() => alert("Часть позиций не добавилась (расчётный лист сохранён):\n\n" + r.errors.join("\n")), 400);
     } catch (e) {
         cshDealBusy = false;
         if (msg) { msg.textContent = "Не удалось создать заказ: " + (e.message || ""); msg.className = "dbo-ya-note payment-alert"; }
