@@ -1,8 +1,8 @@
 // --- РАСЧЁТНЫЙ ЛИСТ (черновик заказа, живёт до перезагрузки/закрытия) ---
 // НАБРОСОК. Кнопка «Добавить в расчёт» в синем блоке калькулятора кладёт текущий
 // расчёт в этот лист (отдельная вкладка). Можно накапливать несколько расчётов и
-// добавлять позиции вручную. Кнопка «Добавить в реальный заказ» — пока заглушка
-// со сводкой (интеграцию с CRM допилим по факту).
+// добавлять позиции вручную. Кнопка «Добавить в реальный заказ» создаёт сделку в
+// PrintOffice с этими позициями (выбор/создание клиента) и открывает её карточку.
 //
 // Данные в памяти (calcSheetItems) — при перезагрузке страницы теряются.
 
@@ -248,19 +248,117 @@ async function copyCalcSheetForCustomer() {
     }
 }
 
-// НАБРОСОК: отправка листа в реальный заказ CRM. Пока — сводка + TODO.
+// Оформление расчётного листа в реальный заказ (сделка PrintOffice): выбор/создание клиента → создание сделки с позициями.
+let cshDealSearchTimer = null;
+let cshDealBusy = false;
 function addCalcSheetToRealDeal() {
     if ((typeof currentUser === "undefined") || currentUser.role !== "staff") return;
     if (!calcSheetItems.length) { alert("Расчётный лист пуст"); return; }
-    const summary = calcSheetItems
-        .map(it => `• ${it.name || "—"} — ${it.qty} шт — ${csMoney(it.total)} ₽`)
-        .join("\n");
-    alert(
-        "Добавить в реальный заказ — в разработке.\n\n" +
-        summary +
-        `\n\nИтого: ${csMoney(getCalcSheetTotal())} ₽\n\n` +
-        "Следующий шаг: создание сделки в CRM и отправка этих позиций."
-    );
+    let ov = document.getElementById("cshDealOverlay");
+    if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "cshDealOverlay";
+        ov.className = "client-card-overlay";
+        ov.setAttribute("onclick", "if (event.target===this) cshCloseDealModal()");
+        document.body.appendChild(ov);
+    }
+    const summary = calcSheetItems.map(it => `<li>${csEsc(it.name || "—")} — ${Number(it.qty) || 0} шт — ${csMoney(it.total)} ₽</li>`).join("");
+    ov.innerHTML = `<div class="client-card csh-deal-modal">
+        <div class="client-card-header"><h3>Оформить заказ</h3>
+            <button class="client-card-close" onclick="cshCloseDealModal()" aria-label="Закрыть">&times;</button></div>
+        <div class="client-card-body">
+            <div class="csh-deal-summary"><b>${calcSheetItems.length} поз. на ${csMoney(getCalcSheetTotal())} ₽</b><ul>${summary}</ul></div>
+            <p class="csh-deal-step">Выберите клиента для заказа:</p>
+            <input type="text" id="cshClientSearch" class="dbo-input" placeholder="Поиск: название, телефон, ИНН…" oninput="cshSearchClients(this.value)" autocomplete="off">
+            <div id="cshClientResults" class="csh-client-results"></div>
+            <div class="csh-deal-or">или</div>
+            <button type="button" class="dbo-btn" id="cshNewClientToggle" onclick="cshToggleNewClient()">＋ Создать нового клиента</button>
+            <div id="cshNewClientForm" class="csh-newclient" hidden>
+                <input type="text" id="cshNcCompany" class="dbo-input" placeholder="Название / ФИО клиента *">
+                <input type="text" id="cshNcContact" class="dbo-input" placeholder="Контактное лицо (необязательно)">
+                <input type="text" id="cshNcPhone" class="dbo-input" placeholder="Телефон (необязательно)">
+                <button type="button" class="dbo-btn dbo-btn-primary" onclick="cshCreateClientAndDeal()">Создать клиента и оформить заказ</button>
+            </div>
+            <div id="cshDealMsg" class="dbo-ya-note"></div>
+        </div></div>`;
+    ov.style.display = "flex";
+    setTimeout(() => { const i = document.getElementById("cshClientSearch"); if (i) i.focus(); }, 60);
+    cshSearchClients("");
+}
+function cshCloseDealModal() {
+    const ov = document.getElementById("cshDealOverlay");
+    if (ov) ov.style.display = "none";
+}
+function cshToggleNewClient() {
+    const f = document.getElementById("cshNewClientForm");
+    if (f) { f.hidden = !f.hidden; if (!f.hidden) document.getElementById("cshNcCompany")?.focus(); }
+}
+function cshSearchClients(q) {
+    clearTimeout(cshDealSearchTimer);
+    cshDealSearchTimer = setTimeout(async () => {
+        const host = document.getElementById("cshClientResults");
+        if (!host) return;
+        host.innerHTML = `<div class="csh-client-empty">Поиск…</div>`;
+        try {
+            const data = await clientsApi("listClients", { q: String(q || "").trim() });
+            const list = (typeof getClientsFromResponse === "function") ? getClientsFromResponse(data) : [];
+            const rows = list.filter(c => c.crmId).slice(0, 25).map(c => {
+                const phone = c.mobile || c.landline || "";
+                const sub = [c.contactName, phone].filter(Boolean).join(" · ");
+                return `<button type="button" class="csh-client-row" onclick="cshCreateDeal(${c.crmId})">
+                    <span class="csh-client-name">${csEsc(c.company || "—")}</span>
+                    ${sub ? `<span class="csh-client-sub">${csEsc(sub)}</span>` : ""}</button>`;
+            }).join("");
+            host.innerHTML = rows || `<div class="csh-client-empty">${q ? "Ничего не найдено." : "Начните вводить для поиска."}</div>`;
+        } catch (e) {
+            host.innerHTML = `<div class="csh-client-empty payment-alert">Ошибка поиска клиентов.</div>`;
+        }
+    }, 300);
+}
+async function cshCreateClientAndDeal() {
+    const company = String(document.getElementById("cshNcCompany")?.value || "").trim();
+    const contact = String(document.getElementById("cshNcContact")?.value || "").trim();
+    const phone = String(document.getElementById("cshNcPhone")?.value || "").trim();
+    const msg = document.getElementById("cshDealMsg");
+    if (!company) { if (msg) { msg.textContent = "Укажите название клиента."; msg.className = "dbo-ya-note payment-alert"; } return; }
+    if (cshDealBusy) return; cshDealBusy = true;
+    if (msg) { msg.textContent = "Создаём клиента…"; msg.className = "dbo-ya-note"; }
+    try {
+        const r = await clientsApi("createClient", { client: { company_name: company, contact_name: contact, mobile_phone: phone } });
+        const cid = r?.client?.crm_client_id;
+        if (!cid) { cshDealBusy = false; if (msg) { msg.textContent = "Клиент сохранён только локально (CRM недоступна) — заказ оформить нельзя. " + (r?.crmError || ""); msg.className = "dbo-ya-note payment-alert"; } return; }
+        cshDealBusy = false;
+        cshCreateDeal(Number(cid));
+    } catch (e) {
+        cshDealBusy = false;
+        if (msg) { msg.textContent = "Не удалось создать клиента: " + (e.message || ""); msg.className = "dbo-ya-note payment-alert"; }
+    }
+}
+async function cshCreateDeal(clientId) {
+    if (cshDealBusy) return; cshDealBusy = true;
+    const msg = document.getElementById("cshDealMsg");
+    if (msg) { msg.textContent = "Создаём заказ и позиции в CRM…"; msg.className = "dbo-ya-note"; }
+    const items = calcSheetItems.map(it => ({
+        name: it.name, qty: it.qty, priceOne: it.priceOne, total: it.total,
+        cost: it.cost, costHq: it.costHq, sra3: it.sra3
+    }));
+    try {
+        const r = await clientsApi("createDealFromCalcSheet", { clientId: Number(clientId), items });
+        cshDealBusy = false;
+        if (!r?.newDealId) { if (msg) { msg.textContent = "CRM не вернула заказ."; msg.className = "dbo-ya-note payment-alert"; } return; }
+        cshCloseDealModal();
+        // Лист оформлен — очищаем.
+        calcSheetItems = [];
+        if (typeof renderCalcSheet === "function") renderCalcSheet();
+        if (typeof updateCalcSheetTabCount === "function") updateCalcSheetTabCount();
+        if (typeof showReadinessToast === "function") showReadinessToast(`Заказ создан (${r.added} поз.)` + (r.errors && r.errors.length ? `, ошибок: ${r.errors.length}` : ""));
+        if (typeof openDbOrders === "function") openDbOrders();
+        if (typeof openDbDealCard === "function") openDbDealCard(Number(r.newDealId));
+        if (r.errors && r.errors.length) setTimeout(() => alert("Часть позиций не добавилась:\n\n" + r.errors.join("\n")), 400);
+    } catch (e) {
+        cshDealBusy = false;
+        if (msg) { msg.textContent = "Не удалось создать заказ: " + (e.message || ""); msg.className = "dbo-ya-note payment-alert"; }
+    }
 }
 
 // Скачать коммерческое предложение (Word .docx) по позициям листа

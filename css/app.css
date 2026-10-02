@@ -552,6 +552,21 @@
     .cd-steps li { margin-bottom: 4px; }
     .cd-link-row { margin: 8px 0; }
     .dbo-user-list { display: flex; flex-direction: column; gap: 8px; }
+    /* Оформление расчётного листа в заказ */
+    .csh-deal-modal { max-width: 460px; }
+    .csh-deal-summary { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
+    .csh-deal-summary ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-muted); }
+    .csh-deal-summary li { margin: 2px 0; }
+    .csh-deal-step { font-weight: 600; margin: 4px 0 8px; }
+    .csh-client-results { max-height: 240px; overflow: auto; margin: 8px 0; border: 1px solid var(--border); border-radius: var(--r-sm); }
+    .csh-client-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 9px 12px; background: var(--surface); border: none; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .csh-client-row:last-child { border-bottom: none; }
+    .csh-client-row:hover { background: var(--surface-2); }
+    .csh-client-name { font-weight: 600; }
+    .csh-client-sub { font-size: 12px; color: var(--text-muted); }
+    .csh-client-empty { padding: 14px 12px; color: var(--text-muted); font-size: 13px; text-align: center; }
+    .csh-deal-or { text-align: center; color: var(--text-muted); font-size: 12px; margin: 10px 0; }
+    .csh-newclient { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
     /* Налог по методам оплаты (Настройки → Финансы → Прибыль) */
     .dbo-tax-row { align-items: center; }
     .dbo-tax-pct { display: flex; align-items: center; gap: 6px; }
