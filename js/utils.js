@@ -305,6 +305,17 @@ function updateType() {
     let t = document.getElementById("type").value, p = document.getElementById("product"); p.innerHTML = "";
     const sheetProducts = (typeof CALC_SHEET_PRODUCTS !== "undefined") ? CALC_SHEET_PRODUCTS : ["Визитка", "Листовка", "Открытка", "Наклейка", "Стикерпак", "Буклет", "Карточка", "Меню"];
     const catalogProducts = (typeof CALC_CATALOG_PRODUCTS !== "undefined") ? CALC_CATALOG_PRODUCTS : ["Каталог", "Презентация"];
+    const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? "" : "none"; };
+    // Поля, относящиеся к листовой/каталогу, прячем для календаря.
+    const isCal = t === "calendar";
+    show("formatCol", !isCal); show("sizeRow", !isCal); show("calendarFields", isCal);
+    if (isCal) {
+        p.add(new Option("Квартальный календарь", "Квартальный календарь"));
+        show("catalogFields", false); show("catalogPaper", false);
+        show("sheetBlock", false); show("layoutContainer", false); show("processOptions", false);
+        if (typeof calInit === "function") calInit();
+        return;
+    }
     if(t === "sheet"){
         sheetProducts.forEach(x => p.add(new Option(x, x)));
         document.getElementById("catalogFields").style.display = "none"; document.getElementById("catalogPaper").style.display = "none";

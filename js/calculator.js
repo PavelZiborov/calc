@@ -1,6 +1,8 @@
 // --- РАСЧЕТ ---
 async function calc() {
     const type = document.getElementById("type").value;
+    // Квартальный календарь считается отдельным модулем (calendar-calc.js).
+    if (type === "calendar") { if (typeof calComputePrice === "function") await calComputePrice(); return; }
     const tir = Number(document.getElementById("tirazh").value);
     const lay = Number(document.getElementById("layout").value);
     const width = Number(document.getElementById("width").value);
