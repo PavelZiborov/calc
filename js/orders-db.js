@@ -3678,7 +3678,116 @@ function openSettingsPage() {
     renderKpSettingsInline();
     renderStatusSettingsInline();
     renderCarddavSettingsInline();
+    renderCalendarSettingsInline();
     settingsSwitchTab("calc");
+}
+
+// ——— Настройки: квартальные календари (прайс блоков + параметры расчёта) ———
+async function renderCalendarSettingsInline() {
+    const host = document.getElementById("settingsCalendarHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    let d;
+    try { d = await clientsApi("getCalendarSettings", {}); }
+    catch (e) { host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить (нужны права администратора).</p>`; return; }
+    const s = d.settings || {};
+    const f = (id, label, val, hint) => `<label class="dbo-edit-wide">${label}
+        <input type="text" inputmode="decimal" id="${id}" value="${val == null ? "" : val}" oninput="dbCleanNum(this)">
+        ${hint ? `<span class="dbo-ya-hint" style="display:block">${escapeHtml(hint)}</span>` : ""}</label>`;
+    const nextYear = new Date().getFullYear() + 1;
+    host.innerHTML = `
+        <p class="dbo-ya-note">Прайс блоков: <b>${d.blocksYear ? `${d.blocksYear} год — ${d.blocksCount} блоков` : "не загружен"}</b></p>
+        <label class="dbo-edit-wide">Новый прайс блоков (файл .xls от поставщика — это HTML-таблица)
+            <input type="file" id="calPriceFile" accept=".xls,.html,.htm,.csv,.txt">
+        </label>
+        <div style="display:flex;gap:10px;align-items:center;margin:6px 0 2px;flex-wrap:wrap;">
+            <label style="display:flex;gap:6px;align-items:center;margin:0;">Год прайса
+                <input type="text" inputmode="numeric" id="calPriceYear" value="${d.blocksYear || nextYear}" style="width:84px">
+            </label>
+            <button type="button" class="dbo-btn dbo-btn-primary" onclick="dbImportCalendarPrice(this)">Загрузить прайс</button>
+        </div>
+        <div id="calPriceMsg" class="dbo-ya-note"></div>
+        <h4 style="margin:16px 0 8px;">Параметры расчёта</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${f("calSetAssembly", "Сборка, ₽/шт", s.assembly)}
+            ${f("calSetCursor", "Курсор, ₽/шт", s.cursor)}
+            ${f("calSetSpring", "Пружина, ₽/шт (× 3)", s.spring)}
+            ${f("calSetMarkup", "Наценка (×)", s.markup)}
+            ${f("calSetPosterRate", "Печать постера, ₽/м²", s.posterRatePerM2)}
+            ${f("calSetFieldRate", "Печать рекл. поля, ₽/м²", s.fieldRatePerM2)}
+            ${f("calSetBlockUnit", "Цена блока указана за, шт", s.blockUnit, "в прайсе цена за столько штук (обычно 100)")}
+        </div>
+        <div class="settings-actions" style="margin-top:12px;"><button class="dbo-btn dbo-btn-primary" onclick="dbSaveCalendarSettings()">Сохранить параметры</button></div>
+        <div id="calSetMsg" class="dbo-ya-note"></div>`;
+}
+async function dbSaveCalendarSettings() {
+    const g = id => { const v = String(document.getElementById(id)?.value || "").replace(",", ".").trim(); return v === "" ? undefined : Number(v); };
+    const settings = {
+        assembly: g("calSetAssembly"), cursor: g("calSetCursor"), spring: g("calSetSpring"), markup: g("calSetMarkup"),
+        posterRatePerM2: g("calSetPosterRate"), fieldRatePerM2: g("calSetFieldRate"), blockUnit: g("calSetBlockUnit"),
+    };
+    const msg = document.getElementById("calSetMsg");
+    try { await clientsApi("setCalendarSettings", { settings }); if (msg) { msg.textContent = "Сохранено. Новый расчёт использует эти параметры."; msg.className = "dbo-ya-note payment-ok"; } }
+    catch (e) { if (msg) { msg.textContent = "Ошибка: " + (e.message || ""); msg.className = "dbo-ya-note payment-alert"; } }
+}
+// Разбор прайса блоков (HTML-таблица .xls поставщика или CSV).
+function calParsePriceFile(text) {
+    const SIZES = ["супермакси", "макси", "миди", "мини", "стандарт"];
+    const num = s => { const v = Number(String(s).replace(/[\s ]/g, "")); return Number.isFinite(v) ? v : null; };
+    const parseName = n => {
+        const toks = String(n).trim().split(/\s+/);
+        let size = null, sidx = -1;
+        for (let i = 0; i < toks.length; i++) if (SIZES.includes(toks[i].toLowerCase())) { size = toks[i].toLowerCase(); sidx = i; break; }
+        const m = String(n).match(/(\d+)-сп/); const springs = m ? Number(m[1]) : null;
+        const series = sidx > 0 ? toks.slice(0, sidx).join(" ") : toks[0];
+        let color = "";
+        if (sidx >= 0) { let end = toks.length; for (let j = sidx + 1; j < toks.length; j++) if (/\d+-сп/.test(toks[j])) { end = j; break; } color = toks.slice(sidx + 1, end).join(" "); }
+        return { series, size, color, springs };
+    };
+    const rows = [];
+    if (/<table/i.test(text)) {
+        const doc = new DOMParser().parseFromString(text, "text/html");
+        doc.querySelectorAll("table tr").forEach(tr => {
+            const tds = [...tr.querySelectorAll("td,th")].map(td => td.textContent.trim());
+            if (tds.length < 13) return;
+            const name = tds[0];
+            if (!name || /наименование/i.test(name)) return;
+            const p = parseName(name);
+            rows.push({ name, series: p.series, size: p.size, color: p.color, springs: p.springs,
+                g1: num(tds[5]), g2: num(tds[6]), g3: num(tds[7]), g4: num(tds[8]), g5: num(tds[9]), g6: num(tds[10]), g7: num(tds[11]), g8: num(tds[12]) });
+        });
+    } else {
+        // CSV/TSV: имя; g1; g2 ... g8
+        text.split(/\r?\n/).forEach(line => {
+            const cells = line.split(/[\t;,]/).map(x => x.trim());
+            if (cells.length < 2) return;
+            const name = cells[0]; if (!name || /наименование/i.test(name)) return;
+            const p = parseName(name);
+            const g = i => num(cells[i]);
+            rows.push({ name, series: p.series, size: p.size, color: p.color, springs: p.springs,
+                g1: g(1), g2: g(2) ?? g(1), g3: g(3) ?? g(1), g4: g(4) ?? g(1), g5: g(5) ?? g(1), g6: g(6) ?? g(1), g7: g(7) ?? g(1), g8: g(8) ?? g(1) });
+        });
+    }
+    return rows;
+}
+async function dbImportCalendarPrice(btn) {
+    const file = document.getElementById("calPriceFile")?.files?.[0];
+    const year = Number(document.getElementById("calPriceYear")?.value);
+    const msg = document.getElementById("calPriceMsg");
+    if (!file) { if (msg) { msg.textContent = "Выберите файл прайса."; msg.className = "dbo-ya-note payment-alert"; } return; }
+    if (!Number.isFinite(year)) { if (msg) { msg.textContent = "Укажите год прайса."; msg.className = "dbo-ya-note payment-alert"; } return; }
+    if (msg) { msg.textContent = "Разбор файла…"; msg.className = "dbo-ya-note"; }
+    if (btn) btn.disabled = true;
+    try {
+        const text = await file.text();
+        const rows = calParsePriceFile(text);
+        if (!rows.length) { if (msg) { msg.textContent = "Не удалось разобрать прайс (0 строк). Файл должен быть HTML-таблицей от поставщика или CSV."; msg.className = "dbo-ya-note payment-alert"; } return; }
+        const r = await clientsApi("importCalendarBlocks", { year, rows });
+        if (msg) { msg.textContent = `Загружено ${r.imported} блоков за ${year} год.`; msg.className = "dbo-ya-note payment-ok"; }
+        renderCalendarSettingsInline();
+    } catch (e) {
+        if (msg) { msg.textContent = "Ошибка загрузки: " + (e.message || ""); msg.className = "dbo-ya-note payment-alert"; }
+    } finally { if (btn) btn.disabled = false; }
 }
 
 // ——— Настройки: определитель номера на iPhone (CardDAV) ———
