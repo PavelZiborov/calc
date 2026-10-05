@@ -106,9 +106,12 @@ function calRenderPreview() {
     const lblSvg = labels.map(l => `
         <line x1="${x + scaleW}" y1="${l.y.toFixed(1)}" x2="${x + scaleW + 14}" y2="${l.y.toFixed(1)}" stroke="${col}" stroke-width="1"/>
         <text x="${x + scaleW + 18}" y="${(l.y + 3).toFixed(1)}" font-size="8" fill="${col}">${calEsc(l.text)}</text>`).join("");
-    host.innerHTML = `<svg viewBox="0 0 ${svgW} ${Math.ceil(svgH)}" style="max-width:100%;height:auto;max-height:420px">${parts.join("")}${lblSvg}</svg>`;
+    host.innerHTML = `<svg viewBox="0 0 ${svgW} ${Math.ceil(svgH)}" width="${svgW}" style="width:${svgW}px;max-width:100%;height:auto;max-height:420px">${parts.join("")}${lblSvg}</svg>`;
     host.style.display = "flex";
+    host.style.width = "100%";
+    host.style.minWidth = "200px";
     host.style.justifyContent = "center";
+    host.style.alignItems = "flex-start";
 }
 
 async function calComputePrice() {
