@@ -141,38 +141,30 @@ async function calComputePrice() {
         calState.dims = r.dims;
         document.getElementById("resultMain") && (document.getElementById("resultMain").style.display = "block");
 
+        // Блоки — кратно 50 шт: если ввели не кратно, подгоняем поле тиража к фактическому.
+        const qtyEff = Number(r.qty) || qty;
+        const tirEl = document.getElementById("tirazh");
+        if (tirEl && Number(tirEl.value) !== qtyEff) tirEl.value = qtyEff;
+
         const sizeLabel = { "мини": "Мини", "миди": "Стандарт", "макси": "Макси" }[calState.size] || calState.size;
         const fieldsLabel = calState.fields === 0 ? "без полей" : (calState.fields === 1 ? "1 реклам. поле" : "3 реклам. поля");
         const blk = calState.block ? `, блок ${calState.block.series}${calState.block.color ? " " + calState.block.color : ""}` : "";
         const name = `Квартальный календарь ${sizeLabel}, ${fieldsLabel}${blk}`;
 
-        const bd = r.breakdown;
         const isStaff = !!(typeof currentUser !== "undefined" && currentUser && currentUser.role === "staff");
-        const fmt = v => Math.round(Number(v) || 0).toLocaleString("ru-RU");
 
-        if (isStaff && bd) {
-            // Полная разбивка по себестоимости + наценка — как у других продукций.
-            const costPerUnit = Number(bd.costPerUnit) || 0;
-            const costTotal = Math.round(costPerUnit * qty);
-            const comp = [`Печать: ${fmt(bd.posterPrint * qty)} ₽`];
-            if ((Number(bd.block) || 0) > 0) comp.push(`Блоки: ${fmt(bd.block * qty)} ₽`);
-            if ((Number(bd.cursor) || 0) > 0) comp.push(`Курсор: ${fmt(bd.cursor * qty)} ₽`);
-            if ((Number(bd.springs) || 0) > 0) comp.push(`Пружины: ${fmt(bd.springs * qty)} ₽`);
-            if ((Number(bd.assembly) || 0) > 0) comp.push(`Сборка: ${fmt(bd.assembly * qty)} ₽`);
+        if (isStaff && r.cost != null) {
+            // Полная разбивка + наценка по общей схеме (как у других продукций).
+            const recMult = r.recommendedMultiplier;
             lastCalcData = {
-                name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit,
-                costTotal, costHQ: costTotal, costBreakdownHtml: comp.join(" | "),
-                sra3Sheets: null, selectedMultiplier: bd.markup,
+                name, fullName: name, qty: qtyEff, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit,
+                costTotal: r.cost, costHQ: r.costHQ, costBreakdownHtml: r.costBreakdown || "",
+                sra3Sheets: (r.totalSheets != null ? r.totalSheets : null), selectedMultiplier: recMult,
             };
-            // Кнопки наценки (цена = себестоимость × коэффициент), как в листовой/каталоге.
-            const CAL_MARKUPS = [1.6, 1.7, 1.8, 1.9, 2, 2.2];
-            const markupList = CAL_MARKUPS.map(m => ({ multiplier: m, total: Math.round(costTotal * m), perOne: Math.round(costPerUnit * m * 100) / 100 }));
-            if (typeof renderMarkupSelect === "function") renderMarkupSelect(markupList, costTotal, bd.markup);
+            if (typeof renderMarkupSelect === "function") renderMarkupSelect(r.markupList || [], r.cost, recMult);
             if (typeof exitInlinePriceEdit === "function") exitInlinePriceEdit();
             const gearEl = document.getElementById("recPriceGear"); if (gearEl) gearEl.style.display = "inline-flex";
             const roundRow = document.getElementById("recRoundRow"); if (roundRow) roundRow.style.display = "";
-            const scs = document.getElementById("staffCostSummary");
-            if (scs) { scs.innerHTML = `Себестоимость: <b>${fmt(costTotal)} ₽</b> · За штуку: <b>${costPerUnit.toFixed(2)} ₽</b>`; scs.style.display = "block"; }
             if (typeof refreshSelectedPriceUI === "function") refreshSelectedPriceUI("Рекомендованная цена");
             if (!r.hasBlockPrice) { const sub = document.getElementById("recMultiplierLabel"); if (sub) sub.textContent += " · нет цены блока!"; }
             if (typeof renderStaffTechAndCopyUI === "function") renderStaffTechAndCopyUI();
@@ -184,7 +176,7 @@ async function calComputePrice() {
             const sub = document.getElementById("recMultiplierLabel"); if (sub) sub.textContent = "Итоговая стоимость";
             ["recPriceGear", "markupCoefRow", "recRoundRow", "recPriceEdit"].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = "none"; });
             const techData = document.getElementById("techData"); if (techData) techData.style.display = "none";
-            lastCalcData = { name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit, costTotal: null, costHQ: null, sra3Sheets: null };
+            lastCalcData = { name, fullName: name, qty: qtyEff, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit, costTotal: null, costHQ: null, sra3Sheets: null };
         }
         const addBtn = document.getElementById("addToSheetBtn"); if (addBtn) addBtn.style.display = "";
     } catch (e) {

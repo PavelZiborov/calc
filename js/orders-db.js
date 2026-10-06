@@ -3708,23 +3708,30 @@ async function renderCalendarSettingsInline() {
         </div>
         <div id="calPriceMsg" class="dbo-ya-note"></div>
         <h4 style="margin:16px 0 8px;">Параметры расчёта</h4>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <label class="dbo-edit-wide">Бумага для печати постера и полей (4+0)
+            <select id="calSetPaper">${calPaperOptions(s.paperId)}</select>
+            <span class="dbo-ya-hint" style="display:block">из общего списка бумаг; печать считается по листовой логике</span>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
             ${f("calSetAssembly", "Сборка, ₽/шт", s.assembly)}
             ${f("calSetCursor", "Курсор, ₽/шт", s.cursor)}
             ${f("calSetSpring", "Пружина, ₽/шт (× 3)", s.spring)}
-            ${f("calSetMarkup", "Наценка (×)", s.markup)}
-            ${f("calSetPosterRate", "Печать постера, ₽/м²", s.posterRatePerM2)}
-            ${f("calSetFieldRate", "Печать рекл. поля, ₽/м²", s.fieldRatePerM2)}
-            ${f("calSetBlockUnit", "Цена блока указана за, шт", s.blockUnit, "в прайсе цена за столько штук (обычно 100)")}
+            ${f("calSetDelivery", "Доставка блоков, ₽ (разовая)", s.blockDelivery, "добавляется к себестоимости один раз за тираж")}
         </div>
         <div class="settings-actions" style="margin-top:12px;"><button class="dbo-btn dbo-btn-primary" onclick="dbSaveCalendarSettings()">Сохранить параметры</button></div>
         <div id="calSetMsg" class="dbo-ya-note"></div>`;
 }
+// Опции <select> с бумагами (из загруженного прайса калькулятора).
+function calPaperOptions(selectedId) {
+    const papers = (typeof calcPricesData !== "undefined" && calcPricesData && Array.isArray(calcPricesData.papers)) ? calcPricesData.papers : [];
+    if (!papers.length) return `<option value="${escapeHtml(selectedId || "paper_350")}">${escapeHtml(selectedId || "paper_350")}</option>`;
+    return papers.map(p => `<option value="${escapeHtml(p.ID)}"${p.ID === selectedId ? " selected" : ""}>${escapeHtml(p.Name || p.ID)}</option>`).join("");
+}
 async function dbSaveCalendarSettings() {
     const g = id => { const v = String(document.getElementById(id)?.value || "").replace(",", ".").trim(); return v === "" ? undefined : Number(v); };
     const settings = {
-        assembly: g("calSetAssembly"), cursor: g("calSetCursor"), spring: g("calSetSpring"), markup: g("calSetMarkup"),
-        posterRatePerM2: g("calSetPosterRate"), fieldRatePerM2: g("calSetFieldRate"), blockUnit: g("calSetBlockUnit"),
+        assembly: g("calSetAssembly"), cursor: g("calSetCursor"), spring: g("calSetSpring"),
+        blockDelivery: g("calSetDelivery"), paperId: String(document.getElementById("calSetPaper")?.value || "").trim() || undefined,
     };
     const msg = document.getElementById("calSetMsg");
     try { await clientsApi("setCalendarSettings", { settings }); if (msg) { msg.textContent = "Сохранено. Новый расчёт использует эти параметры."; msg.className = "dbo-ya-note payment-ok"; } }
