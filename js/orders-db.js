@@ -3721,11 +3721,18 @@ async function renderCalendarSettingsInline() {
         <div class="settings-actions" style="margin-top:12px;"><button class="dbo-btn dbo-btn-primary" onclick="dbSaveCalendarSettings()">Сохранить параметры</button></div>
         <div id="calSetMsg" class="dbo-ya-note"></div>`;
 }
-// Опции <select> с бумагами (из загруженного прайса калькулятора).
+// Опции <select> с бумагами. Берём из прайса калькулятора; если не загружен —
+// из уже заполненного списка бумаг основного калькулятора (#paper) — IDs те же.
 function calPaperOptions(selectedId) {
-    const papers = (typeof calcPricesData !== "undefined" && calcPricesData && Array.isArray(calcPricesData.papers)) ? calcPricesData.papers : [];
+    let papers = [];
+    if (typeof calcPricesData !== "undefined" && calcPricesData && Array.isArray(calcPricesData.papers) && calcPricesData.papers.length)
+        papers = calcPricesData.papers.map(p => ({ id: p.ID, name: p.Name || p.ID }));
+    if (!papers.length) {
+        const mainSel = document.getElementById("paper");
+        if (mainSel && mainSel.options.length) papers = [...mainSel.options].map(o => ({ id: o.value, name: o.textContent }));
+    }
     if (!papers.length) return `<option value="${escapeHtml(selectedId || "paper_350")}">${escapeHtml(selectedId || "paper_350")}</option>`;
-    return papers.map(p => `<option value="${escapeHtml(p.ID)}"${p.ID === selectedId ? " selected" : ""}>${escapeHtml(p.Name || p.ID)}</option>`).join("");
+    return papers.map(p => `<option value="${escapeHtml(p.id)}"${p.id === selectedId ? " selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
 }
 async function dbSaveCalendarSettings() {
     const g = id => { const v = String(document.getElementById(id)?.value || "").replace(",", ".").trim(); return v === "" ? undefined : Number(v); };
