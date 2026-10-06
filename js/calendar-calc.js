@@ -159,7 +159,7 @@ async function calComputePrice() {
             if ((Number(bd.cursor) || 0) > 0) comp.push(`Курсор: ${fmt(bd.cursor * qty)} ₽`);
             if ((Number(bd.springs) || 0) > 0) comp.push(`Пружины: ${fmt(bd.springs * qty)} ₽`);
             if ((Number(bd.assembly) || 0) > 0) comp.push(`Сборка: ${fmt(bd.assembly * qty)} ₽`);
-            window.lastCalcData = {
+            lastCalcData = {
                 name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit,
                 costTotal, costHQ: costTotal, costBreakdownHtml: comp.join(" | "),
                 sra3Sheets: null, selectedMultiplier: bd.markup,
@@ -184,7 +184,7 @@ async function calComputePrice() {
             const sub = document.getElementById("recMultiplierLabel"); if (sub) sub.textContent = "Итоговая стоимость";
             ["recPriceGear", "markupCoefRow", "recRoundRow", "recPriceEdit"].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = "none"; });
             const techData = document.getElementById("techData"); if (techData) techData.style.display = "none";
-            window.lastCalcData = { name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit, costTotal: null, costHQ: null, sra3Sheets: null };
+            lastCalcData = { name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit, costTotal: null, costHQ: null, sra3Sheets: null };
         }
         const addBtn = document.getElementById("addToSheetBtn"); if (addBtn) addBtn.style.display = "";
     } catch (e) {
