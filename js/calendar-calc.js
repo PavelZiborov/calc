@@ -43,6 +43,13 @@ async function calLoadBlocks(pickDefault) {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ size: calState.size }),
         }, 20000).then(x => x.json());
+        // Показываем только блоки, для которых есть превью из архива. Цвета/серии без
+        // картинки (их реально не было в архиве) не выводим — ни плитки, ни свотчи.
+        if (r && Array.isArray(r.series)) {
+            r.series = r.series
+                .map(s => ({ ...s, colors: (s.colors || []).filter(c => c.imageUrl) }))
+                .filter(s => s.colors.length);
+        }
         calState.blocksData = r;
         if (pickDefault && Array.isArray(r.series) && r.series.length) {
             const s0 = r.series[0];
@@ -64,7 +71,7 @@ function calUpdateBlockLabel() {
 }
 function calEsc(v) { return (typeof escapeHtml === "function") ? escapeHtml(String(v == null ? "" : v)) : String(v == null ? "" : v); }
 
-// Схема-превью (SVG): постер + 3 блока + N рекламных полей, с размерами (как у Coral).
+// Схема-превью (SVG): постер + 3 блока, под каждым блоком — рекламное поле (как у Coral).
 function calRenderPreview() {
     const host = document.getElementById("previewItem");
     if (!host) return;
@@ -77,39 +84,45 @@ function calRenderPreview() {
     };
     const d = DIMS[calState.size] || DIMS["мини"];
     const W = d.poster[0], pH = d.poster[1], bH = d.block[1], fH = d.field[1];
-    const nF = calState.fields;
-    const gap = 10;            // зазор под пружину
-    const totalH = pH + bH * 3 + fH * nF + gap * (3 + nF);
-    const scaleW = 150, scale = scaleW / W;
-    const svgW = scaleW + 110, svgH = totalH * scale + 20;
-    const x = 6, col = "#9aa0aa", fill = "#fff", stroke = "#c4c9d2";
-    let y = 10, parts = [], labels = [];
-    const rect = (h, label) => {
+    const nF = Math.max(0, Math.min(3, calState.fields));
+    // Поля навешиваются снизу вверх: при 1 поле — только под нижним блоком, при 3 — под каждым.
+    const hasField = i => i >= (3 - nF);
+    const scaleW = 150, scale = scaleW / W, gap = 13 * scale;   // gap — зазор под пружину
+    // Высота: постер + 3 блока + поля + 3 пружины (перед каждым блоком).
+    const totalH = (pH + bH * 3 + fH * nF) * scale + gap * 3 + 16;
+    const x = 8, labelX = x + scaleW + 16;
+    const stroke = "#6b7280", spr = "#4b5563";
+    const POSTER = "#d4d8df", FIELD = "#b7bcc6", BLK = ["#ffffff", "#e7eaef"];
+    let y = 8, parts = [], labels = [];
+    const rect = (h, fill, label) => {
         const hh = h * scale;
-        parts.push(`<rect x="${x}" y="${y.toFixed(1)}" width="${scaleW}" height="${hh.toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`);
-        if (label) labels.push({ y: y + hh / 2, text: label });
+        parts.push(`<rect x="${x}" y="${y.toFixed(1)}" width="${scaleW}" height="${hh.toFixed(1)}" rx="1.5" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>`);
+        if (label) labels.push({ y: y + hh / 2, name: label[0], dims: label[1] });
         y += hh;
     };
     const spring = () => {
-        parts.push(`<rect x="${x}" y="${y.toFixed(1)}" width="${scaleW}" height="${(gap * scale).toFixed(1)}" fill="none"/>`);
-        // пунктир пружины
-        parts.push(`<line x1="${x}" y1="${(y + gap * scale / 2).toFixed(1)}" x2="${x + scaleW}" y2="${(y + gap * scale / 2).toFixed(1)}" stroke="${col}" stroke-width="1.4" stroke-dasharray="3 2"/>`);
-        y += gap * scale;
+        const n = 9, w = scaleW / n, yc = y + gap / 2;
+        for (let i = 0; i < n; i++)
+            parts.push(`<path d="M ${(x + i * w).toFixed(1)} ${(y + 1).toFixed(1)} Q ${(x + i * w + w / 2).toFixed(1)} ${(yc + 3).toFixed(1)} ${(x + (i + 1) * w).toFixed(1)} ${(y + 1).toFixed(1)}" fill="none" stroke="${spr}" stroke-width="1.3"/>`);
+        y += gap;
     };
-    // отверстие постера
-    parts.push(`<circle cx="${x + scaleW / 2}" cy="${(y + 4).toFixed(1)}" r="2" fill="none" stroke="${col}"/>`);
-    rect(pH, `Постер ${d.poster[0]}×${d.poster[1]} мм`); spring();
-    rect(bH, `Календарный блок ${d.block[0]}×${d.block[1]} мм`); spring();
-    rect(bH, ""); spring();
-    rect(bH, ""); if (nF) spring();
-    for (let i = 0; i < nF; i++) { rect(fH, i === 0 ? `Рекламное поле ${d.field[0]}×${d.field[1]} мм` : ""); if (i < nF - 1) spring(); }
+    // Постер (с отверстием для подвеса).
+    rect(pH, POSTER, [`Постер`, `${d.poster[0]}×${d.poster[1]} мм`]);
+    parts.push(`<circle cx="${x + scaleW / 2}" cy="${(y - pH * scale + 8).toFixed(1)}" r="3" fill="#fff" stroke="${stroke}" stroke-width="1.2"/>`);
+    for (let i = 0; i < 3; i++) {
+        spring();
+        rect(bH, BLK[i % 2], i === 0 ? [`Календарный блок`, `${d.block[0]}×${d.block[1]} мм`] : null);
+        if (hasField(i)) rect(fH, FIELD, (nF && !labels.some(l => l.name === "Рекламное поле")) ? [`Рекламное поле`, `${d.field[0]}×${d.field[1]} мм`] : null);
+    }
+    const svgH = Math.ceil(y + 8);
     const lblSvg = labels.map(l => `
-        <line x1="${x + scaleW}" y1="${l.y.toFixed(1)}" x2="${x + scaleW + 14}" y2="${l.y.toFixed(1)}" stroke="${col}" stroke-width="1"/>
-        <text x="${x + scaleW + 18}" y="${(l.y + 3).toFixed(1)}" font-size="8" fill="${col}">${calEsc(l.text)}</text>`).join("");
-    host.innerHTML = `<svg viewBox="0 0 ${svgW} ${Math.ceil(svgH)}" width="${svgW}" style="width:${svgW}px;max-width:100%;height:auto;max-height:420px">${parts.join("")}${lblSvg}</svg>`;
+        <line x1="${x + scaleW}" y1="${l.y.toFixed(1)}" x2="${labelX - 4}" y2="${l.y.toFixed(1)}" stroke="${stroke}" stroke-width="1"/>
+        <text x="${labelX}" y="${(l.y - 2).toFixed(1)}" font-size="11" font-weight="600" fill="#374151">${calEsc(l.name)}</text>
+        <text x="${labelX}" y="${(l.y + 11).toFixed(1)}" font-size="10.5" fill="#6b7280">${calEsc(l.dims)}</text>`).join("");
+    const svgW = labelX + 140;
+    host.innerHTML = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="width:100%;height:auto;max-height:480px">${parts.join("")}${lblSvg}</svg>`;
     host.style.display = "flex";
     host.style.width = "100%";
-    host.style.minWidth = "200px";
     host.style.justifyContent = "center";
     host.style.alignItems = "flex-start";
 }
@@ -163,10 +176,10 @@ function calOpenBlockPicker() {
         <div class="cal-picker-head"><h3>Дизайн блока</h3><button class="client-card-close" onclick="calClosePicker()" aria-label="Закрыть">&times;</button></div>
         <div class="cal-picker-body">
             <div class="cal-picker-series" id="calPickerSeries"></div>
-            <div class="cal-picker-colors"><div class="cal-picker-colors-title" id="calPickerColorsTitle"></div><div class="cal-picker-colors-grid" id="calPickerColorsGrid"></div></div>
-            <div class="cal-picker-preview"><div id="calPickerBig" class="cal-picker-big"></div></div>
+            <div class="cal-picker-colors"><div class="cal-picker-colors-title" id="calPickerColorsTitle"></div><div class="cal-picker-colors-grid" id="calPickerColorsGrid" onmouseleave="calPickPreview(calPickColorName)"></div></div>
+            <div class="cal-picker-preview"><div id="calPickerCaption" class="cal-picker-big-caption"></div><div id="calPickerBig" class="cal-picker-big"></div></div>
         </div>
-        <div class="cal-picker-foot"><span id="calPickerCaption" class="cal-picker-caption"></span><button class="cal-pick-select" onclick="calPickConfirm()">Выбрать</button></div>
+        <div class="cal-picker-foot"><button class="cal-pick-select" onclick="calPickConfirm()">Выбрать</button></div>
     </div>`;
     ov.style.display = "flex";
     calRenderPicker();
@@ -195,27 +208,33 @@ function calRenderPickerColors() {
     const grid = document.getElementById("calPickerColorsGrid");
     const title = document.getElementById("calPickerColorsTitle");
     if (!s) { if (grid) grid.innerHTML = ""; return; }
-    if (!calPickColorName && s.colors.length) calPickColorName = s.colors[0].color;
-    if (title) title.textContent = calPickColorName ? `Цвет: ${calPickColorName}` : "";
+    // Выбранный цвет (подтверждается кликом). Если прежний отсутствует в серии — берём первый.
+    if (!s.colors.some(c => c.color === calPickColorName)) calPickColorName = s.colors.length ? s.colors[0].color : null;
     grid.innerHTML = s.colors.map(c => {
         const img = c.imageUrl ? `<img src="${calEsc(c.imageUrl)}" alt="">` : `<span class="cal-color-swatch" style="background:${calColorHex(c.color)}"></span>`;
+        const cn = calEsc(c.color).replace(/'/g, "\\'");
         return `<button type="button" class="cal-color-thumb${c.color === calPickColorName ? " is-active" : ""}" title="${calEsc(c.color)}"
-            onmouseenter="calPickHover('${calEsc(c.color).replace(/'/g, "\\'")}')" onclick="calPickHover('${calEsc(c.color).replace(/'/g, "\\'")}')">${img}</button>`;
+            onmouseenter="calPickPreview('${cn}')" onclick="calPickSelect('${cn}')">${img}</button>`;
     }).join("");
-    calPickHover(calPickColorName);
+    calPickPreview(calPickColorName);   // большое превью — выбранного цвета
 }
-function calPickHover(color) {
-    calPickColorName = color;
+// Наведение — только показать большое превью (выбор НЕ меняется).
+function calPickPreview(color) {
     const data = calState.blocksData;
     const s = (data.series || []).find(x => x.name === calPickSeries);
     const c = s && s.colors.find(x => x.color === color);
     const big = document.getElementById("calPickerBig");
     const title = document.getElementById("calPickerColorsTitle");
+    const cap = document.getElementById("calPickerCaption");
     if (title) title.textContent = color ? `Цвет: ${color}` : "";
     if (big) big.innerHTML = c && c.imageUrl ? `<img src="${calEsc(c.imageUrl)}" alt="">` : `<span class="cal-big-swatch" style="background:${calColorHex(color)}"></span>`;
+    if (cap) cap.textContent = c ? c.name : "";
+}
+// Клик — подтвердить выбор цвета (рамка остаётся на выбранном).
+function calPickSelect(color) {
+    calPickColorName = color;
     document.querySelectorAll("#calPickerColorsGrid .cal-color-thumb").forEach(b => b.classList.toggle("is-active", b.title === color));
-    const cap = document.getElementById("calPickerCaption");
-    if (cap && c) cap.textContent = `${(data && data.year) || ""} · ${c.name}`.trim();
+    calPickPreview(color);
 }
 function calPickConfirm() {
     const data = calState.blocksData;
