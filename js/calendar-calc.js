@@ -147,7 +147,7 @@ async function calComputePrice() {
         const name = `Квартальный календарь ${sizeLabel}, ${fieldsLabel}${blk}`;
 
         const bd = r.breakdown;
-        const isStaff = !!(window.currentUser && currentUser.role === "staff");
+        const isStaff = !!(typeof currentUser !== "undefined" && currentUser && currentUser.role === "staff");
         const fmt = v => Math.round(Number(v) || 0).toLocaleString("ru-RU");
 
         if (isStaff && bd) {
@@ -156,7 +156,9 @@ async function calComputePrice() {
             const costTotal = Math.round(costPerUnit * qty);
             const comp = [`Печать: ${fmt(bd.posterPrint * qty)} ₽`];
             if ((Number(bd.block) || 0) > 0) comp.push(`Блоки: ${fmt(bd.block * qty)} ₽`);
-            comp.push(`Курсор: ${fmt(bd.cursor * qty)} ₽`, `Пружины: ${fmt(bd.springs * qty)} ₽`, `Сборка: ${fmt(bd.assembly * qty)} ₽`);
+            if ((Number(bd.cursor) || 0) > 0) comp.push(`Курсор: ${fmt(bd.cursor * qty)} ₽`);
+            if ((Number(bd.springs) || 0) > 0) comp.push(`Пружины: ${fmt(bd.springs * qty)} ₽`);
+            if ((Number(bd.assembly) || 0) > 0) comp.push(`Сборка: ${fmt(bd.assembly * qty)} ₽`);
             window.lastCalcData = {
                 name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit,
                 costTotal, costHQ: costTotal, costBreakdownHtml: comp.join(" | "),
