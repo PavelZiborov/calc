@@ -4663,3 +4663,68 @@
     .app-top-bar { display: none; }
     body { padding-top: 6px; }
 }
+
+/* ——— Подрядчики (перезаказ) ——— */
+.ctr-page { max-width: 1100px; }
+.ctr-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+.ctr-head h2 { margin: 0; }
+.ctr-head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.ctr-subnote { color: var(--text-muted); font-size: 13px; margin: 2px 0 16px; }
+.ctr-note { color: var(--text-muted); padding: 18px 2px; }
+.ctr-alert { color: #c0392b; }
+.ctr-btn { margin: 0; width: auto; display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--r-sm, 8px); font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); box-shadow: none; }
+.ctr-btn-primary { background: var(--accent-container, #2563eb); border-color: transparent; color: #fff; }
+.ctr-btn-ghost { background: var(--surface); color: var(--text); }
+.ctr-btn-ghost:hover, .ctr-btn-primary:hover { filter: brightness(0.97); }
+.ctr-btn-danger { background: transparent; border-color: #e3b7b2; color: #c0392b; }
+.ctr-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ctr-table th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.ctr-table td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ctr-td-num { text-align: right; white-space: nowrap; }
+.ctr-row { cursor: pointer; }
+.ctr-row:hover { background: var(--surface-2); }
+.ctr-row--off { opacity: .55; }
+.ctr-td-name { font-weight: 600; }
+.ctr-debt { color: #c0392b; font-weight: 700; }
+.ctr-unpaid { color: #c0392b; font-size: 12px; font-weight: 600; }
+.ctr-tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
+.ctr-tag--po { color: var(--accent-container, #2563eb); }
+.ctr-po-col { color: var(--text-muted); }
+/* карточка подрядчика */
+.ctr-detail-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.ctr-detail-title { margin: 0; flex: 1 1 auto; }
+.ctr-detail-comment { color: var(--text-muted); margin: 0 0 14px; }
+.ctr-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 10px 0 16px; }
+.ctr-sum-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md, 12px); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.ctr-sum-box span { color: var(--text-muted); font-size: 12px; }
+.ctr-sum-box b { font-size: 19px; }
+.ctr-sum-box.ctr-sum-po b { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.ctr-sum-debt b { color: #c0392b; }
+.ctr-payall-row { margin: 0 0 16px; }
+.ctr-orders td { font-size: 13.5px; }
+.ctr-ord-name { max-width: 360px; }
+.ctr-ord--paid { opacity: .6; }
+.ctr-paid { color: #1e8e4e; font-weight: 600; }
+.ctr-owed { color: #c0392b; font-weight: 600; }
+.ctr-td-act { text-align: right; white-space: nowrap; }
+.ctr-orders .ctr-btn { padding: 5px 11px; font-size: 13px; }
+/* модалка добавления/редактирования */
+.ctr-modal { background: var(--surface); border-radius: var(--r-md, 14px); width: min(460px, 94vw); padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.ctr-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.ctr-modal-head h3 { margin: 0; }
+.ctr-field { display: flex; flex-direction: column; gap: 5px; font-weight: 600; font-size: 13px; color: var(--text); }
+.ctr-field input, .ctr-field textarea { font-weight: 400; }
+.ctr-check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.ctr-check input, .ctr-reorder-check input, .dbo-reorder-check input { width: auto; margin: 0; }
+.ctr-modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.ctr-modal-foot > div { display: flex; gap: 8px; }
+/* перезаказ в редакторе позиции / карточке заказа */
+.dbo-reorder { padding: 10px 0 2px; border-top: 1px solid var(--border); margin-top: 4px; }
+.dbo-reorder-check { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0; }
+.dbo-reorder-paid { color: #1e8e4e; font-size: 13px; font-weight: 600; margin-top: 6px; }
+.dbo-el-reorder { font-size: 12.5px; color: var(--accent-container, #2563eb); margin-top: 2px; }
+.dbo-reorder-paidtag { color: #1e8e4e; font-weight: 600; }
+@media (max-width: 640px) {
+    .ctr-po-col { display: none; }
+    .ctr-ord-name { max-width: 160px; }
+}

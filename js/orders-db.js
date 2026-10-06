@@ -1361,6 +1361,26 @@ async function dbMgrPick(crmId, responsibleId) {
         if (typeof showReadinessToast === "function") showReadinessToast("Ответственный: " + (r.employeeName || ""));
     } catch (e) { console.error("setDealResponsible", e); alert("Не удалось сменить ответственного: " + (e.message || "")); }
 }
+// Кэш подрядчиков (для выпадашки «перезаказ»). Обновляется при открытии вкладки «Подрядчики».
+let dbContractorsCache = null;
+async function dbEnsureContractors(force) {
+    if (dbContractorsCache && !force) return dbContractorsCache;
+    try { const r = await clientsApi("listContractors", {}); dbContractorsCache = Array.isArray(r.contractors) ? r.contractors : []; }
+    catch (e) { console.error("listContractors", e); dbContractorsCache = dbContractorsCache || []; }
+    return dbContractorsCache;
+}
+function dbContractorOptions(selId) {
+    const list = (dbContractorsCache || []).filter(c => c.active || Number(c.id) === Number(selId));
+    const opts = list.map(c => `<option value="${c.id}"${Number(c.id) === Number(selId) ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+    return `<option value="">— выберите подрядчика —</option>` + opts;
+}
+function dbToggleReorder() {
+    const on = !!document.getElementById("dbEditReorder")?.checked;
+    const pick = document.getElementById("dbEditReorderPick");
+    const hq = document.getElementById("dbEditHqSheets");
+    if (pick) pick.style.display = on ? "" : "none";
+    if (hq) hq.style.display = on ? "none" : "";
+}
 function dbOpenElEdit(elId) {
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     if (!e) return;
@@ -1416,8 +1436,19 @@ function dbOpenElEdit(elId) {
                 <div class="dbo-edit-wide dbo-resp-field">Ответственный
                     ${dbRespControlHtml()}
                 </div>
+                <div class="dbo-edit-wide dbo-reorder">
+                    <label class="dbo-reorder-check"><input type="checkbox" id="dbEditReorder" ${locked ? "disabled" : ""} onchange="dbToggleReorder()"${e.reorder ? " checked" : ""}> Перезаказ у подрядчика</label>
+                    <div id="dbEditReorderPick" style="margin-top:8px;${e.reorder ? "" : "display:none;"}">
+                        <label class="dbo-edit-wide">Подрядчик
+                            <select id="dbEditContractor" ${locked ? "disabled" : ""}>${dbContractorOptions(e.reorder?.contractorId)}</select>
+                        </label>
+                        ${e.reorder?.paid ? `<div class="dbo-reorder-paid">✓ оплачено подрядчику</div>` : ""}
+                    </div>
+                </div>
+                <div id="dbEditHqSheets"${e.reorder ? ` style="display:none;"` : ""}>
                 <label class="dbo-edit-wide">Себестоимость HQ<input type="text" inputmode="decimal" id="dbEditCostHq" value="${escapeHtml(costHq)}" oninput="dbCleanNum(this)"></label>
                 <label class="dbo-edit-wide">Количество листов<input type="text" inputmode="decimal" id="dbEditSheets" value="${escapeHtml(sheets)}" oninput="dbCleanNum(this)"></label>
+                </div>
                 <label class="dbo-edit-wide">Дополнительная информация
                     <textarea id="dbEditElInfo" class="dbo-edit-name dbo-edit-info" rows="3" data-minh="80" oninput="dbAutoGrow(this)" placeholder="Заметки к позиции…">${escapeHtml(e.description || "")}</textarea>
                 </label>
@@ -1445,6 +1476,11 @@ function dbOpenElEdit(elId) {
     if (!cached || cached.status !== "ready") dboLoadElementAssets(elId).catch(() => {});
     // Ответственные — загружаем менеджеров и текущий выбор.
     dbInitRespControl(elId).catch(() => {});
+    // Подрядчики для выпадашки «перезаказ» — если кэш пуст, догружаем и перестраиваем select.
+    if (!locked && !dbContractorsCache) dbEnsureContractors().then(() => {
+        const sel = document.getElementById("dbEditContractor");
+        if (sel) sel.innerHTML = dbContractorOptions(e.reorder?.contractorId);
+    });
 }
 // ——— Ответственные за позицию (мультивыбор менеджеров, зеркалим в PrintOffice) ———
 let dbEditRespSelected = new Set();   // выбранные crm-id ответственных
@@ -1615,12 +1651,18 @@ async function dbSaveElEdit(elId) {
     // имя/категория изменились → пересоздание
     const recreate = (name !== dbElBaseName(e)) || (categoryId !== (e.category_id != null ? Number(e.category_id) : null));
 
+    // Перезаказ у подрядчика (наш учёт). При включении — обязателен выбор подрядчика.
+    const reorderOn = !!document.getElementById("dbEditReorder")?.checked;
+    const contractorId = reorderOn ? (Number(document.getElementById("dbEditContractor")?.value) || 0) : 0;
+    if (reorderOn && !contractorId) { alert("Выберите подрядчика или снимите галочку «Перезаказ у подрядчика»."); return; }
+    const reorder = reorderOn ? { contractorId } : null;
+
     const btn = document.getElementById("dbEditSaveBtn");
     if (btn) { btn.disabled = true; btn.textContent = recreate ? "Пересоздание…" : "Сохранение…"; }
     try {
         const data = await clientsApi("editElement", {
             dealId: Number(dbCardDealId), elementId: Number(elId),
-            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate, description
+            name, categoryId, units, quantity, price, total, cost, costHq, sheets, recreate, description, reorder
         });
         // Ответственные: синхронизируем, если менялись (или элемент пересоздан → id новый).
         const targetElId = Number(data?.newElementId ?? elId);
@@ -2230,6 +2272,7 @@ function dbElementRow(e) {
             <div class="dbo-el-status">${dbElStatusBtn(e)}<span class="element-preview-thumb dbo-el-thumb" data-el="${e.crm_element_id}"></span></div>
             <div class="dbo-el-name">
                 <div class="dbo-el-title dbo-el-title--edit" onclick="dbOpenElEdit(${e.crm_element_id})" title="Редактировать позицию">${escapeHtml(e.category_and_name || e.name || "—")}${price ? `<span class="dbo-el-price-inline"> (${money2(price)} руб./${units})</span>` : ""}</div>
+                ${e.reorder ? `<div class="dbo-el-reorder" title="Перезаказ у подрядчика">↗ Перезаказ: <b>${escapeHtml(e.reorder.contractorName || "подрядчик")}</b>${e.reorder.paid ? ` <span class="dbo-reorder-paidtag">оплачено</span>` : ""}</div>` : ""}
                 ${cost ? `<div class="dbo-el-costline">Себестоимость: <b>${money(cost)}</b></div>` : ""}
                 ${dbElAfLine(e)}
             </div>
