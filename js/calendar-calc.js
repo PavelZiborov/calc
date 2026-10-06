@@ -87,33 +87,35 @@ function calRenderPreview() {
     const nF = Math.max(0, Math.min(3, calState.fields));
     // Поля навешиваются снизу вверх: при 1 поле — только под нижним блоком, при 3 — под каждым.
     const hasField = i => i >= (3 - nF);
-    const scaleW = 150, scale = scaleW / W, gap = 13 * scale;   // gap — зазор под пружину
-    // Высота: постер + 3 блока + поля + 3 пружины (перед каждым блоком).
-    const totalH = (pH + bH * 3 + fH * nF) * scale + gap * 3 + 16;
+    const scaleW = 150, scale = scaleW / W, gap = 8;   // gap — высота витков пружины
     const x = 8, labelX = x + scaleW + 16;
-    const stroke = "#6b7280", spr = "#4b5563";
-    const POSTER = "#d4d8df", FIELD = "#b7bcc6", BLK = ["#ffffff", "#e7eaef"];
+    // Цвета как в эталоне: постер/подставка — светло-серые, блоки/поля — белые, тонкая серая обводка.
+    const stroke = "#9aa0aa", coil = "#9aa0aa";
+    const POSTER = "#eef0f2", BLOCK = "#ffffff", FIELD = "#ffffff", BASE = "#eef0f2";
     let y = 8, parts = [], labels = [];
     const rect = (h, fill, label) => {
         const hh = h * scale;
-        parts.push(`<rect x="${x}" y="${y.toFixed(1)}" width="${scaleW}" height="${hh.toFixed(1)}" rx="1.5" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>`);
+        parts.push(`<rect x="${x}" y="${y.toFixed(1)}" width="${scaleW}" height="${hh.toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`);
         if (label) labels.push({ y: y + hh / 2, name: label[0], dims: label[1] });
         y += hh;
     };
+    // Пружина — металлическая спираль: ряд перекрывающихся витков (как у эталона).
     const spring = () => {
-        const n = 9, w = scaleW / n, yc = y + gap / 2;
-        for (let i = 0; i < n; i++)
-            parts.push(`<path d="M ${(x + i * w).toFixed(1)} ${(y + 1).toFixed(1)} Q ${(x + i * w + w / 2).toFixed(1)} ${(yc + 3).toFixed(1)} ${(x + (i + 1) * w).toFixed(1)} ${(y + 1).toFixed(1)}" fill="none" stroke="${spr}" stroke-width="1.3"/>`);
+        const cy = y + gap / 2, step = 5, rx = (step * 0.62), ry = (gap * 0.46), seg = [];
+        for (let xx = x + 1; xx <= x + scaleW - step + 0.1; xx += step)
+            seg.push(`<ellipse cx="${(xx + step / 2).toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="none" stroke="${coil}" stroke-width="0.9"/>`);
+        parts.push(seg.join(""));
         y += gap;
     };
     // Постер (с отверстием для подвеса).
     rect(pH, POSTER, [`Постер`, `${d.poster[0]}×${d.poster[1]} мм`]);
-    parts.push(`<circle cx="${x + scaleW / 2}" cy="${(y - pH * scale + 8).toFixed(1)}" r="3" fill="#fff" stroke="${stroke}" stroke-width="1.2"/>`);
+    parts.push(`<circle cx="${x + scaleW / 2}" cy="${(y - pH * scale + 8).toFixed(1)}" r="2.4" fill="#fff" stroke="${stroke}" stroke-width="1"/>`);
     for (let i = 0; i < 3; i++) {
         spring();
-        rect(bH, BLK[i % 2], i === 0 ? [`Календарный блок`, `${d.block[0]}×${d.block[1]} мм`] : null);
-        if (hasField(i)) rect(fH, FIELD, (nF && !labels.some(l => l.name === "Рекламное поле")) ? [`Рекламное поле`, `${d.field[0]}×${d.field[1]} мм`] : null);
+        rect(bH, BLOCK, i === 0 ? [`Календарный блок`, `${d.block[0]}×${d.block[1]} мм`] : null);
+        if (hasField(i)) rect(fH, FIELD, (!labels.some(l => l.name === "Рекламное поле")) ? [`Рекламное поле`, `${d.field[0]}×${d.field[1]} мм`] : null);
     }
+    rect(fH * 0.62, BASE, null);   // подставка (нижнее основание)
     const svgH = Math.ceil(y + 8);
     const lblSvg = labels.map(l => `
         <line x1="${x + scaleW}" y1="${l.y.toFixed(1)}" x2="${labelX - 4}" y2="${l.y.toFixed(1)}" stroke="${stroke}" stroke-width="1"/>
@@ -137,23 +139,51 @@ async function calComputePrice() {
         }, 20000).then(x => x.json());
         if (!r || r.error) throw new Error(r && r.error);
         calState.dims = r.dims;
-        // Показ цены в общем блоке результата.
-        if (valEl) valEl.textContent = `${calMoney(r.total)} ₽`;
-        const sub = document.getElementById("recMultiplierLabel");
-        if (sub) sub.textContent = `${calMoney(r.perUnit)} ₽ за штуку${r.hasBlockPrice ? "" : " · нет цены блока!"}`;
-        // Прячем листовые элементы управления ценой.
-        ["recPriceGear", "markupCoefRow", "recRoundRow", "recPriceEdit"].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = "none"; });
         document.getElementById("resultMain") && (document.getElementById("resultMain").style.display = "block");
-        // lastCalcData — чтобы работала кнопка «Добавить в расчёт».
+
         const sizeLabel = { "мини": "Мини", "миди": "Стандарт", "макси": "Макси" }[calState.size] || calState.size;
         const fieldsLabel = calState.fields === 0 ? "без полей" : (calState.fields === 1 ? "1 реклам. поле" : "3 реклам. поля");
         const blk = calState.block ? `, блок ${calState.block.series}${calState.block.color ? " " + calState.block.color : ""}` : "";
         const name = `Квартальный календарь ${sizeLabel}, ${fieldsLabel}${blk}`;
-        window.lastCalcData = {
-            name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit,
-            costTotal: r.breakdown ? Math.round(r.breakdown.costPerUnit * qty) : null,
-            costHQ: null, sra3Sheets: null,
-        };
+
+        const bd = r.breakdown;
+        const isStaff = !!(window.currentUser && currentUser.role === "staff");
+        const fmt = v => Math.round(Number(v) || 0).toLocaleString("ru-RU");
+
+        if (isStaff && bd) {
+            // Полная разбивка по себестоимости + наценка — как у других продукций.
+            const costPerUnit = Number(bd.costPerUnit) || 0;
+            const costTotal = Math.round(costPerUnit * qty);
+            const comp = [`Печать: ${fmt(bd.posterPrint * qty)} ₽`];
+            if ((Number(bd.block) || 0) > 0) comp.push(`Блоки: ${fmt(bd.block * qty)} ₽`);
+            comp.push(`Курсор: ${fmt(bd.cursor * qty)} ₽`, `Пружины: ${fmt(bd.springs * qty)} ₽`, `Сборка: ${fmt(bd.assembly * qty)} ₽`);
+            window.lastCalcData = {
+                name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit,
+                costTotal, costHQ: costTotal, costBreakdownHtml: comp.join(" | "),
+                sra3Sheets: null, selectedMultiplier: bd.markup,
+            };
+            // Кнопки наценки (цена = себестоимость × коэффициент), как в листовой/каталоге.
+            const CAL_MARKUPS = [1.6, 1.7, 1.8, 1.9, 2, 2.2];
+            const markupList = CAL_MARKUPS.map(m => ({ multiplier: m, total: Math.round(costTotal * m), perOne: Math.round(costPerUnit * m * 100) / 100 }));
+            if (typeof renderMarkupSelect === "function") renderMarkupSelect(markupList, costTotal, bd.markup);
+            if (typeof exitInlinePriceEdit === "function") exitInlinePriceEdit();
+            const gearEl = document.getElementById("recPriceGear"); if (gearEl) gearEl.style.display = "inline-flex";
+            const roundRow = document.getElementById("recRoundRow"); if (roundRow) roundRow.style.display = "";
+            const scs = document.getElementById("staffCostSummary");
+            if (scs) { scs.innerHTML = `Себестоимость: <b>${fmt(costTotal)} ₽</b> · За штуку: <b>${costPerUnit.toFixed(2)} ₽</b>`; scs.style.display = "block"; }
+            if (typeof refreshSelectedPriceUI === "function") refreshSelectedPriceUI("Рекомендованная цена");
+            if (!r.hasBlockPrice) { const sub = document.getElementById("recMultiplierLabel"); if (sub) sub.textContent += " · нет цены блока!"; }
+            if (typeof renderStaffTechAndCopyUI === "function") renderStaffTechAndCopyUI();
+            const techData = document.getElementById("techData"); if (techData) techData.style.display = "block";
+            const costDetail = document.getElementById("costDetail"); if (costDetail) costDetail.style.display = "none";
+        } else {
+            // Гость/клиент — только итог без себестоимости.
+            if (valEl) valEl.innerHTML = `${calMoney(r.total)} ₽ <small>(${calMoney(r.perUnit)} ₽/шт)</small>`;
+            const sub = document.getElementById("recMultiplierLabel"); if (sub) sub.textContent = "Итоговая стоимость";
+            ["recPriceGear", "markupCoefRow", "recRoundRow", "recPriceEdit"].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = "none"; });
+            const techData = document.getElementById("techData"); if (techData) techData.style.display = "none";
+            window.lastCalcData = { name, fullName: name, qty, total: r.total, priceOne: r.perUnit, pricePerOne: r.perUnit, costTotal: null, costHQ: null, sra3Sheets: null };
+        }
         const addBtn = document.getElementById("addToSheetBtn"); if (addBtn) addBtn.style.display = "";
     } catch (e) {
         console.error("calComputePrice", e);
