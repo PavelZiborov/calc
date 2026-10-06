@@ -40,7 +40,7 @@ function calOnChange() {
 async function calLoadBlocks(pickDefault) {
     try {
         const r = await fetchWithTimeout(CAL_BLOCKS_URL, {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST", headers: (typeof authHeaders === "function" ? authHeaders() : { "Content-Type": "application/json" }),
             body: JSON.stringify({ size: calState.size }),
         }, 20000).then(x => x.json());
         // Показываем только блоки, для которых есть превью из архива. Цвета/серии без
@@ -134,7 +134,7 @@ async function calComputePrice() {
     const valEl = document.getElementById("recPriceVal");
     try {
         const r = await fetchWithTimeout(CAL_CALC_URL, {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST", headers: (typeof authHeaders === "function" ? authHeaders() : { "Content-Type": "application/json" }),
             body: JSON.stringify({ size: calState.size, fields: calState.fields, block: calState.block?.name, tirazh: qty }),
         }, 20000).then(x => x.json());
         if (!r || r.error) throw new Error(r && r.error);
