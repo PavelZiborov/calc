@@ -1264,6 +1264,7 @@ async function openDbDealCard(crmId) {
     try {
         const data = await clientsApi("getDeal", { crmId: Number(crmId) });
         renderDbDealCard(data, crmId);
+        dbEnsureContractors().catch(() => {});   // прогрев кэша подрядчиков для редактора позиций
     } catch (e) {
         console.error("getDeal", e);
         ov.innerHTML = `
@@ -1381,11 +1382,14 @@ function dbToggleReorder() {
     if (pick) pick.style.display = on ? "" : "none";
     if (hq) hq.style.display = on ? "none" : "";
 }
-function dbOpenElEdit(elId) {
+async function dbOpenElEdit(elId) {
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     if (!e) return;
     closeDbElEdit();
     const locked = dbCardLocked();   // завершённый заказ — открываем на ПРОСМОТР (без редактирования)
+    // Подрядчики для выпадашки «перезаказ» загружаем ДО построения формы — иначе select
+    // отрисуется пустым, а поздняя async-подгрузка сбросит выбор пользователя.
+    if (!locked) await dbEnsureContractors();
     const name = dbElBaseName(e);
     const catId = e.category_id != null ? Number(e.category_id) : null;
     const catOpts = (dbCardCategories || []).map(c =>
@@ -1476,11 +1480,6 @@ function dbOpenElEdit(elId) {
     if (!cached || cached.status !== "ready") dboLoadElementAssets(elId).catch(() => {});
     // Ответственные — загружаем менеджеров и текущий выбор.
     dbInitRespControl(elId).catch(() => {});
-    // Подрядчики для выпадашки «перезаказ» — если кэш пуст, догружаем и перестраиваем select.
-    if (!locked && !dbContractorsCache) dbEnsureContractors().then(() => {
-        const sel = document.getElementById("dbEditContractor");
-        if (sel) sel.innerHTML = dbContractorOptions(e.reorder?.contractorId);
-    });
 }
 // ——— Ответственные за позицию (мультивыбор менеджеров, зеркалим в PrintOffice) ———
 let dbEditRespSelected = new Set();   // выбранные crm-id ответственных
