@@ -4,7 +4,7 @@
 
 const prodState = { statusId: "", manager: "", categoryId: "", search: "", page: 1 };
 let prodData = { elements: [], statuses: [], managers: [], categories: [], total: 0, page: 1, pages: 1 };
-const prodPreviews = new Map();   // elId -> url | null
+const prodAssets = new Map();   // elId -> { url: string|null, layouts: [] }
 let prodSearchTimer = null;
 
 function prodEsc(v) { return (typeof escapeHtml === "function") ? escapeHtml(String(v == null ? "" : v)) : String(v == null ? "" : v); }
@@ -125,19 +125,19 @@ function prodRenderList() {
             <div class="prod-main">
                 <div class="prod-dealline"><button type="button" class="prod-dealnum" onclick="openDbDealCard(${e.deal_crm_id})" title="Открыть заказ">№ ${prodEsc(e.deal_num || "—")}</button>${e.client_name ? ` · ${prodEsc(e.client_name)}` : ""}${cat ? ` · <span class="prod-cat">${prodEsc(cat)}</span>` : ""}</div>
                 <div class="prod-title">${prodEsc(e.category_and_name || e.name || "—")}</div>
+                <div class="prod-layouts" data-el="${e.crm_element_id}"></div>
                 <div class="prod-meta">${sheets}Кол-во: <b>${qty} ${units}</b></div>
                 ${reorder}
                 <div class="prod-mgr">Менеджер: ${prodEsc(e.manager || "—")}</div>
             </div>
             <div class="prod-actions">
                 ${prodStatusSelectHtml(e)}
-                <button type="button" class="prod-btn prod-btn-open" onclick="openDbDealCard(${e.deal_crm_id})">Открыть заказ ↗</button>
             </div>
         </div>`;
     }).join("");
     host.innerHTML = rowsHtml + prodPagerHtml();
-    // восстановить уже загруженные превью
-    for (const e of els) { if (prodPreviews.has(String(e.crm_element_id))) prodApplyThumb(e.crm_element_id); }
+    // восстановить уже загруженные превью/макеты
+    for (const e of els) { if (prodAssets.has(String(e.crm_element_id))) prodApplyAssets(e.crm_element_id); }
 }
 
 function prodPagerHtml() {
@@ -153,27 +153,38 @@ function prodPagerHtml() {
 async function prodLoadPreviews() {
     for (const e of prodData.elements) {
         const key = String(e.crm_element_id);
-        if (prodPreviews.has(key)) { prodApplyThumb(e.crm_element_id); continue; }
+        if (prodAssets.has(key)) { prodApplyAssets(e.crm_element_id); continue; }
         try {
             const data = await clientsApi("getElementAssets", { dealId: Number(e.deal_crm_id), elementId: Number(e.crm_element_id), dealNum: String(e.deal_num || "") });
             const url = data?.preview?.thumbUrl || data?.preview?.url || null;
-            prodPreviews.set(key, (typeof dboIsImageUrl === "function" && dboIsImageUrl(url)) ? url : null);
-        } catch (_) { prodPreviews.set(key, null); }
-        prodApplyThumb(e.crm_element_id);
+            prodAssets.set(key, {
+                url: (typeof dboIsImageUrl === "function" && dboIsImageUrl(url)) ? url : null,
+                layouts: Array.isArray(data?.layouts) ? data.layouts : [],
+            });
+        } catch (_) { prodAssets.set(key, { url: null, layouts: [] }); }
+        prodApplyAssets(e.crm_element_id);
     }
 }
-function prodApplyThumb(elId) {
-    const url = prodPreviews.get(String(elId));
+function prodApplyAssets(elId) {
+    const a = prodAssets.get(String(elId)) || { url: null, layouts: [] };
     document.querySelectorAll(`.prod-thumb[data-el="${elId}"]`).forEach(t => {
-        if (url) {
-            t.innerHTML = `<img src="${prodEsc(url)}" alt="" referrerpolicy="no-referrer">`;
+        if (a.url) {
+            t.innerHTML = `<img src="${prodEsc(a.url)}" alt="" referrerpolicy="no-referrer">`;
             t.classList.add("has-preview");
-            t.onclick = () => { if (typeof dboOpenLightbox === "function") dboOpenLightbox(url); };
+            t.onclick = () => { if (typeof dboOpenLightbox === "function") dboOpenLightbox(a.url); };
         } else {
             t.innerHTML = `<span class="prod-thumb-ph">нет превью</span>`;
             t.classList.remove("has-preview");
             t.onclick = null;
         }
+    });
+    // Макеты позиции (только относящиеся к этому элементу) — ссылки для скачивания.
+    document.querySelectorAll(`.prod-layouts[data-el="${elId}"]`).forEach(h => {
+        const L = a.layouts || [];
+        h.innerHTML = L.length
+            ? `<span class="prod-layouts-cap">Макеты:</span> ` + L.map(l =>
+                `<a class="prod-layout" href="${prodEsc(l.url || "#")}" target="_blank" rel="noopener" title="Открыть / скачать макет">📎 ${prodEsc(l.name || l.file_name || "файл")}</a>`).join("")
+            : "";
     });
 }
 
@@ -181,7 +192,7 @@ async function prodSetStatus(elId, dealId, statusId) {
     const sid = Number(statusId);
     if (!Number.isFinite(sid)) return;
     try {
-        await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: sid });
+        await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: sid, force: true });
         const st = prodData.statuses.find(s => Number(s.id) === sid);
         if (st && Number(st.type) === 1) {
             // завершено — убираем из очереди производства
