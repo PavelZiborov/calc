@@ -2331,6 +2331,9 @@ function renderDbDealCard(data, crmId) {
         try { history.replaceState(null, "", "#deal-" + encodeURIComponent(String(d.num))); } catch (_) {}
     }
     dbCardElementStatuses = Array.isArray(data?.elementStatuses) ? data.elementStatuses : [];
+    // Статусы сделки (цвета + клик по кнопке статуса) — из ответа карточки, если список/канбан
+    // ещё не загружал их (например, при открытии заказа напрямую по ссылке #deal-…).
+    if (Array.isArray(data?.statuses) && data.statuses.length) dbOrdersState.statuses = data.statuses;
     // Свежие суммы/статус/оплата из карточки → в кэш списка (чтобы список не показывал старое).
     dbSyncListDealFromCard(d);
     dbCardCategories = Array.isArray(data?.categories) ? data.categories : dbCardCategories;
