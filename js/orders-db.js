@@ -1381,6 +1381,27 @@ function dbToggleReorder() {
     const hq = document.getElementById("dbEditHqSheets");
     if (pick) pick.style.display = on ? "" : "none";
     if (hq) hq.style.display = on ? "none" : "";
+    if (on) dbSyncReorderAmt();   // при включении: сумма подрядчику = текущая себестоимость (если не переопределена)
+}
+// Сумма подрядчику: пока не переопределена вручную — равна общей себестоимости позиции.
+function dbSyncReorderAmt() {
+    const inp = document.getElementById("dbEditReorderAmt");
+    if (inp && inp.dataset.custom !== "1") inp.value = dbRound(Number(document.getElementById("dbEditCost")?.value) || 0);
+}
+// Кнопка ✎/↺: переключить сумму подрядчику между «= себестоимость» и ручным вводом.
+function dbToggleReorderAmt() {
+    const inp = document.getElementById("dbEditReorderAmt");
+    const btn = document.getElementById("dbEditReorderAmtBtn");
+    if (!inp) return;
+    if (inp.dataset.custom === "1") {
+        inp.dataset.custom = "0"; inp.disabled = true;
+        inp.value = dbRound(Number(document.getElementById("dbEditCost")?.value) || 0);
+        if (btn) { btn.classList.remove("is-custom"); btn.textContent = "✎"; btn.title = "Изменить сумму вручную"; }
+    } else {
+        inp.dataset.custom = "1"; inp.disabled = false;
+        if (btn) { btn.classList.add("is-custom"); btn.textContent = "↺"; btn.title = "Вернуть к себестоимости"; }
+        inp.focus(); inp.select();
+    }
 }
 async function dbOpenElEdit(elId) {
     const e = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
@@ -1443,9 +1464,17 @@ async function dbOpenElEdit(elId) {
                 <div class="dbo-edit-wide dbo-reorder">
                     <label class="dbo-reorder-check"><input type="checkbox" id="dbEditReorder" ${locked ? "disabled" : ""} onchange="dbToggleReorder()"${e.reorder ? " checked" : ""}> Перезаказ у подрядчика</label>
                     <div id="dbEditReorderPick" style="margin-top:8px;${e.reorder ? "" : "display:none;"}">
-                        <label class="dbo-edit-wide">Подрядчик
-                            <select id="dbEditContractor" ${locked ? "disabled" : ""}>${dbContractorOptions(e.reorder?.contractorId)}</select>
-                        </label>
+                        <div class="dbo-reorder-row">
+                            <label class="dbo-reorder-col">Подрядчик
+                                <select id="dbEditContractor" ${locked ? "disabled" : ""}>${dbContractorOptions(e.reorder?.contractorId)}</select>
+                            </label>
+                            <label class="dbo-reorder-col dbo-reorder-amt-col">Сумма подрядчику, ₽
+                                <div class="dbo-reorder-amt-wrap">
+                                    <input type="text" inputmode="decimal" id="dbEditReorderAmt" data-custom="${e.reorder?.amountCustom ? "1" : "0"}" value="${dbRound(e.reorder ? (Number(e.reorder.amount) || 0) : (Number(e.cost) || 0))}" ${(e.reorder?.amountCustom && !locked) ? "" : "disabled"} oninput="dbCleanNum(this)">
+                                    <button type="button" id="dbEditReorderAmtBtn" class="dbo-reorder-amt-btn${e.reorder?.amountCustom ? " is-custom" : ""}" ${locked ? "disabled" : ""} onclick="dbToggleReorderAmt()" title="${e.reorder?.amountCustom ? "Вернуть к себестоимости" : "Изменить сумму вручную"}" aria-label="Изменить сумму подрядчику">${e.reorder?.amountCustom ? "↺" : "✎"}</button>
+                                </div>
+                            </label>
+                        </div>
                         ${e.reorder?.paid ? `<div class="dbo-reorder-paid">✓ оплачено подрядчику</div>` : ""}
                     </div>
                 </div>
@@ -1607,6 +1636,7 @@ function dbEditRecalc(source) {
     if (source === "qty") {
         s("dbEditTotal", qty * price);
         s("dbEditCost", dbEditCostPerUnit * qty);   // себест. пропорционально кол-ву
+        if (typeof dbSyncReorderAmt === "function") dbSyncReorderAmt();   // сумма подрядчику = себест. (если auto)
     } else if (source === "price") {
         s("dbEditTotal", qty * price);
     } else if (source === "total") {
@@ -1631,6 +1661,7 @@ function dbCleanNum(el) {
 function dbCostBlur(el) {
     dbCleanNum(el);
     if (!String(el.value).trim()) el.value = "0";
+    if (typeof dbSyncReorderAmt === "function") dbSyncReorderAmt();   // сумма подрядчику = себест. (если auto)
 }
 async function dbSaveElEdit(elId) {
     if (dbCardLocked()) { dbLockNotice(); return; }
@@ -1654,7 +1685,10 @@ async function dbSaveElEdit(elId) {
     const reorderOn = !!document.getElementById("dbEditReorder")?.checked;
     const contractorId = reorderOn ? (Number(document.getElementById("dbEditContractor")?.value) || 0) : 0;
     if (reorderOn && !contractorId) { alert("Выберите подрядчика или снимите галочку «Перезаказ у подрядчика»."); return; }
-    const reorder = reorderOn ? { contractorId } : null;
+    // Сумма подрядчику: переопределена вручную → шлём её; иначе бэкенд возьмёт себестоимость.
+    const amtInp = document.getElementById("dbEditReorderAmt");
+    const amountCustom = reorderOn && amtInp?.dataset.custom === "1";
+    const reorder = reorderOn ? { contractorId, amountCustom, amount: amountCustom ? (Number(amtInp.value) || 0) : undefined } : null;
 
     const btn = document.getElementById("dbEditSaveBtn");
     if (btn) { btn.disabled = true; btn.textContent = recreate ? "Пересоздание…" : "Сохранение…"; }

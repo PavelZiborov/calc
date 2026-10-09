@@ -100,7 +100,7 @@ function ctrRenderDetail(r) {
     const paid = Number(r.paid) || 0;
     const unpaid = orders.filter(o => !o.paid);
     const ordRows = orders.length ? orders.map(o => {
-        const amount = o.paid ? (Number(o.paid_amount) || 0) : (Number(o.element_cost) || 0);
+        const amount = Number(o.amount) || 0;   // эффективная сумма подрядчику (кастомная или = себестоимость)
         const date = o.created_at_crm || "";
         return `<tr class="${o.paid ? "ctr-ord--paid" : ""}">
             <td>${o.deal_num ? `№ ${ctrEsc(o.deal_num)}` : "—"}</td>
@@ -133,7 +133,7 @@ function ctrRenderDetail(r) {
         ${debt > 0 ? `<div class="ctr-payall-row"><button type="button" class="ctr-btn ctr-btn-primary" onclick="ctrPayAll(${c.id}, ${unpaid.length})">Оплатить всё (${ctrMoney(debt)} ₽)</button></div>` : ""}
         <div class="ctr-orders-wrap">
             <table class="ctr-table ctr-orders">
-                <thead><tr><th>Заказ</th><th>Позиция</th><th>Кол-во</th><th>Дата</th><th>Себест.</th><th>Оплата</th><th></th></tr></thead>
+                <thead><tr><th>Заказ</th><th>Позиция</th><th>Кол-во</th><th>Дата</th><th>Сумма</th><th>Оплата</th><th></th></tr></thead>
                 <tbody>${ordRows}</tbody>
             </table>
         </div>`;

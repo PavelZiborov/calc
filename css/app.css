@@ -4729,3 +4729,12 @@
     .ctr-po-col { display: none; }
     .ctr-ord-name { max-width: 160px; }
 }
+
+/* перезаказ: строка «подрядчик | сумма подрядчику» */
+.dbo-reorder-row { display: grid; grid-template-columns: 1fr minmax(150px, 210px); gap: 12px; align-items: start; }
+.dbo-reorder-amt-wrap { display: flex; gap: 6px; align-items: stretch; }
+.dbo-reorder-amt-wrap input { flex: 1 1 auto; min-width: 0; }
+.dbo-reorder-amt-btn { flex: 0 0 auto; width: 42px; margin: 0 !important; padding: 0; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); border-radius: var(--r-sm, 8px); cursor: pointer; font-size: 17px; line-height: 1; box-shadow: none; }
+.dbo-reorder-amt-btn.is-custom { color: var(--accent-container, #2563eb); border-color: var(--accent-container, #2563eb); }
+.dbo-reorder-amt-btn:disabled { opacity: .45; cursor: default; }
+@media (max-width: 560px) { .dbo-reorder-row { grid-template-columns: 1fr; } }
