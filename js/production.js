@@ -2,8 +2,8 @@
 // Незавершённые элементы заказов (с превью) для печати и оперативной смены статуса.
 // Без цен/себестоимости. Фильтры: статус, менеджер, категория, поиск + сброс.
 
-const prodState = { statusId: "", manager: "", categoryId: "", search: "" };
-let prodData = { elements: [], statuses: [], managers: [], categories: [] };
+const prodState = { statusId: "", manager: "", categoryId: "", search: "", page: 1 };
+let prodData = { elements: [], statuses: [], managers: [], categories: [], total: 0, page: 1, pages: 1 };
 const prodPreviews = new Map();   // elId -> url | null
 let prodSearchTimer = null;
 
@@ -28,13 +28,16 @@ async function prodLoad(initial) {
             manager: prodState.manager || undefined,
             categoryId: prodState.categoryId || undefined,
             search: prodState.search || undefined,
+            page: prodState.page || 1,
         });
         prodData = {
             elements: Array.isArray(r.elements) ? r.elements : [],
             statuses: Array.isArray(r.statuses) ? r.statuses : [],
             managers: Array.isArray(r.managers) ? r.managers : [],
             categories: Array.isArray(r.categories) ? r.categories : [],
+            total: Number(r.total) || 0, page: Number(r.page) || 1, pages: Number(r.pages) || 1,
         };
+        prodState.page = prodData.page;
         if (initial) prodRenderFilters();
         prodRenderList();
         prodLoadPreviews();
@@ -47,8 +50,8 @@ async function prodLoad(initial) {
 function prodRenderFilters() {
     const host = document.getElementById("prodFilters");
     if (!host) return;
-    // В фильтре статусов — только незавершённые (type 0); завершённые в списке не показываем.
-    const statusOpts = prodData.statuses.filter(s => Number(s.type) !== 1)
+    // Все статусы (включая «Завершено» — чтобы смотреть завершённые позиции постранично).
+    const statusOpts = prodData.statuses
         .map(s => `<option value="${s.id}"${String(s.id) === String(prodState.statusId) ? " selected" : ""}>${prodEsc(s.name)}</option>`).join("");
     const mgrOpts = prodData.managers
         .map(m => `<option value="${prodEsc(m)}"${m === prodState.manager ? " selected" : ""}>${prodEsc(m)}</option>`).join("");
@@ -66,17 +69,27 @@ function prodOnFilter() {
     prodState.statusId = document.getElementById("prodFilterStatus")?.value || "";
     prodState.manager = document.getElementById("prodFilterManager")?.value || "";
     prodState.categoryId = document.getElementById("prodFilterCategory")?.value || "";
+    prodState.page = 1;
     prodLoad(false);
 }
 function prodOnSearch(v) {
     prodState.search = v;
+    prodState.page = 1;
     clearTimeout(prodSearchTimer);
     prodSearchTimer = setTimeout(() => prodLoad(false), 350);
 }
 function prodReset() {
-    prodState.statusId = ""; prodState.manager = ""; prodState.categoryId = ""; prodState.search = "";
+    prodState.statusId = ""; prodState.manager = ""; prodState.categoryId = ""; prodState.search = ""; prodState.page = 1;
     prodRenderFilters();
     prodLoad(false);
+}
+function prodGoPage(p) {
+    const n = Math.min(prodData.pages, Math.max(1, Number(p) || 1));
+    if (n === prodState.page) return;
+    prodState.page = n;
+    prodLoad(false);
+    const host = document.getElementById("production-tab");
+    if (host) host.scrollIntoView({ block: "start" });
 }
 
 function prodStatusColor(e) {
@@ -96,12 +109,12 @@ function prodRenderList() {
     if (!host) return;
     const els = prodData.elements;
     const countEl = document.getElementById("prodCount");
-    if (countEl) countEl.textContent = els.length ? `${els.length}` : "";
+    if (countEl) countEl.textContent = prodData.total ? `${prodData.total}` : "";
     if (!els.length) {
-        host.innerHTML = `<p class="prod-note">Нет незавершённых позиций по выбранным фильтрам.</p>`;
+        host.innerHTML = `<p class="prod-note">Нет позиций по выбранным фильтрам.</p>`;
         return;
     }
-    host.innerHTML = els.map(e => {
+    const rowsHtml = els.map(e => {
         const qty = (Number(e.quantity) || 0);
         const units = prodEsc(e.units || "шт");
         const sheets = (e.sheets != null && String(e.sheets).trim() !== "") ? `Листов: <b>${prodEsc(e.sheets)}</b> · ` : "";
@@ -110,7 +123,7 @@ function prodRenderList() {
         return `<div class="prod-row" data-el="${e.crm_element_id}">
             <div class="prod-thumb" data-el="${e.crm_element_id}" title="Превью"><span class="prod-thumb-ph">нет превью</span></div>
             <div class="prod-main">
-                <div class="prod-dealline"><span class="prod-dealnum">№ ${prodEsc(e.deal_num || "—")}</span>${e.client_name ? ` · ${prodEsc(e.client_name)}` : ""}${cat ? ` · <span class="prod-cat">${prodEsc(cat)}</span>` : ""}</div>
+                <div class="prod-dealline"><button type="button" class="prod-dealnum" onclick="openDbDealCard(${e.deal_crm_id})" title="Открыть заказ">№ ${prodEsc(e.deal_num || "—")}</button>${e.client_name ? ` · ${prodEsc(e.client_name)}` : ""}${cat ? ` · <span class="prod-cat">${prodEsc(cat)}</span>` : ""}</div>
                 <div class="prod-title">${prodEsc(e.category_and_name || e.name || "—")}</div>
                 <div class="prod-meta">${sheets}Кол-во: <b>${qty} ${units}</b></div>
                 ${reorder}
@@ -118,12 +131,23 @@ function prodRenderList() {
             </div>
             <div class="prod-actions">
                 ${prodStatusSelectHtml(e)}
-                <button type="button" class="prod-btn prod-btn-done" onclick="prodMarkDone(${e.crm_element_id}, ${e.deal_crm_id})">✓ Готово</button>
+                <button type="button" class="prod-btn prod-btn-open" onclick="openDbDealCard(${e.deal_crm_id})">Открыть заказ ↗</button>
             </div>
         </div>`;
     }).join("");
+    host.innerHTML = rowsHtml + prodPagerHtml();
     // восстановить уже загруженные превью
     for (const e of els) { if (prodPreviews.has(String(e.crm_element_id))) prodApplyThumb(e.crm_element_id); }
+}
+
+function prodPagerHtml() {
+    if ((prodData.pages || 1) <= 1) return "";
+    const p = prodData.page, m = prodData.pages;
+    return `<div class="prod-pager">
+        <button type="button" class="prod-btn prod-btn-ghost" ${p <= 1 ? "disabled" : ""} onclick="prodGoPage(${p - 1})">← Назад</button>
+        <span class="prod-pager-info">Страница <b>${p}</b> из <b>${m}</b> · всего ${prodData.total}</span>
+        <button type="button" class="prod-btn prod-btn-ghost" ${p >= m ? "disabled" : ""} onclick="prodGoPage(${p + 1})">Вперёд →</button>
+    </div>`;
 }
 
 async function prodLoadPreviews() {

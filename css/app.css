@@ -4779,3 +4779,11 @@
     .prod-actions { grid-column: 1 / -1; flex-direction: row; min-width: 0; }
     .prod-status-select { flex: 1 1 auto; }
 }
+
+/* производство: кликабельный № заказа, кнопка открытия, пагинация */
+.prod-dealnum { background: none; border: none; box-shadow: none; padding: 0; margin: 0; width: auto; font: inherit; font-weight: 700; color: var(--accent-container, #2563eb); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.prod-dealnum:hover { filter: brightness(1.1); }
+.prod-btn-open { background: var(--surface); color: var(--accent-container, #2563eb); border-color: var(--accent-container, #2563eb); white-space: nowrap; }
+.prod-btn:disabled { opacity: .5; cursor: default; }
+.prod-pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 18px 0 8px; flex-wrap: wrap; }
+.prod-pager-info { color: var(--text-muted); font-size: 14px; }
