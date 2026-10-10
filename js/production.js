@@ -58,12 +58,16 @@ function prodRenderFilters() {
     const catOpts = (prodData.categories || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"))
         .map(c => `<option value="${c.id}"${String(c.id) === String(prodState.categoryId) ? " selected" : ""}>${prodEsc(c.name)}</option>`).join("");
     host.innerHTML = `
-        <div class="prod-filter-group"><label>Статус</label><select id="prodFilterStatus" onchange="prodOnFilter()"><option value="">Все</option>${statusOpts}</select></div>
-        <div class="prod-filter-group"><label>Менеджер</label><select id="prodFilterManager" onchange="prodOnFilter()"><option value="">Все</option>${mgrOpts}</select></div>
-        <div class="prod-filter-group"><label>Категория</label><select id="prodFilterCategory" onchange="prodOnFilter()"><option value="">Все</option>${catOpts}</select></div>
         <div class="prod-filter-group prod-filter-search"><label>Поиск</label><input type="text" id="prodFilterSearch" value="${prodEsc(prodState.search)}" placeholder="Заказ, клиент, позиция…" oninput="prodOnSearch(this.value)"></div>
-        <button type="button" class="prod-btn prod-btn-ghost prod-reset" onclick="prodReset()">Сбросить фильтры</button>`;
+        <button type="button" class="prod-btn prod-btn-ghost prod-filter-toggle" onclick="prodToggleFilters()">Фильтры ▾</button>
+        <div class="prod-filter-adv">
+            <div class="prod-filter-group"><label>Статус</label><select id="prodFilterStatus" onchange="prodOnFilter()"><option value="">Все</option>${statusOpts}</select></div>
+            <div class="prod-filter-group"><label>Менеджер</label><select id="prodFilterManager" onchange="prodOnFilter()"><option value="">Все</option>${mgrOpts}</select></div>
+            <div class="prod-filter-group"><label>Категория</label><select id="prodFilterCategory" onchange="prodOnFilter()"><option value="">Все</option>${catOpts}</select></div>
+            <button type="button" class="prod-btn prod-btn-ghost prod-reset" onclick="prodReset()">Сбросить фильтры</button>
+        </div>`;
 }
+function prodToggleFilters() { document.getElementById("prodFilters")?.classList.toggle("filters-open"); }
 
 function prodOnFilter() {
     prodState.statusId = document.getElementById("prodFilterStatus")?.value || "";
@@ -95,13 +99,44 @@ function prodGoPage(p) {
 function prodStatusColor(e) {
     return (typeof dbElStatusColor === "function") ? dbElStatusColor(e.status_name) : "#7a766c";
 }
-function prodStatusSelectHtml(e) {
-    const cur = e.status_id != null ? Number(e.status_id) : null;
-    const opts = prodData.statuses.map(s =>
-        `<option value="${s.id}"${Number(s.id) === cur ? " selected" : ""}>${prodEsc(s.name)}</option>`).join("");
+// Кнопка-пилюля статуса + меню со свотчами — как в карточке заказа.
+function prodStatusControlHtml(e) {
     const color = prodStatusColor(e);
-    return `<select class="prod-status-select" style="border-color:${color};color:${color}"
-        onchange="prodSetStatus(${e.crm_element_id}, ${e.deal_crm_id}, this.value)">${opts}</select>`;
+    const name = e.status_name || "—";
+    return `<button type="button" class="prod-status-pill" style="color:${color};border-color:${color}" onclick="prodOpenStatusMenu(event, ${e.crm_element_id}, ${e.deal_crm_id})">
+        <span class="prod-status-dot" style="background:${color}"></span><span class="prod-status-name">${prodEsc(name)}</span>
+        <svg class="icn" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6l6 -6"/></svg>
+    </button>`;
+}
+function prodOpenStatusMenu(ev, elId, dealId) {
+    if (ev) ev.stopPropagation();
+    prodCloseStatusMenu();
+    const e = prodData.elements.find(x => Number(x.crm_element_id) === Number(elId));
+    const cur = e && e.status_id != null ? Number(e.status_id) : null;
+    const menu = document.createElement("div");
+    menu.className = "dbk-status-menu"; menu.id = "prodStatusMenu";
+    menu.innerHTML = prodData.statuses.map(s => {
+        const c = (typeof dbElStatusColor === "function") ? dbElStatusColor(s.name) : "#7a766c";
+        return `<button type="button" class="dbk-status-opt${Number(s.id) === cur ? " is-cur" : ""}" onclick="prodPickStatus(${elId}, ${dealId}, ${s.id})"><span class="dbk-status-swatch" style="background:${c}"></span><span class="dbk-status-optname">${prodEsc(s.name)}</span></button>`;
+    }).join("");
+    document.body.appendChild(menu);
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const mw = 240;
+    let left = rect.left; if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    menu.style.width = mw + "px"; menu.style.left = Math.max(8, left) + "px";
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 300 && rect.top > 300) menu.style.top = (rect.top - menu.offsetHeight - 4) + "px";
+    else menu.style.top = (rect.bottom + 4) + "px";
+    setTimeout(() => document.addEventListener("click", prodStatusMenuOutside), 0);
+}
+function prodStatusMenuOutside(ev) { const m = document.getElementById("prodStatusMenu"); if (m && !m.contains(ev.target)) prodCloseStatusMenu(); }
+function prodCloseStatusMenu() { const m = document.getElementById("prodStatusMenu"); if (m) m.remove(); document.removeEventListener("click", prodStatusMenuOutside); }
+function prodPickStatus(elId, dealId, statusId) { prodCloseStatusMenu(); prodSetStatus(elId, dealId, statusId); }
+function prodFmtDateTime(v) {
+    if (!v) return "";
+    const d = new Date(v); if (isNaN(d.getTime())) return "";
+    const p = n => String(n).padStart(2, "0");
+    return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function prodRenderList() {
@@ -131,7 +166,8 @@ function prodRenderList() {
                 <div class="prod-mgr">Менеджер: ${prodEsc(e.manager || "—")}</div>
             </div>
             <div class="prod-actions">
-                ${prodStatusSelectHtml(e)}
+                ${prodStatusControlHtml(e)}
+                ${e.status_changed_at ? `<div class="prod-statustime">изменён ${prodEsc(prodFmtDateTime(e.status_changed_at))}</div>` : ""}
             </div>
         </div>`;
     }).join("");
@@ -192,17 +228,18 @@ async function prodSetStatus(elId, dealId, statusId) {
     const sid = Number(statusId);
     if (!Number.isFinite(sid)) return;
     try {
-        await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: sid, force: true });
+        const r = await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: sid, force: true });
         const st = prodData.statuses.find(s => Number(s.id) === sid);
-        if (st && Number(st.type) === 1) {
-            // завершено — убираем из очереди производства
+        // Если смотрим не этот статус (и не «Все») — позиция уходит из текущей выборки.
+        const dropsFromView = (prodState.statusId && String(prodState.statusId) !== String(sid))
+            || (!prodState.statusId && st && Number(st.type) === 1);
+        if (dropsFromView) {
             prodData.elements = prodData.elements.filter(e => Number(e.crm_element_id) !== Number(elId));
-            prodRenderList();
         } else {
             const e = prodData.elements.find(x => Number(x.crm_element_id) === Number(elId));
-            if (e) { e.status_id = sid; e.status_name = st ? st.name : e.status_name; }
-            prodRenderList();
+            if (e) { e.status_id = sid; e.status_name = st ? st.name : e.status_name; e.status_changed_at = r?.element?.status_changed_at || new Date().toISOString(); }
         }
+        prodRenderList();
         if (typeof showReadinessToast === "function") showReadinessToast("Статус обновлён");
     } catch (e) {
         console.error("prodSetStatus", e);
