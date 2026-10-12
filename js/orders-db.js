@@ -1960,7 +1960,8 @@ function dbOpenElStatusMenu(ev, elId) {
     const cur = el && el.status_id != null ? Number(el.status_id) : null;
     const menu = document.createElement("div");
     menu.className = "dbk-status-menu"; menu.id = "dbElStatusMenu";
-    menu.innerHTML = statuses.map(s => {
+    const clearOpt = `<button type="button" class="dbk-status-opt${cur == null ? " is-cur" : ""}" onclick="dbPickElStatus(0)"><span class="dbk-status-swatch dbk-status-swatch--none"></span><span class="dbk-status-optname">Статус не выбран</span></button>`;
+    menu.innerHTML = clearOpt + statuses.map(s => {
         const c = dbElStatusColor(s.name, s.bk_color);
         return `<button type="button" class="dbk-status-opt${Number(s.id) === cur ? " is-cur" : ""}" onclick="dbPickElStatus(${s.id})"><span class="dbk-status-swatch" style="background:${c}"></span><span class="dbk-status-optname">${escapeHtml(s.name)}</span></button>`;
     }).join("");
@@ -1988,13 +1989,14 @@ function dbCloseElStatusMenu() {
 function dbPickElStatus(statusId) {
     const elId = dbElStatusMenuElId;
     dbCloseElStatusMenu();
-    if (elId == null || !statusId) return;
-    const st = (dbCardElementStatuses || []).find(s => Number(s.id) === Number(statusId));
+    if (elId == null) return;
+    const clearing = !Number(statusId);   // 0 → снять статус («Статус не выбран»)
+    const st = clearing ? null : (dbCardElementStatuses || []).find(s => Number(s.id) === Number(statusId));
     const el = (dbCardData?.elements || []).find(x => Number(x.crm_element_id) === Number(elId));
     const prev = el ? { status_id: el.status_id, status_name: el.status_name } : null;
-    if (el) { el.status_id = Number(statusId); el.status_name = st ? st.name : el.status_name; }
+    if (el) { el.status_id = clearing ? null : Number(statusId); el.status_name = clearing ? "" : (st ? st.name : el.status_name); }
     renderDbDealCard(dbCardData, dbCardDealId);
-    clientsApi("setElementStatus", { dealId: Number(dbCardDealId), elementId: Number(elId), statusId: Number(statusId) })
+    clientsApi("setElementStatus", { dealId: Number(dbCardDealId), elementId: Number(elId), statusId: clearing ? 0 : Number(statusId) })
         .then(() => { if (typeof showReadinessToast === "function") showReadinessToast("Статус элемента обновлён"); })
         .catch(err => {
             console.error("setElementStatus", err);

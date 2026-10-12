@@ -115,7 +115,8 @@ function prodOpenStatusMenu(ev, elId, dealId) {
     const cur = e && e.status_id != null ? Number(e.status_id) : null;
     const menu = document.createElement("div");
     menu.className = "dbk-status-menu"; menu.id = "prodStatusMenu";
-    menu.innerHTML = prodData.statuses.map(s => {
+    const clearOpt = `<button type="button" class="dbk-status-opt${cur == null ? " is-cur" : ""}" onclick="prodPickStatus(${elId}, ${dealId}, 0)"><span class="dbk-status-swatch dbk-status-swatch--none"></span><span class="dbk-status-optname">Статус не выбран</span></button>`;
+    menu.innerHTML = clearOpt + prodData.statuses.map(s => {
         const c = (typeof dbElStatusColor === "function") ? dbElStatusColor(s.name) : "#7a766c";
         return `<button type="button" class="dbk-status-opt${Number(s.id) === cur ? " is-cur" : ""}" onclick="prodPickStatus(${elId}, ${dealId}, ${s.id})"><span class="dbk-status-swatch" style="background:${c}"></span><span class="dbk-status-optname">${prodEsc(s.name)}</span></button>`;
     }).join("");
@@ -227,11 +228,13 @@ function prodApplyAssets(elId) {
 async function prodSetStatus(elId, dealId, statusId) {
     const sid = Number(statusId);
     if (!Number.isFinite(sid)) return;
+    const clearing = sid === 0;   // 0 → снять статус
     try {
         const r = await clientsApi("setElementStatus", { dealId: Number(dealId), elementId: Number(elId), statusId: sid, force: true });
-        const st = prodData.statuses.find(s => Number(s.id) === sid);
-        // Если смотрим не этот статус (и не «Все») — позиция уходит из текущей выборки.
-        const dropsFromView = (prodState.statusId && String(prodState.statusId) !== String(sid))
+        const st = clearing ? null : prodData.statuses.find(s => Number(s.id) === sid);
+        // Снятый статус или статус ≠ текущему фильтру (и «Завершено» в общей очереди) → уходит из выборки.
+        const dropsFromView = clearing
+            || (prodState.statusId && String(prodState.statusId) !== String(sid))
             || (!prodState.statusId && st && Number(st.type) === 1);
         if (dropsFromView) {
             prodData.elements = prodData.elements.filter(e => Number(e.crm_element_id) !== Number(elId));

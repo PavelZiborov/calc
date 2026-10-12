@@ -4811,3 +4811,6 @@
 .prod-layouts-cap { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .prod-layout { font-size: 12.5px; color: var(--accent-container, #2563eb); text-decoration: none; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
 .prod-layout:hover { border-color: var(--accent-container, #2563eb); }
+
+/* свотч «статус не выбран» — штриховка/пустой */
+.dbk-status-swatch--none { background: repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, #f4f5f7 3px, #f4f5f7 6px); border: 1px solid #c7ccd4; }
