@@ -61,7 +61,7 @@ function prodRenderFilters() {
         <div class="prod-filter-group prod-filter-search"><label>Поиск</label><input type="text" id="prodFilterSearch" value="${prodEsc(prodState.search)}" placeholder="Заказ, клиент, позиция…" oninput="prodOnSearch(this.value)"></div>
         <button type="button" class="prod-btn prod-btn-ghost prod-filter-toggle" onclick="prodToggleFilters()">Фильтры ▾</button>
         <div class="prod-filter-adv">
-            <div class="prod-filter-group"><label>Статус</label><select id="prodFilterStatus" onchange="prodOnFilter()"><option value="">Все</option>${statusOpts}</select></div>
+            <div class="prod-filter-group"><label>Статус</label><select id="prodFilterStatus" onchange="prodOnFilter()"><option value="">Все</option><option value="none"${prodState.statusId === "none" ? " selected" : ""}>Без статуса</option>${statusOpts}</select></div>
             <div class="prod-filter-group"><label>Менеджер</label><select id="prodFilterManager" onchange="prodOnFilter()"><option value="">Все</option>${mgrOpts}</select></div>
             <div class="prod-filter-group"><label>Категория</label><select id="prodFilterCategory" onchange="prodOnFilter()"><option value="">Все</option>${catOpts}</select></div>
             <button type="button" class="prod-btn prod-btn-ghost prod-reset" onclick="prodReset()">Сбросить фильтры</button>
