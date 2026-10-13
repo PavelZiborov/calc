@@ -3758,6 +3758,7 @@ function openSettingsPage() {
     renderNotifySettingsInline();
     renderKpSettingsInline();
     renderStatusSettingsInline();
+    renderElStatusOrderInline();
     renderCarddavSettingsInline();
     renderCalendarSettingsInline();
     settingsSwitchTab("calc");
@@ -4029,6 +4030,52 @@ function dbCarddavShowLink(url, self) {
         </div></div>`;
     ov.style.display = "flex";
 }
+// ——— Настройки: порядок статусов позиций (для меню в заказах и производстве) ———
+let elStatusOrderList = [];   // [{id,name,type}]
+async function renderElStatusOrderInline() {
+    const host = document.getElementById("settingsElStatusOrderHost");
+    if (!host) return;
+    host.innerHTML = `<p class="dbo-ya-note">Загрузка…</p>`;
+    try {
+        const r = await clientsApi("getElementStatusOrder", {});
+        elStatusOrderList = Array.isArray(r.statuses) ? r.statuses : [];
+        elStatusOrderRender();
+    } catch (e) { console.error("getElementStatusOrder", e); host.innerHTML = `<p class="dbo-ya-note payment-alert">Не удалось загрузить статусы (нужны права администратора).</p>`; }
+}
+function elStatusColorFor(name) { return (typeof dbElStatusColor === "function") ? dbElStatusColor(name) : "#7a766c"; }
+function elStatusOrderRender() {
+    const host = document.getElementById("settingsElStatusOrderHost");
+    if (!host) return;
+    const rows = elStatusOrderList.map((s, i) => `
+        <div class="elso-row">
+            <span class="elso-swatch" style="background:${elStatusColorFor(s.name)}"></span>
+            <span class="elso-name">${escapeHtml(s.name)}</span>
+            <span class="elso-arrows">
+                <button type="button" class="elso-arrow" ${i === 0 ? "disabled" : ""} onclick="elStatusMove(${i},-1)" aria-label="Выше">↑</button>
+                <button type="button" class="elso-arrow" ${i === elStatusOrderList.length - 1 ? "disabled" : ""} onclick="elStatusMove(${i},1)" aria-label="Ниже">↓</button>
+            </span>
+        </div>`).join("");
+    host.innerHTML = `<div class="elso-list">${rows}</div>
+        <div class="settings-actions" style="margin-top:12px;"><button class="dbo-btn dbo-btn-primary" onclick="elStatusOrderSave(this)">Сохранить порядок</button></div>
+        <div id="elsoMsg" class="dbo-ya-note"></div>`;
+}
+function elStatusMove(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= elStatusOrderList.length) return;
+    const t = elStatusOrderList[i]; elStatusOrderList[i] = elStatusOrderList[j]; elStatusOrderList[j] = t;
+    elStatusOrderRender();
+}
+async function elStatusOrderSave(btn) {
+    const order = elStatusOrderList.map(s => Number(s.id)).filter(Number.isFinite);
+    const msg = document.getElementById("elsoMsg");
+    if (btn) btn.disabled = true;
+    try {
+        await clientsApi("setElementStatusOrder", { order });
+        if (msg) { msg.textContent = "Порядок сохранён — применяется в заказах и производстве."; msg.className = "dbo-ya-note payment-ok"; }
+    } catch (e) { if (msg) { msg.textContent = "Ошибка: " + (e.message || ""); msg.className = "dbo-ya-note payment-alert"; } }
+    finally { if (btn) btn.disabled = false; }
+}
+
 // ——— Настройки: автоматизация статусов заказа (по статусам позиций) ———
 async function renderStatusSettingsInline() {
     const host = document.getElementById("settingsStatusHost");
