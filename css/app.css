@@ -4824,3 +4824,13 @@
 .elso-arrow { margin: 0; width: 34px; height: 34px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; line-height: 1; box-shadow: none; }
 .elso-arrow:disabled { opacity: .4; cursor: default; }
 .elso-arrow:not(:disabled):hover { background: var(--surface-2); }
+
+/* Интеграция подрядчика (коннектор в его CRM) */
+.ctr-integ { border: 1px solid var(--border); border-radius: var(--r-md, 12px); padding: 14px 16px; margin: 16px 0; background: var(--surface-2); }
+.ctr-integ-head { font-weight: 700; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+.ctr-integ .ctr-field { margin-top: 10px; }
+.ctr-integ-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.ctr-integ-check { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; }
+.ctr-integ-check.ok { color: #1e8e4e; background: color-mix(in srgb, #1e8e4e 12%, transparent); }
+.ctr-integ-check.bad { color: #c0392b; background: color-mix(in srgb, #c0392b 12%, transparent); }
+.ctr-ok { color: #1e8e4e; }

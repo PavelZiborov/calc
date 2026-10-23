@@ -131,12 +131,81 @@ function ctrRenderDetail(r) {
             <div class="ctr-sum-box ctr-sum-po"><span>По PrintOffice</span><b title="справочно">долг ${c.po_debt != null ? ctrMoney(c.po_debt) : "—"} / опл. ${c.po_paid != null ? ctrMoney(c.po_paid) : "—"}</b></div>
         </div>
         ${debt > 0 ? `<div class="ctr-payall-row"><button type="button" class="ctr-btn ctr-btn-primary" onclick="ctrPayAll(${c.id}, ${unpaid.length})">Оплатить всё (${ctrMoney(debt)} ₽)</button></div>` : ""}
+        <div id="ctrIntegrationHost"></div>
         <div class="ctr-orders-wrap">
             <table class="ctr-table ctr-orders">
                 <thead><tr><th>Заказ</th><th>Позиция</th><th>Кол-во</th><th>Дата</th><th>Сумма</th><th>Оплата</th><th></th></tr></thead>
                 <tbody>${ordRows}</tbody>
             </table>
         </div>`;
+    if (ctrIsAdmin()) ctrLoadIntegration(c.id);
+}
+
+// ——— Интеграция: коннектор в CRM подрядчика (только админ) ———
+function ctrIsAdmin() { return typeof currentUser !== "undefined" && currentUser && (currentUser.role === "superadmin" || currentUser.is_admin); }
+let ctrConnData = null;
+async function ctrLoadIntegration(contractorId) {
+    const host = document.getElementById("ctrIntegrationHost");
+    if (!host) return;
+    host.innerHTML = `<div class="ctr-integ"><div class="ctr-integ-head">Интеграция с CRM подрядчика</div><p class="ctr-note">Загрузка…</p></div>`;
+    try {
+        ctrConnData = await clientsApi("getContractorConnector", { contractorId: Number(contractorId) });
+        ctrRenderIntegration(contractorId);
+    } catch (e) { console.error("getContractorConnector", e); host.innerHTML = ""; }
+}
+function ctrRenderIntegration(contractorId) {
+    const host = document.getElementById("ctrIntegrationHost");
+    if (!host || !ctrConnData) return;
+    const c = ctrConnData.connector || {};
+    const our = Array.isArray(ctrConnData.ourStatuses) ? ctrConnData.ourStatuses : [];
+    const trigOpts = our.map(s => `<option value="${s.id}"${Number(s.id) === Number(c.triggerStatusId) ? " selected" : ""}>${ctrEsc(s.name)}</option>`).join("");
+    const encWarn = ctrConnData.encReady ? "" : `<p class="ctr-note ctr-alert">На сервере не задан ключ шифрования (CONNECTOR_ENC_KEY) — API-ключ подрядчика сохранить нельзя.</p>`;
+    const check = c.lastCheckAt ? `<span class="ctr-integ-check ${c.lastCheckOk ? "ok" : "bad"}">${c.lastCheckOk ? "✓ связь ок" : "✗ связь не прошла"}</span>` : "";
+    host.innerHTML = `<div class="ctr-integ">
+        <div class="ctr-integ-head">Интеграция с CRM подрядчика ${check}</div>
+        <p class="ctr-note">Заказы будут передаваться в CRM подрядчика. Ключ храним зашифрованным; обращаемся только к связанным заказам.</p>
+        ${encWarn}
+        <label class="ctr-field">Тип CRM
+            <select id="ctrConnType"><option value="printoffice"${(c.type || "printoffice") === "printoffice" ? " selected" : ""}>PrintOffice</option></select>
+        </label>
+        <label class="ctr-field">URL API подрядчика<input type="text" id="ctrConnBase" value="${ctrEsc(c.baseUrl || "")}" placeholder="https://crm.их-домен.ru/api/v1"></label>
+        <label class="ctr-field">API-ключ подрядчика<input type="password" id="ctrConnKey" placeholder="${c.hasKey ? "•••••• (задан — оставьте пустым, чтобы не менять)" : "вставьте ключ"}" autocomplete="off"></label>
+        <label class="ctr-field">Статус-триггер отправки<select id="ctrConnTrigger"><option value="">—</option>${trigOpts}</select></label>
+        <label class="ctr-check"><input type="checkbox" id="ctrConnActive" ${c.active === false ? "" : "checked"}> Интеграция активна</label>
+        <div class="ctr-integ-actions">
+            <button type="button" class="ctr-btn ctr-btn-primary" onclick="ctrSaveConnector(${contractorId})">Сохранить</button>
+            <button type="button" class="ctr-btn ctr-btn-ghost" onclick="ctrTestConnector(${contractorId}, this)">Проверить связь</button>
+        </div>
+        <div id="ctrConnMsg" class="ctr-note"></div>
+    </div>`;
+}
+async function ctrSaveConnector(contractorId) {
+    const msg = document.getElementById("ctrConnMsg");
+    const body = {
+        contractorId: Number(contractorId),
+        type: document.getElementById("ctrConnType")?.value || "printoffice",
+        baseUrl: document.getElementById("ctrConnBase")?.value || "",
+        triggerStatusId: document.getElementById("ctrConnTrigger")?.value || "",
+        active: !!document.getElementById("ctrConnActive")?.checked,
+    };
+    const key = document.getElementById("ctrConnKey")?.value || "";
+    if (key.trim()) body.apiKey = key.trim();   // пусто → не меняем сохранённый
+    try {
+        await clientsApi("setContractorConnector", body);
+        if (msg) { msg.textContent = "Сохранено."; msg.className = "ctr-note ctr-ok"; }
+        await ctrLoadIntegration(contractorId);
+    } catch (e) { if (msg) { msg.textContent = "Ошибка: " + (e.message || ""); msg.className = "ctr-note ctr-alert"; } }
+}
+async function ctrTestConnector(contractorId, btn) {
+    const msg = document.getElementById("ctrConnMsg");
+    if (btn) { btn.disabled = true; btn.textContent = "Проверка…"; }
+    try {
+        const r = await clientsApi("testContractorConnector", { contractorId: Number(contractorId) });
+        const n = Array.isArray(r.theirStatuses) ? r.theirStatuses.length : 0;
+        if (msg) { msg.textContent = `Связь ок. Получено статусов подрядчика: ${n} (статусы сопоставлены по именам автоматически).`; msg.className = "ctr-note ctr-ok"; }
+        await ctrLoadIntegration(contractorId);
+    } catch (e) { if (msg) { msg.textContent = "Не удалось: " + (e.message || ""); msg.className = "ctr-note ctr-alert"; } }
+    finally { if (btn) { btn.disabled = false; btn.textContent = "Проверить связь"; } }
 }
 
 async function ctrSetPaid(crmElementId, paid) {
