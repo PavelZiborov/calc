@@ -158,9 +158,29 @@ function ctrRenderIntegration(contractorId) {
     if (!host || !ctrConnData) return;
     const c = ctrConnData.connector || {};
     const our = Array.isArray(ctrConnData.ourStatuses) ? ctrConnData.ourStatuses : [];
+    const ourCats = Array.isArray(ctrConnData.ourCategories) ? ctrConnData.ourCategories : [];
+    const extSt = Array.isArray(ctrConnData.extStatuses) ? ctrConnData.extStatuses : [];
+    const extCat = Array.isArray(ctrConnData.extCategories) ? ctrConnData.extCategories : [];
+    const smap = new Map((ctrConnData.statusMap || []).map(m => [Number(m.our_status_id), m.ext_status_id]));
+    const cmap = new Map((ctrConnData.categoryMap || []).map(m => [Number(m.our_category_id), m.ext_category_id]));
     const trigOpts = our.map(s => `<option value="${s.id}"${Number(s.id) === Number(c.triggerStatusId) ? " selected" : ""}>${ctrEsc(s.name)}</option>`).join("");
     const encWarn = ctrConnData.encReady ? "" : `<p class="ctr-note ctr-alert">На сервере не задан ключ шифрования (CONNECTOR_ENC_KEY) — API-ключ подрядчика сохранить нельзя.</p>`;
     const check = c.lastCheckAt ? `<span class="ctr-integ-check ${c.lastCheckOk ? "ok" : "bad"}">${c.lastCheckOk ? "✓ связь ок" : "✗ связь не прошла"}</span>` : "";
+    // Дефолт-категория у подрядчика.
+    const defCatOpts = `<option value="">— авто (первая/Цифровая печать) —</option>` +
+        extCat.map(x => `<option value="${x.id}"${Number(x.id) === Number(c.defaultCategoryId) ? " selected" : ""}>${ctrEsc(x.name)}</option>`).join("");
+    // Таблица сопоставления статусов: наш статус → их статус.
+    const stRows = extSt.length ? our.map(s => {
+        const sel = smap.has(Number(s.id)) ? Number(smap.get(Number(s.id))) : null;
+        const opts = `<option value="">— не слать —</option>` + extSt.map(x => `<option value="${x.id}"${Number(x.id) === sel ? " selected" : ""}>${ctrEsc(x.name)}</option>`).join("");
+        return `<div class="ctr-map-row"><span class="ctr-map-our">${ctrEsc(s.name)}</span><span class="ctr-map-arrow">→</span><select data-our="${s.id}" class="ctr-map-st">${opts}</select></div>`;
+    }).join("") : `<p class="ctr-note">Списки статусов подрядчика появятся после сохранения ключа и «Проверить связь».</p>`;
+    // Таблица сопоставления категорий: наша категория → их категория.
+    const catRows = extCat.length ? ourCats.map(s => {
+        const sel = cmap.has(Number(s.id)) ? Number(cmap.get(Number(s.id))) : null;
+        const opts = `<option value="">— по умолчанию —</option>` + extCat.map(x => `<option value="${x.id}"${Number(x.id) === sel ? " selected" : ""}>${ctrEsc(x.name)}</option>`).join("");
+        return `<div class="ctr-map-row"><span class="ctr-map-our">${ctrEsc(s.name)}</span><span class="ctr-map-arrow">→</span><select data-our="${s.id}" class="ctr-map-cat">${opts}</select></div>`;
+    }).join("") : `<p class="ctr-note">Списки категорий подрядчика появятся после сохранения ключа и «Проверить связь».</p>`;
     host.innerHTML = `<div class="ctr-integ">
         <div class="ctr-integ-head">Интеграция с CRM подрядчика ${check}</div>
         <p class="ctr-note">Заказы будут передаваться в CRM подрядчика. Ключ храним зашифрованным; обращаемся только к связанным заказам.</p>
@@ -170,8 +190,18 @@ function ctrRenderIntegration(contractorId) {
         </label>
         <label class="ctr-field">URL API подрядчика<input type="text" id="ctrConnBase" value="${ctrEsc(c.baseUrl || "")}" placeholder="https://crm.их-домен.ru/api/v1"></label>
         <label class="ctr-field">API-ключ подрядчика<input type="password" id="ctrConnKey" placeholder="${c.hasKey ? "•••••• (задан — оставьте пустым, чтобы не менять)" : "вставьте ключ"}" autocomplete="off"></label>
+        <label class="ctr-field">ID клиента в CRM подрядчика<input type="text" inputmode="numeric" id="ctrConnClient" value="${c.extClientId != null ? ctrEsc(String(c.extClientId)) : ""}" placeholder="напр. 783407 (существующий клиент у них)"></label>
         <label class="ctr-field">Статус-триггер отправки<select id="ctrConnTrigger"><option value="">—</option>${trigOpts}</select></label>
+        <label class="ctr-field">Категория позиции по умолчанию<select id="ctrConnDefCat">${defCatOpts}</select></label>
         <label class="ctr-check"><input type="checkbox" id="ctrConnActive" ${c.active === false ? "" : "checked"}> Интеграция активна</label>
+        <div class="ctr-map-block">
+            <div class="ctr-map-title">Сопоставление статусов (наш → подрядчика)</div>
+            <div class="ctr-map-list">${stRows}</div>
+        </div>
+        <div class="ctr-map-block">
+            <div class="ctr-map-title">Сопоставление категорий (наша → подрядчика)</div>
+            <div class="ctr-map-list">${catRows}</div>
+        </div>
         <div class="ctr-integ-actions">
             <button type="button" class="ctr-btn ctr-btn-primary" onclick="ctrSaveConnector(${contractorId})">Сохранить</button>
             <button type="button" class="ctr-btn ctr-btn-ghost" onclick="ctrTestConnector(${contractorId}, this)">Проверить связь</button>
@@ -181,12 +211,17 @@ function ctrRenderIntegration(contractorId) {
 }
 async function ctrSaveConnector(contractorId) {
     const msg = document.getElementById("ctrConnMsg");
+    const statusMap = Array.from(document.querySelectorAll("#ctrIntegrationHost .ctr-map-st")).map(s => ({ ourStatusId: s.dataset.our, extStatusId: s.value || "" }));
+    const categoryMap = Array.from(document.querySelectorAll("#ctrIntegrationHost .ctr-map-cat")).map(s => ({ ourCategoryId: s.dataset.our, extCategoryId: s.value || "" }));
     const body = {
         contractorId: Number(contractorId),
         type: document.getElementById("ctrConnType")?.value || "printoffice",
         baseUrl: document.getElementById("ctrConnBase")?.value || "",
         triggerStatusId: document.getElementById("ctrConnTrigger")?.value || "",
         active: !!document.getElementById("ctrConnActive")?.checked,
+        extClientId: document.getElementById("ctrConnClient")?.value ?? "",
+        defaultCategoryId: document.getElementById("ctrConnDefCat")?.value ?? "",
+        statusMap, categoryMap,
     };
     const key = document.getElementById("ctrConnKey")?.value || "";
     if (key.trim()) body.apiKey = key.trim();   // пусто → не меняем сохранённый
