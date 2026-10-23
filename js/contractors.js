@@ -142,7 +142,7 @@ function ctrRenderDetail(r) {
 }
 
 // ——— Интеграция: коннектор в CRM подрядчика (только админ) ———
-function ctrIsAdmin() { return typeof currentUser !== "undefined" && currentUser && (currentUser.role === "superadmin" || currentUser.is_admin); }
+function ctrIsAdmin() { return (typeof isCurrentUserAdmin === "function") ? isCurrentUserAdmin() : !!(typeof currentUser !== "undefined" && currentUser && currentUser.isAdmin); }
 let ctrConnData = null;
 async function ctrLoadIntegration(contractorId) {
     const host = document.getElementById("ctrIntegrationHost");
@@ -240,7 +240,7 @@ function ctrOpenEditModal(c) {
         <label class="ctr-field">Комментарий<textarea id="ctrEditComment" rows="2">${ctrEsc(c?.comment || "")}</textarea></label>
         <label class="ctr-check"><input type="checkbox" id="ctrEditActive" ${(!c || c.active) ? "checked" : ""}> Активен</label>
         <div class="ctr-modal-foot">
-            ${edit && (typeof currentUser !== "undefined" && currentUser && (currentUser.role === "superadmin" || currentUser.is_admin)) ? `<button type="button" class="ctr-btn ctr-btn-danger" onclick="ctrDelete(${c.id})">Удалить</button>` : "<span></span>"}
+            ${edit && ctrIsAdmin() ? `<button type="button" class="ctr-btn ctr-btn-danger" onclick="ctrDelete(${c.id})">Удалить</button>` : "<span></span>"}
             <div><button type="button" class="ctr-btn ctr-btn-ghost" onclick="document.getElementById('ctrEditOverlay').remove()">Отмена</button>
             <button type="button" class="ctr-btn ctr-btn-primary" onclick="ctrSave(${edit ? c.id : "null"})">Сохранить</button></div>
         </div>
