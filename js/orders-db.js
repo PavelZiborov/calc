@@ -2149,6 +2149,20 @@ async function dbDeleteElement(elementId, btn) {
         alert("Не удалось удалить позицию: " + String(e.message || e));
     }
 }
+// Ручная отправка позиции подрядчику в его CRM (Этап 2): создать/обновить заказ+позицию у подрядчика.
+// Автоматически это же происходит при переводе статуса на триггер-статус коннектора.
+async function dbPushReorder(elementId, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Отправляем…"; }
+    try {
+        const r = await clientsApi("pushReorderToContractor", { elementId: Number(elementId) });
+        if (typeof showReadinessToast === "function") showReadinessToast("Отправлено подрядчику: " + (r?.info || "готово"));
+        if (btn) { btn.textContent = "✓ Отправлено"; setTimeout(() => { btn.disabled = false; btn.textContent = "Отправить подрядчику"; }, 2500); }
+    } catch (e) {
+        console.error("pushReorderToContractor", e);
+        alert("Не удалось отправить подрядчику: " + String(e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = "Отправить подрядчику"; }
+    }
+}
 // Удаление всей сделки: подтверждение → бэкенд удаляет её в CRM (PrintOffice) + БД.
 async function dbDeleteDeal(crmId, btn) {
     const d = dbCardData?.deal || {};
@@ -2307,7 +2321,7 @@ function dbElementRow(e) {
             <div class="dbo-el-status">${dbElStatusBtn(e)}<span class="element-preview-thumb dbo-el-thumb" data-el="${e.crm_element_id}"></span></div>
             <div class="dbo-el-name">
                 <div class="dbo-el-title dbo-el-title--edit" onclick="dbOpenElEdit(${e.crm_element_id})" title="Редактировать позицию">${escapeHtml(e.category_and_name || e.name || "—")}${price ? `<span class="dbo-el-price-inline"> (${money2(price)} руб./${units})</span>` : ""}</div>
-                ${e.reorder ? `<div class="dbo-el-reorder" title="Перезаказ у подрядчика">↗ Перезаказ: <b>${escapeHtml(e.reorder.contractorName || "подрядчик")}</b>${e.reorder.paid ? ` <span class="dbo-reorder-paidtag">оплачено</span>` : ""}</div>` : ""}
+                ${e.reorder ? `<div class="dbo-el-reorder" title="Перезаказ у подрядчика">↗ Перезаказ: <b>${escapeHtml(e.reorder.contractorName || "подрядчик")}</b>${e.reorder.paid ? ` <span class="dbo-reorder-paidtag">оплачено</span>` : ""}<button type="button" class="dbo-el-pushbtn" onclick="event.stopPropagation(); dbPushReorder(${e.crm_element_id}, this)" title="Создать/обновить заказ у подрядчика в его CRM">Отправить подрядчику</button></div>` : ""}
                 ${cost ? `<div class="dbo-el-costline">Себестоимость: <b>${money(cost)}</b></div>` : ""}
                 ${dbElAfLine(e)}
             </div>
