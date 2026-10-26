@@ -224,6 +224,13 @@ function ctrRenderIntegration(contractorId) {
     const tzField = extFields.length
         ? `<label class="ctr-field">Поле «Техническое задание» у подрядчика (туда дублируем наименование с категорией)<select id="ctrConnTz">${tzOpts}</select></label>`
         : `<p class="ctr-note">Поле «Техническое задание» подрядчика появится после сохранения ключа и «Проверить связь».</p>`;
+    // Ответственный менеджер в CRM подрядчика (к нему добавляется новый заказ).
+    const extUsers = Array.isArray(ctrConnData.extUsers) ? ctrConnData.extUsers : [];
+    const respOpts = `<option value="">— по умолчанию (первый активный) —</option>` +
+        extUsers.map(u => `<option value="${u.id}"${Number(u.id) === Number(c.responsibleId) ? " selected" : ""}>${ctrEsc(u.name)}</option>`).join("");
+    const respField = extUsers.length
+        ? `<label class="ctr-field">Ответственный менеджер в CRM подрядчика (к нему добавляется заказ)<select id="ctrConnResp">${respOpts}</select></label>`
+        : `<p class="ctr-note">Список менеджеров подрядчика появится после сохранения ключа и «Проверить связь».</p>`;
     // Таблица сопоставления статусов: наш статус → их статус.
     const stRows = extSt.length ? our.map(s => {
         const sel = smap.has(Number(s.id)) ? Number(smap.get(Number(s.id))) : null;
@@ -246,6 +253,7 @@ function ctrRenderIntegration(contractorId) {
         <label class="ctr-field">URL API подрядчика<input type="text" id="ctrConnBase" value="${ctrEsc(c.baseUrl || "")}" placeholder="https://crm.их-домен.ru/api/v1"></label>
         <label class="ctr-field">API-ключ подрядчика<input type="password" id="ctrConnKey" placeholder="${c.hasKey ? "•••••• (задан — оставьте пустым, чтобы не менять)" : "вставьте ключ"}" autocomplete="off"></label>
         <label class="ctr-field">ID клиента в CRM подрядчика<input type="text" inputmode="numeric" id="ctrConnClient" value="${c.extClientId != null ? ctrEsc(String(c.extClientId)) : ""}" placeholder="напр. 783407 (существующий клиент у них)"></label>
+        ${respField}
         <label class="ctr-field">Статус-триггер отправки<select id="ctrConnTrigger"><option value="">—</option>${trigOpts}</select></label>
         <label class="ctr-field">Категория позиции по умолчанию<select id="ctrConnDefCat">${defCatOpts}</select></label>
         ${tzField}
@@ -281,6 +289,8 @@ async function ctrSaveConnector(contractorId) {
     };
     const tzEl = document.getElementById("ctrConnTz");
     if (tzEl) body.tzFieldId = tzEl.value ?? "";   // шлём только если список полей подгружен
+    const respEl = document.getElementById("ctrConnResp");
+    if (respEl) body.responsibleId = respEl.value ?? "";   // шлём только если список менеджеров подгружен
     const key = document.getElementById("ctrConnKey")?.value || "";
     if (key.trim()) body.apiKey = key.trim();   // пусто → не меняем сохранённый
     try {
