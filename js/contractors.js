@@ -100,6 +100,7 @@ async function ctrSync(btn) {
 // ——— Карточка подрядчика ———
 async function ctrOpenDetail(id) {
     ctrCurrentId = Number(id);
+    ctrIntegrationLoaded = false;   // при открытии подрядчика интеграция грузится заново (лениво)
     const list = document.getElementById("contractorsListView");
     const det = document.getElementById("contractorDetailView");
     if (list) list.style.display = "none";
@@ -124,8 +125,12 @@ function ctrRenderDetail(r) {
     const ordRows = orders.length ? orders.map(o => {
         const amount = Number(o.amount) || 0;   // эффективная сумма подрядчику (кастомная или = себестоимость)
         const date = o.created_at_crm || "";
+        const dealId = o.deal_crm_id != null ? Number(o.deal_crm_id) : null;
+        const numCell = o.deal_num
+            ? (dealId ? `<a href="#" class="ctr-ord-link" onclick="ctrOpenDeal(${dealId}); return false;">№ ${ctrEsc(o.deal_num)}</a>` : `№ ${ctrEsc(o.deal_num)}`)
+            : "—";
         return `<tr class="${o.paid ? "ctr-ord--paid" : ""}">
-            <td>${o.deal_num ? `№ ${ctrEsc(o.deal_num)}` : "—"}</td>
+            <td>${numCell}</td>
             <td class="ctr-ord-name">${ctrEsc(o.category_and_name || o.element_name || "—")}</td>
             <td class="ctr-td-num">${Number(o.quantity) || 0} ${ctrEsc(o.units || "шт")}</td>
             <td>${ctrEsc(date)}</td>
@@ -153,14 +158,35 @@ function ctrRenderDetail(r) {
             <div class="ctr-sum-box ctr-sum-po"><span>По PrintOffice</span><b title="справочно">долг ${c.po_debt != null ? ctrMoney(c.po_debt) : "—"} / опл. ${c.po_paid != null ? ctrMoney(c.po_paid) : "—"}</b></div>
         </div>
         ${debt > 0 ? `<div class="ctr-payall-row"><button type="button" class="ctr-btn ctr-btn-primary" onclick="ctrPayAll(${c.id}, ${unpaid.length})">Оплатить всё (${ctrMoney(debt)} ₽)</button></div>` : ""}
-        <div id="ctrIntegrationHost"></div>
-        <div class="ctr-orders-wrap">
-            <table class="ctr-table ctr-orders">
-                <thead><tr><th>Заказ</th><th>Позиция</th><th>Кол-во</th><th>Дата</th><th>Сумма</th><th>Оплата</th><th></th></tr></thead>
-                <tbody>${ordRows}</tbody>
-            </table>
-        </div>`;
-    if (ctrIsAdmin()) ctrLoadIntegration(c.id);
+        <div class="ctr-tabs">
+            <button type="button" class="ctr-tab is-active" data-tab="orders" onclick="ctrSwitchTab(${c.id}, 'orders', this)">Заказы</button>
+            ${ctrIsAdmin() ? `<button type="button" class="ctr-tab" data-tab="integration" onclick="ctrSwitchTab(${c.id}, 'integration', this)">Интеграция</button>` : ""}
+        </div>
+        <div id="ctrTabOrders" class="ctr-tabpanel">
+            <div class="ctr-orders-wrap">
+                <table class="ctr-table ctr-orders">
+                    <thead><tr><th>Заказ</th><th>Позиция</th><th>Кол-во</th><th>Дата</th><th>Сумма</th><th>Оплата</th><th></th></tr></thead>
+                    <tbody>${ordRows}</tbody>
+                </table>
+            </div>
+        </div>
+        <div id="ctrTabIntegration" class="ctr-tabpanel" style="display:none"><div id="ctrIntegrationHost"></div></div>`;
+}
+// Переключение вкладок в карточке подрядчика. Интеграция грузится лениво при первом открытии.
+let ctrIntegrationLoaded = false;
+function ctrSwitchTab(contractorId, tab, btn) {
+    document.querySelectorAll("#contractorDetailView .ctr-tab").forEach(b => b.classList.toggle("is-active", b === btn));
+    const ord = document.getElementById("ctrTabOrders");
+    const integ = document.getElementById("ctrTabIntegration");
+    if (ord) ord.style.display = tab === "orders" ? "" : "none";
+    if (integ) integ.style.display = tab === "integration" ? "" : "none";
+    if (tab === "integration" && !ctrIntegrationLoaded) { ctrIntegrationLoaded = true; ctrLoadIntegration(contractorId); }
+}
+// Открыть сделку (карточку заказа) из списка перезаказов подрядчика.
+function ctrOpenDeal(crmDealId) {
+    if (typeof openDbDealCard === "function") openDbDealCard(Number(crmDealId));
+    else if (typeof loadDbDealCard === "function") loadDbDealCard(Number(crmDealId));
+    else console.warn("Не найдена функция открытия сделки");
 }
 
 // ——— Интеграция: коннектор в CRM подрядчика (только админ) ———
