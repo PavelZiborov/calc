@@ -231,6 +231,12 @@ function ctrRenderIntegration(contractorId) {
     const respField = extUsers.length
         ? `<label class="ctr-field">Ответственный менеджер в CRM подрядчика (к нему добавляется заказ)<select id="ctrConnResp">${respOpts}</select></label>`
         : `<p class="ctr-note">Список менеджеров подрядчика появится после сохранения ключа и «Проверить связь».</p>`;
+    // Ответственный за наименование (позицию) в CRM подрядчика — ставится отдельно от ответственного за сделку.
+    const respElOpts = `<option value="">— не назначать —</option>` +
+        extUsers.map(u => `<option value="${u.id}"${Number(u.id) === Number(c.elementResponsibleId) ? " selected" : ""}>${ctrEsc(u.name)}</option>`).join("");
+    const respElField = extUsers.length
+        ? `<label class="ctr-field">Ответственный за наименование в CRM подрядчика (на позицию)<select id="ctrConnRespEl">${respElOpts}</select></label>`
+        : "";
     // Таблица сопоставления статусов: наш статус → их статус.
     const stRows = extSt.length ? our.map(s => {
         const sel = smap.has(Number(s.id)) ? Number(smap.get(Number(s.id))) : null;
@@ -254,6 +260,7 @@ function ctrRenderIntegration(contractorId) {
         <label class="ctr-field">API-ключ подрядчика<input type="password" id="ctrConnKey" placeholder="${c.hasKey ? "•••••• (задан — оставьте пустым, чтобы не менять)" : "вставьте ключ"}" autocomplete="off"></label>
         <label class="ctr-field">ID клиента в CRM подрядчика<input type="text" inputmode="numeric" id="ctrConnClient" value="${c.extClientId != null ? ctrEsc(String(c.extClientId)) : ""}" placeholder="напр. 783407 (существующий клиент у них)"></label>
         ${respField}
+        ${respElField}
         <label class="ctr-field">Статус-триггер отправки<select id="ctrConnTrigger"><option value="">—</option>${trigOpts}</select></label>
         <label class="ctr-field">Категория позиции по умолчанию<select id="ctrConnDefCat">${defCatOpts}</select></label>
         ${tzField}
@@ -291,6 +298,8 @@ async function ctrSaveConnector(contractorId) {
     if (tzEl) body.tzFieldId = tzEl.value ?? "";   // шлём только если список полей подгружен
     const respEl = document.getElementById("ctrConnResp");
     if (respEl) body.responsibleId = respEl.value ?? "";   // шлём только если список менеджеров подгружен
+    const respElEl = document.getElementById("ctrConnRespEl");
+    if (respElEl) body.elementResponsibleId = respElEl.value ?? "";   // ответственный за наименование
     const key = document.getElementById("ctrConnKey")?.value || "";
     if (key.trim()) body.apiKey = key.trim();   // пусто → не меняем сохранённый
     try {
