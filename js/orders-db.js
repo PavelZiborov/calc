@@ -1364,9 +1364,14 @@ async function dbMgrPick(crmId, responsibleId) {
 }
 // Кэш подрядчиков (для выпадашки «перезаказ»). Обновляется при открытии вкладки «Подрядчики».
 let dbContractorsCache = null;
+let dbReorderDefaultId = null;   // подрядчик по умолчанию (подставляется при включении галочки)
 async function dbEnsureContractors(force) {
     if (dbContractorsCache && !force) return dbContractorsCache;
-    try { const r = await clientsApi("listContractors", {}); dbContractorsCache = Array.isArray(r.contractors) ? r.contractors : []; }
+    try {
+        const r = await clientsApi("listContractors", {});
+        dbContractorsCache = Array.isArray(r.contractors) ? r.contractors : [];
+        dbReorderDefaultId = (r.defaultContractorId != null) ? Number(r.defaultContractorId) : null;
+    }
     catch (e) { console.error("listContractors", e); dbContractorsCache = dbContractorsCache || []; }
     return dbContractorsCache;
 }
@@ -1381,7 +1386,12 @@ function dbToggleReorder() {
     const hq = document.getElementById("dbEditHqSheets");
     if (pick) pick.style.display = on ? "" : "none";
     if (hq) hq.style.display = on ? "none" : "";
-    if (on) dbSyncReorderAmt();   // при включении: сумма подрядчику = текущая себестоимость (если не переопределена)
+    if (on) {
+        // Подставляем подрядчика по умолчанию (если задан в настройках и ещё не выбран).
+        const sel = document.getElementById("dbEditContractor");
+        if (sel && !sel.value && dbReorderDefaultId != null) sel.value = String(dbReorderDefaultId);
+        dbSyncReorderAmt();   // сумма подрядчику = текущая себестоимость (если не переопределена)
+    }
 }
 // Сумма подрядчику: пока не переопределена вручную — равна общей себестоимости позиции.
 function dbSyncReorderAmt() {

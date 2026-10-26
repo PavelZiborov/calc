@@ -4725,7 +4725,7 @@
 .dbo-reorder-paid { color: #1e8e4e; font-size: 13px; font-weight: 600; margin-top: 6px; }
 .dbo-el-reorder { font-size: 12.5px; color: var(--accent-container, #2563eb); margin-top: 2px; }
 .dbo-reorder-paidtag { color: #1e8e4e; font-weight: 600; }
-.dbo-el-pushbtn { margin-left: 8px; padding: 1px 8px; font-size: 11.5px; line-height: 1.5; border: 1px solid var(--accent-container, #2563eb); color: var(--accent-container, #2563eb); background: transparent; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.dbo-el-pushbtn { display: inline-flex; align-items: center; vertical-align: middle; width: auto; margin: 0 0 0 10px; padding: 2px 9px; font-size: 11.5px; font-weight: 600; line-height: 1.5; border: 1px solid var(--accent-container, #2563eb); color: var(--accent-container, #2563eb); background: transparent; border-radius: 999px; cursor: pointer; white-space: nowrap; box-shadow: none; }
 .dbo-el-pushbtn:hover:not(:disabled) { background: var(--accent-container, #2563eb); color: #fff; }
 .dbo-el-pushbtn:disabled { opacity: .6; cursor: default; }
 @media (max-width: 640px) {
@@ -4844,3 +4844,6 @@
 .ctr-map-our { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctr-map-arrow { color: var(--text-muted, #888); font-size: 13px; }
 .ctr-map-row select { font-size: 13px; padding: 3px 6px; }
+.ctr-default-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm, 8px); background: var(--surface-2); }
+.ctr-default-label { font-weight: 600; font-size: 13px; color: var(--text); }
+.ctr-default-row select { font-size: 13px; padding: 4px 8px; }

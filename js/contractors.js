@@ -4,6 +4,7 @@
 
 let ctrListCache = [];
 let ctrCurrentId = null;
+let ctrDefaultContractorId = null;   // подрядчик по умолчанию для перезаказа
 
 function ctrMoney(v) { return (typeof money2 === "function") ? money2(v) : (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function ctrEsc(v) { return (typeof escapeHtml === "function") ? escapeHtml(String(v == null ? "" : v)) : String(v == null ? "" : v); }
@@ -29,7 +30,8 @@ async function ctrLoadList() {
     try {
         const r = await clientsApi("listContractors", {});
         ctrListCache = Array.isArray(r.contractors) ? r.contractors : [];
-        if (typeof dbContractorsCache !== "undefined") dbContractorsCache = ctrListCache;  // синхронизируем кэш выпадашки
+        ctrDefaultContractorId = (r.defaultContractorId != null) ? Number(r.defaultContractorId) : null;
+        if (typeof dbContractorsCache !== "undefined") { dbContractorsCache = ctrListCache; dbReorderDefaultId = ctrDefaultContractorId; }  // синхронизируем кэш выпадашки
         ctrRenderList();
     } catch (e) {
         console.error("listContractors", e);
@@ -55,12 +57,32 @@ function ctrRenderList() {
             <td class="ctr-td-num ctr-po-col">${poDebt != null ? ctrMoney(poDebt) + " ₽" : "—"}</td>
         </tr>`;
     }).join("");
-    host.innerHTML = `<table class="ctr-table">
+    // Подрядчик по умолчанию для перезаказа (подставляется при включении галочки в позиции). Только админ.
+    let defBlock = "";
+    if (ctrIsAdmin()) {
+        const opts = `<option value="">— без конкретного —</option>` +
+            ctrListCache.map(c => `<option value="${c.id}"${Number(c.id) === Number(ctrDefaultContractorId) ? " selected" : ""}>${ctrEsc(c.name)}</option>`).join("");
+        defBlock = `<div class="ctr-default-row">
+            <label class="ctr-default-label">Подрядчик по умолчанию для перезаказа:</label>
+            <select id="ctrDefaultSel" onchange="ctrSetDefaultContractor(this.value)">${opts}</select>
+            <span id="ctrDefaultMsg" class="ctr-note"></span>
+        </div>`;
+    }
+    host.innerHTML = defBlock + `<table class="ctr-table">
         <thead><tr>
             <th>Подрядчик</th><th>Наш долг</th><th>Оплачено нами</th><th>Заказов</th><th class="ctr-po-col" title="Долг по данным PrintOffice (справочно)">Долг PrintOffice</th>
         </tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
+}
+async function ctrSetDefaultContractor(val) {
+    const msg = document.getElementById("ctrDefaultMsg");
+    try {
+        const r = await clientsApi("setReorderDefaultContractor", { contractorId: val || "" });
+        ctrDefaultContractorId = (r.defaultContractorId != null) ? Number(r.defaultContractorId) : null;
+        if (typeof dbReorderDefaultId !== "undefined") dbReorderDefaultId = ctrDefaultContractorId;
+        if (msg) { msg.textContent = "Сохранено"; msg.className = "ctr-note ctr-ok"; setTimeout(() => { if (msg) msg.textContent = ""; }, 1800); }
+    } catch (e) { if (msg) { msg.textContent = "Ошибка: " + (e.message || ""); msg.className = "ctr-note ctr-alert"; } }
 }
 
 async function ctrSync(btn) {
@@ -169,6 +191,13 @@ function ctrRenderIntegration(contractorId) {
     // Дефолт-категория у подрядчика.
     const defCatOpts = `<option value="">— авто (первая/Цифровая печать) —</option>` +
         extCat.map(x => `<option value="${x.id}"${Number(x.id) === Number(c.defaultCategoryId) ? " selected" : ""}>${ctrEsc(x.name)}</option>`).join("");
+    // Поле «Техническое задание» наименования у подрядчика.
+    const extFields = Array.isArray(ctrConnData.extElementFields) ? ctrConnData.extElementFields : [];
+    const tzOpts = `<option value="">— не заполнять —</option>` +
+        extFields.map(x => `<option value="${x.id}"${Number(x.id) === Number(c.tzFieldId) ? " selected" : ""}>${ctrEsc(x.name)}</option>`).join("");
+    const tzField = extFields.length
+        ? `<label class="ctr-field">Поле «Техническое задание» у подрядчика (туда дублируем наименование с категорией)<select id="ctrConnTz">${tzOpts}</select></label>`
+        : `<p class="ctr-note">Поле «Техническое задание» подрядчика появится после сохранения ключа и «Проверить связь».</p>`;
     // Таблица сопоставления статусов: наш статус → их статус.
     const stRows = extSt.length ? our.map(s => {
         const sel = smap.has(Number(s.id)) ? Number(smap.get(Number(s.id))) : null;
@@ -193,6 +222,7 @@ function ctrRenderIntegration(contractorId) {
         <label class="ctr-field">ID клиента в CRM подрядчика<input type="text" inputmode="numeric" id="ctrConnClient" value="${c.extClientId != null ? ctrEsc(String(c.extClientId)) : ""}" placeholder="напр. 783407 (существующий клиент у них)"></label>
         <label class="ctr-field">Статус-триггер отправки<select id="ctrConnTrigger"><option value="">—</option>${trigOpts}</select></label>
         <label class="ctr-field">Категория позиции по умолчанию<select id="ctrConnDefCat">${defCatOpts}</select></label>
+        ${tzField}
         <label class="ctr-check"><input type="checkbox" id="ctrConnActive" ${c.active === false ? "" : "checked"}> Интеграция активна</label>
         <div class="ctr-map-block">
             <div class="ctr-map-title">Сопоставление статусов (наш → подрядчика)</div>
@@ -223,6 +253,8 @@ async function ctrSaveConnector(contractorId) {
         defaultCategoryId: document.getElementById("ctrConnDefCat")?.value ?? "",
         statusMap, categoryMap,
     };
+    const tzEl = document.getElementById("ctrConnTz");
+    if (tzEl) body.tzFieldId = tzEl.value ?? "";   // шлём только если список полей подгружен
     const key = document.getElementById("ctrConnKey")?.value || "";
     if (key.trim()) body.apiKey = key.trim();   // пусто → не меняем сохранённый
     try {
