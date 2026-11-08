@@ -1,10 +1,9 @@
 // --- КОНФИГУРАЦИЯ И СЕССИЯ ---
 let SRA3_W = 320, SRA3_H = 450; // могут переопределяться настройками калькулятора (calc-settings.js)
-const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 // Раздел «Клиенты»: свой бэкенд на сервере (Postgres) — server/backend.
 // Абсолютный адрес → работает с ОБОИХ доменов: с calc.heavendevelop.ru это
 // same-origin, с github.io — кросс-домен (бэкенд отдаёт CORS). Сюда же будем
-// переносить остальные API по мере ухода с n8n.
+// остальные API.
 // Пока основной хостинг не восстановлен, API и CRM живут на временном контуре (домашний
 // сервер, *.netcraze.pro) — для всех доменов фронта, включая GitHub Pages.
 // Возврат на основной сервер: TEMP_BACKEND = false.
@@ -19,7 +18,6 @@ const LOGOUT_URL = CLIENTS_URL.replace(/\/clients$/, "/logout");
 const CALC_URL = CLIENTS_URL.replace(/\/clients$/, "/calculate");
 const SERVER_TIMEOUT_MS = 15000;
 const UPLOAD_TIMEOUT_MS = 120000;
-const DELETE_ASSETS_TIMEOUT_MS = 45000;
 const SERVER_UNAVAILABLE_MESSAGE = "Сервер не отвечает, попробуйте позднее";
 function fetchWithTimeout(url, options = {}, timeoutMs = SERVER_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -156,15 +154,8 @@ function hydrateCurrentUserFromStorage() {
     currentUser = readSession();
 }
 let lastCalcData = null;
-const dealsCache = new Map();
-let dealTabFetchToken = 0;
 const tabScrollPositions = {};
 const ACTIVE_TAB_STORAGE_KEY = "calc_active_tab";
-let lastNonDealTabId = "main-tab";
-let calendarMonth = new Date();
-let calendarRangeStart = "";
-let calendarRangeEnd = "";
-
 function getSessionExpiryTime(session = currentUser) {
     const value = session?.expiresAt;
     if (value == null || value === "") return null;
@@ -382,16 +373,8 @@ function normalizeCategories(categories) {
         .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
-function getCrmStatuses() {
-    return normalizeStatuses(currentUser.statuses);
-}
-
 function getManagers() {
     return normalizeManagers(currentUser.managers);
-}
-
-function getPaymentMethods() {
-    return normalizePaymentMethods(currentUser.paymentMethods);
 }
 
 function getCategories() {

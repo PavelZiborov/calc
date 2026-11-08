@@ -95,7 +95,6 @@ async function attemptLogin(event) {
 
         if (response.ok && data?.role && token) {
             currentUser = buildUserSession({ ...data, token }, email);
-            if (typeof applyUserPrefsFromAuth === "function") applyUserPrefsFromAuth(data);
             if (!persistSession(currentUser)) {
                 if (errorDiv) {
                     errorDiv.innerText = "Не удалось сохранить сессию. Проверьте, что браузер не блокирует localStorage (режим инкognito, настройки приватности).";
@@ -104,7 +103,6 @@ async function attemptLogin(event) {
             }
             toggleAuthModal(false);
             applyPermissions();
-            if (typeof initStaffUserPrefs === "function") initStaffUserPrefs();
             if (typeof refreshCalcMaterials === "function") refreshCalcMaterials();
         } else if (errorDiv) {
             errorDiv.innerText = data?.error || "Неверный email или пароль";
@@ -128,41 +126,17 @@ function logout() {
     toggleAuthModal(false);
     localStorage.removeItem("calc_session");
     sessionStorage.removeItem("calc_session_meta");
-    clearOpenDealState();
     location.reload();
 }
 
 function applyPermissions() {
-    const crmContainer = document.getElementById("crm-search-container");
-    const searchRow = crmContainer ? crmContainer.querySelector(".row") : null;
-
     updateAuthModalUi();
 
     if (isUserLoggedIn()) {
-        if (crmContainer) crmContainer.style.display = "block";   // легаси-блок удалён — может отсутствовать
-
-        if (currentUser.role === "client" && searchRow) {
-            searchRow.innerHTML = `
-                <div class="col">
-                    <button onclick="searchCRM('main')" style="margin-top:0; background: var(--accent);">
-                        ${typeof icon === "function" ? icon("refresh") : ""} Загрузить список моих заказов
-                    </button>
-                </div>`;
-        }
-
         if (currentUser.role === "staff") {
             document.querySelectorAll(".gated-nav").forEach(el => { el.style.display = ""; });
             const isAdmin = typeof isCurrentUserAdmin === "function" && isCurrentUserAdmin();
             document.querySelectorAll(".admin-nav").forEach(el => { el.style.display = isAdmin ? "" : "none"; });
-            fillStatusFilter();
-            fillManagerFilter();
-        } else {
-            localStorage.setItem(CRM_VIEW_STORAGE_KEY, "list");
         }
-
-        document.querySelectorAll("#adv-search-container .crm-view-toggle").forEach(el => {
-            el.style.display = currentUser.role === "staff" ? "" : "none";
-        });
-        if (typeof applyCrmViewLayoutClass === "function") applyCrmViewLayoutClass();
     }
 }

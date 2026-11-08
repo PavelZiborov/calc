@@ -27,10 +27,6 @@ function switchTab(id, trigger = null) {
     const currentTab = document.querySelector('.tab-content.active');
     if (currentTab) {
         tabScrollPositions[currentTab.id] = window.scrollY || window.pageYOffset || 0;
-        if (currentTab.id === "search-tab" && typeof saveAdvKanbanScrollState === "function") {
-            saveAdvKanbanScrollState();
-        }
-        if (currentTab.id !== "deal-tab") lastNonDealTabId = currentTab.id;
     }
 
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -50,37 +46,9 @@ function switchTab(id, trigger = null) {
 
     requestAnimationFrame(() => {
         window.scrollTo(0, tabScrollPositions[id] || 0);
-        if (typeof applyCrmViewLayoutClass === "function") applyCrmViewLayoutClass();
-        if (id === "search-tab" && typeof runAdvSearchOnTabOpen === "function") {
-            runAdvSearchOnTabOpen();
-        }
     });
 }
 
-function restoreAppUiState() {
-    if (currentUser.role !== "staff" && currentUser.role !== "client") return;
-
-    const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || "main-tab";
-
-    if (savedTab === "search-tab" && currentUser.role === "staff") {
-        // активной делаем вкладку под текущий режим: Канбан → доска, Заказы → список
-        const isKanban = typeof getCrmViewMode === "function" && getCrmViewMode() === "kanban";
-        const btn = document.getElementById(isKanban ? "kanban-nav-btn" : "adv-tab-btn")
-            || document.getElementById("adv-tab-btn");
-        if (btn) {
-            switchTab("search-tab", btn);
-            return;
-        }
-    }
-
-    if (savedTab === "deal-tab" && typeof readOpenDealState === "function") {
-        const saved = readOpenDealState();
-        if (saved?.dealId && typeof restoreOpenDealTab === "function") {
-            restoreOpenDealTab();
-            return;
-        }
-    }
-}
 function fillOptions(id, data, def) { let el = document.getElementById(id); el.innerHTML = ""; data.forEach(i => { let o = document.createElement("option"); o.value = i[1]; o.text = i[0]; if (i[0] === def) o.selected = true; el.appendChild(o); }); }
 function fillFormatOptions(p) { let el = document.getElementById("format"); el.innerHTML = ""; let data = (p === "Наклейка") ? stickerFormats : (p === "Стикерпак" ? stickerPackFormats : commonFormats); for (let k in data) { let o = document.createElement("option"); o.value = k; o.text = Array.isArray(data[k]) ? `${k} (${data[k][0]}x${data[k][1]} мм)` : data[k]; el.appendChild(o); } }
 function setFormat() {
@@ -522,29 +490,6 @@ function transliterateFileNamePart(value) {
         .split("")
         .map(ch => CYRILLIC_TO_LATIN[ch] ?? ch)
         .join("");
-}
-
-function toSafeUploadFileName(name, fallback = "file") {
-    const normalized = String(name || "").normalize("NFC").trim();
-    if (!normalized) return `${fallback}.bin`;
-
-    const lastDot = normalized.lastIndexOf(".");
-    let base = lastDot > 0 ? normalized.slice(0, lastDot) : normalized;
-    let ext = lastDot > 0 ? normalized.slice(lastDot + 1) : "";
-
-    ext = ext.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-    if (ext === "jpeg") ext = "jpg";
-
-    base = transliterateFileNamePart(base)
-        .replace(/[/\\?%*:|"<>]/g, "_")
-        .replace(/[^\w\s.\-+()]/g, "_")
-        .replace(/[\s_]+/g, "_")
-        .replace(/^_+|_+$/g, "")
-        .slice(0, 150);
-
-    if (!base) base = fallback;
-
-    return ext ? `${base}.${ext}` : base;
 }
 
 function extractSra3SheetsFromTechInfo(techInfoHtml) {

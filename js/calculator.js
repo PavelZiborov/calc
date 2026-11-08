@@ -11,7 +11,7 @@ async function calc() {
 
     // Для каталогов нормализуем только layout для серверного расчета:
     // A4 -> 2 разворота, A5 -> 4 разворота, A6 -> 8 разворотов на SRA3.
-    // Полосность отправляем исходную, иначе n8n посчитает листы в 2 раза меньше.
+    // Полосность отправляем исходную, иначе бэкенд посчитает листы в 2 раза меньше.
     let layoutForRequest = lay;
     if (type === "catalog") {
         const divisor = getCatalogDivisorBySize(width, height);
@@ -139,7 +139,7 @@ async function calc() {
                 if (gearEl) gearEl.style.display = "inline-flex";
                 const roundRow = document.getElementById("recRoundRow");
                 if (roundRow) roundRow.style.display = "";
-                // Берём структурированные данные из n8n; локальный расчёт оставляем как fallback.
+                // Берём структурированные данные с бэкенда; локальный расчёт оставляем как fallback.
                 lastCalcData.sra3Sheets = toFiniteNumber(
                     result.totalSheets ?? result.lastCalc?.totalSheets,
                     calculateSra3Sheets(type, tir, lay)

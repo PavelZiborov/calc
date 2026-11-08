@@ -4186,11 +4186,7 @@ async function renderNotifySettingsInline() {
         <label class="dbo-edit-wide">Секрет вебхука (любая длинная строка)
             <input type="text" id="dboTgSecret" value="${escapeHtml(s.webhookSecret || "")}" placeholder="сгенерируйте случайную строку" autocomplete="off">
         </label>
-        <p class="dbo-ya-hint">Подписки клиентов (кнопка «Старт» в боте) можно ловить одним из способов:</p>
-        <ul class="dbo-ya-hint" style="margin:4px 0 0 16px;">
-            <li>указать вебхук бота на:<br><code style="word-break:break-all;">${wh ? escapeHtml(wh) : "— (сначала задайте секрет и сохраните)"}</code></li>
-            <li>или из n8n-бота слать <code>POST ${escapeHtml(s.subscribeUrl || "/api/telegram/subscribe")}</code> с заголовком <code>X-Sync-Secret: &lt;секрет&gt;</code> и телом <code>{chat_id, username, first_name}</code>.</li>
-        </ul>
+        <p class="dbo-ya-hint">Подписки клиентов (кнопка «Старт» в боте) ловит вебхук бота:<br><code style="word-break:break-all;">${wh ? escapeHtml(wh) : "— (сначала задайте секрет и сохраните)"}</code></p>
         <div class="settings-actions">
             <button class="dbo-btn dbo-btn-primary" onclick="dboSaveTelegramSettings()">Сохранить</button>
         </div>

@@ -212,7 +212,7 @@ function renderClientsTable() {
         <div class="clients-count">Всего клиентов: <b>${clientsState.items.length}</b></div>`;
 }
 
-// ---- Добавление клиента (пишет в БД + дублирует в CRM на стороне n8n) ----
+// ---- Добавление клиента (пишет в БД + дублирует в CRM через бэкенд) ----
 function toggleClientForm(show) {
     const form = document.getElementById("clientAddForm");
     if (!form) return;

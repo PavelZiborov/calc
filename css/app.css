@@ -3639,8 +3639,6 @@
         text-transform: uppercase;
         color: #fff;
     }
-    /* Легаси-разделы на n8n («Заказы»/«Канбан») временно скрыты (перенос не завершён). */
-    .legacy-n8n-hidden { display: none !important; }
     /* Компактные вкладки (карточка заказа и карточка клиента) */
     .hp-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; padding: 0; }
     .hp-tabs[hidden] { display: none !important; }   /* иначе display:flex перебивает атрибут hidden */
