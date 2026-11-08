@@ -2414,7 +2414,7 @@ function renderDbDealCard(data, crmId) {
         <div class="dbo-card${dbLocked ? " dbo-card--locked" : ""}" role="dialog" aria-modal="true">
             <div class="dbo-head">
                 <div class="dbo-head-left">
-                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button>${dbClientClickable ? `<button type="button" class="dbo-num-copy" onclick="dbNewDealForClient(${Number(d.client_crm_id)}, this)" title="Создать новый пустой заказ для этого клиента" aria-label="Новый заказ для клиента">${DBO_NEWDEAL_ICON}</button>` : ""}<a class="dbo-num-copy dbo-num-crm" href="https://crm.heavendevelop.ru/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в PrintOffice" aria-label="Открыть в PrintOffice">↗</a></div>
+                    <div class="dbo-num">№ ${escapeHtml(String(d.num ?? crmId))}<button type="button" class="dbo-num-copy" onclick="dbCopyDeal(${crmId}, this)" title="Создать копию заказа (без макетов)" aria-label="Создать копию заказа">${DBO_COPY_ICON}</button>${dbClientClickable ? `<button type="button" class="dbo-num-copy" onclick="dbNewDealForClient(${Number(d.client_crm_id)}, this)" title="Создать новый пустой заказ для этого клиента" aria-label="Новый заказ для клиента">${DBO_NEWDEAL_ICON}</button>` : ""}<a class="dbo-num-copy dbo-num-crm" href="${CRM_WEB_URL}/editDeal/${crmId}" target="_blank" rel="noopener" title="Открыть в PrintOffice" aria-label="Открыть в PrintOffice">↗</a></div>
                     ${(d.created_at_crm || d.employee_name) ? `<div class="dbo-head-meta">${[
                         d.created_at_crm ? `<b>${escapeHtml(d.created_at_crm)}</b>` : "",
                         d.employee_name ? `Менеджер: <b>${escapeHtml(d.employee_name)}</b>` : ""
@@ -2686,7 +2686,7 @@ function dbNotifyRender(dealId) {
                     ${ddOptionsHtml}
                     <div class="deal-notify-dd-foot">
                         <button type="button" class="deal-notify-dd-add" onclick="dbNotifyOpenForm(${dealId})">+ Добавить</button>
-                        ${clientId ? `<a class="deal-notify-dd-crm" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" onclick="dbNotifyCloseDropdown()">Добавить в CRM ↗</a>` : ""}
+                        ${clientId ? `<a class="deal-notify-dd-crm" href="${CRM_WEB_URL}/editClient/${clientId}" target="_blank" rel="noopener" onclick="dbNotifyCloseDropdown()">Добавить в CRM ↗</a>` : ""}
                     </div>
                 </div>
                 ${hasSelection ? `<div class="dbo-notify-menu-sec">

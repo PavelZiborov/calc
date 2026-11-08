@@ -152,7 +152,7 @@ function money(n) {
 
 function clientRowHtml(c) {
     const crmLink = c.crmId
-        ? `<a class="clients-crm-link" href="https://crm.heavendevelop.ru/editClient/${c.crmId}" target="_blank" rel="noopener" title="Открыть клиента в CRM">↗</a>`
+        ? `<a class="clients-crm-link" href="${CRM_WEB_URL}/editClient/${c.crmId}" target="_blank" rel="noopener" title="Открыть клиента в CRM">↗</a>`
         : "";
     const phone = c.mobile || c.landline || "";
     const debtHtml = c.debt > 0.009
@@ -374,7 +374,7 @@ function renderClientCard(data, crmId) {
     const contactBits = [c.contactName, c.mobile || c.landline, c.email].filter(Boolean);
     const sub = contactBits.map(escapeHtml).join(" · ");
     const crmLink = crmId
-        ? `<a class="client-card-crm" href="https://crm.heavendevelop.ru/editClient/${crmId}" target="_blank" rel="noopener">В CRM ↗</a>`
+        ? `<a class="client-card-crm" href="${CRM_WEB_URL}/editClient/${crmId}" target="_blank" rel="noopener">В CRM ↗</a>`
         : "";
 
     const balanceCls = c.balance < -0.009 ? "is-negative" : (c.balance > 0.009 ? "is-positive" : "");

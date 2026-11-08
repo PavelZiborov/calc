@@ -5,7 +5,13 @@ const N8N_URL = "https://n8n.heavenprint.digital/webhook/search-crm";
 // Абсолютный адрес → работает с ОБОИХ доменов: с calc.heavendevelop.ru это
 // same-origin, с github.io — кросс-домен (бэкенд отдаёт CORS). Сюда же будем
 // переносить остальные API по мере ухода с n8n.
-const CLIENTS_URL = "https://calc.heavendevelop.ru/api/clients";
+// Пока основной хостинг не восстановлен, API и CRM живут на временном контуре (домашний
+// сервер, *.netcraze.pro) — для всех доменов фронта, включая GitHub Pages.
+// Возврат на основной сервер: TEMP_BACKEND = false.
+const TEMP_BACKEND = true;
+const API_ORIGIN = TEMP_BACKEND ? "https://calc.assistant88.netcraze.pro" : "https://calc.heavendevelop.ru";
+const CRM_WEB_URL = TEMP_BACKEND ? "https://crm.assistant88.netcraze.pro" : "https://crm.heavendevelop.ru";
+const CLIENTS_URL = `${API_ORIGIN}/api/clients`;
 // Своя авторизация (ушли от n8n): вход/выход через собственный бэкенд.
 const LOGIN_URL = CLIENTS_URL.replace(/\/clients$/, "/login");
 const LOGOUT_URL = CLIENTS_URL.replace(/\/clients$/, "/logout");

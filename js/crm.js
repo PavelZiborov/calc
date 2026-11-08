@@ -1526,7 +1526,7 @@ function renderElementColsHeader(options = {}) {
 }
 
 function getDealUrl(dealId) {
-    return `https://crm.heavendevelop.ru/editDeal/${dealId}`;
+    return `${CRM_WEB_URL}/editDeal/${dealId}`;
 }
 
 function openCrmDealUrl(dealId) {
@@ -3021,7 +3021,7 @@ function normalizeRequisitesList(list) {
 
 function openClientRequisitesEditor(clientId) {
     if (!clientId) return;
-    window.open(`https://crm.heavendevelop.ru/editClient/${clientId}`, "_blank", "noopener");
+    window.open(`${CRM_WEB_URL}/editClient/${clientId}`, "_blank", "noopener");
 }
 
 async function fetchClientRequisites(clientId) {
@@ -3262,7 +3262,7 @@ function renderDealNotifyBody(dealId, state) {
                     ${ddOptionsHtml}
                     <div class="deal-notify-dd-foot">
                         <button type="button" class="deal-notify-dd-add" onclick="openDealContactForm(${dealId})">+ Добавить</button>
-                        ${clientId ? `<a class="deal-notify-dd-crm" href="https://crm.heavendevelop.ru/editClient/${clientId}" target="_blank" rel="noopener" onclick="closeAllNotifyDropdowns()" title="Добавить контакт в карточке клиента в CRM">Добавить в CRM ↗</a>` : ""}
+                        ${clientId ? `<a class="deal-notify-dd-crm" href="${CRM_WEB_URL}/editClient/${clientId}" target="_blank" rel="noopener" onclick="closeAllNotifyDropdowns()" title="Добавить контакт в карточке клиента в CRM">Добавить в CRM ↗</a>` : ""}
                     </div>
                 </div>
             </div>
@@ -5290,7 +5290,7 @@ function createDealCardById(id) {
     card.innerHTML = `
         <div class="crm-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
             <div class="deal-num" style="font-weight: bold; font-size: 16px;">
-                <a href="https://crm.heavendevelop.ru/editDeal/${id}" target="_blank" style="color: var(--accent); text-decoration: none;">№ ${id} ${icon("link")}</a>
+                <a href="${CRM_WEB_URL}/editDeal/${id}" target="_blank" style="color: var(--accent); text-decoration: none;">№ ${id} ${icon("link")}</a>
                 <small style="font-weight:normal; color:#888; margin-left:8px;">новая сделка</small>
             </div>
             <div class="status-badge" style="background:#eaf3ff; color:#2f7df6;">Новая</div>
