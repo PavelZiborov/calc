@@ -4,10 +4,9 @@ let SRA3_W = 320, SRA3_H = 450; // могут переопределяться �
 // Абсолютный адрес → работает с ОБОИХ доменов: с calc.heavendevelop.ru это
 // same-origin, с github.io — кросс-домен (бэкенд отдаёт CORS). Сюда же будем
 // остальные API.
-// Пока основной хостинг не восстановлен, API и CRM живут на временном контуре (домашний
-// сервер, *.netcraze.pro) — для всех доменов фронта, включая GitHub Pages.
-// Возврат на основной сервер: TEMP_BACKEND = false.
-const TEMP_BACKEND = true;
+// TEMP_BACKEND = true — API и CRM временного контура (домашний сервер, *.netcraze.pro), был
+// включён после атаки на хостинг. С 15.11.2026 работаем на боевом сервере (*.heavendevelop.ru).
+const TEMP_BACKEND = false;
 const API_ORIGIN = TEMP_BACKEND ? "https://calc.assistant88.netcraze.pro" : "https://calc.heavendevelop.ru";
 const CRM_WEB_URL = TEMP_BACKEND ? "https://crm.assistant88.netcraze.pro" : "https://crm.heavendevelop.ru";
 const CLIENTS_URL = `${API_ORIGIN}/api/clients`;
